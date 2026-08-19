@@ -1,0 +1,51 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# testing
+/coverage
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+.pnpm-debug.log*
+
+# lockfiles from other package managers (use pnpm-lock.yaml)
+package-lock.json
+yarn.lock
+
+# env files
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# generated prisma client — postinstall/build already regenerate it, so committing it
+# is pure bloat that can drift from prisma/schema.prisma
+/src/generated/
+
+# playwright mcp debug output
+/*.png
+.playwright-mcp/
+
+# claude code
+.claude/
+.skills/
+.agents/
+skills-lock.json
+
+# scratch notes, research dumps — not part of the app
+/tmp/

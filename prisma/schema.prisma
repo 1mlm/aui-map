@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Tag {
+  id    String  @id
+  label String
+  // key into the app's icon registry (src/map/iconRegistry.ts) — a HugeIcon's
+  // path data isn't something postgres can hold, so only the lookup key is stored
+  icon  String
+  color String?
+  pins  Pin[]
+}
+
+model Pin {
+  id           String       @id
+  // kept as the existing short slugs (m6l, b4, ...) rather than a generated id,
+  // so ?focus= deep links into the map keep working unchanged
+  title        String
+  aliases      String[]
+  description  String?
+  latitude     Float
+  longitude    Float
+  // curated place link (reviews/photos) some pins get by hand — overrides the
+  // coordinate-search link the maps menu would otherwise build. https-only, checked in upsertPin
+  mapsUrl      String?
+  // freeform, e.g. "Mon-Thu 8am-12am, Fri 8am-6pm" — formats vary too much per place for a
+  // structured schedule to be worth it. ramadanHours only shown (via a small reveal) when set
+  hours        String?
+  ramadanHours String?
+  phone        String?
+  email        String?
+  tagId        String
+  tag          Tag          @relation(fields: [tagId], references: [id])
+  attachments  Attachment[]
+  submissions  Submission[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Attachment {
+  id          String   @id @default(cuid())
+  url         String
+  // null on attachments created before file-type support existed — those are all images,
+  // so render code treats a null mimeType as "image/*" rather than backfilling a lie
+  mimeType    String?
+  fileName    String?
+  caption     String?
+  // at most one true per pin, enforced in the server action rather than the
+  // schema — a partial unique index isn't expressible in Prisma's declarative syntax
+  isThumbnail Boolean  @default(false)
+  // manual admin ordering within a pin's gallery, independent of postedAt
+  order       Int      @default(0)
+  postedAt    DateTime @default(now())
+  pinId       String
+  pin         Pin      @relation(fields: [pinId], references: [id], onDelete: Cascade)
+}
+
+enum SubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// a visitor-contributed file for a pin — a photo, but also a video, a menu PDF, a floor plan,
+// a spreadsheet, whatever. Approving one promotes it into that pin's Attachment gallery, typed
+// and rendered per its mimeType
+model Submission {
+  id          String           @id @default(cuid())
+  pinId       String
+  pin         Pin              @relation(fields: [pinId], references: [id], onDelete: Cascade)
+  fileUrl     String
+  fileName    String
+  mimeType    String
+  caption     String?
+  status      SubmissionStatus @default(PENDING)
+  submittedAt DateTime         @default(now())
+  reviewedAt  DateTime?
+}
+
+// general feedback/bug reports from the bulb icon on the public map — not tied to a pin
+model Suggestion {
+  id          String   @id @default(cuid())
+  message     String
+  submittedAt DateTime @default(now())
+  resolved    Boolean  @default(false)
+}

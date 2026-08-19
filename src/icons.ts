@@ -1,0 +1,143 @@
+import {
+  AlignLeftIcon,
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
+  Atm01Icon,
+  Briefcase01Icon,
+  BulbIcon,
+  CallIcon,
+  Cancel01Icon,
+  CaptionsIcon,
+  CheckIcon,
+  CheckmarkCircle02Icon,
+  ClinicIcon,
+  Clock01Icon,
+  Copy01Icon,
+  CopyCheckIcon,
+  Csv01Icon,
+  Cursor02Icon,
+  Delete02Icon,
+  Edit02Icon,
+  FavouriteIcon,
+  File01Icon,
+  FileAddIcon,
+  FileAttachmentIcon,
+  FileSpreadsheetIcon,
+  FilterIcon,
+  FlaskConicalIcon,
+  FloppyDiskIcon,
+  Folder01Icon,
+  Github,
+  Gps02Icon,
+  IdCardLanyardIcon,
+  IdIcon,
+  Image02Icon,
+  ImageAdd02Icon,
+  Loading01Icon,
+  Location01Icon,
+  Location02Icon,
+  LogoutIcon,
+  Mail01Icon,
+  MapsIcon,
+  Message01Icon,
+  MoonIcon,
+  MoreHorizontalIcon,
+  Mosque01Icon,
+  PaintBoardIcon,
+  Pdf01Icon,
+  PlusSignIcon,
+  RefreshIcon,
+  Search02Icon,
+  SentIcon,
+  Tag01Icon,
+  Target01Icon,
+  TextIcon,
+  TheaterIcon,
+  Upload01Icon,
+  Video01Icon,
+  WashingMachineIcon,
+} from "@hugeicons/core-free-icons"
+import type { HugeIcon } from "@/components/Icon"
+
+// single source of truth for every icon used outside the ported shadcn/table/app-nav internals
+// (those own their icons as implementation detail, not app concepts) and the db-backed tag icon
+// registry (see map/iconRegistry.ts, which is per-tag and admin-editable, a different concern).
+// change a glyph here and every place that concept shows up follows.
+export const ICONS = {
+  // map chrome
+  // Location02Icon's teardrop bottoms out at a specific fraction of its viewBox, not the very
+  // bottom — MapPin.tsx and PinPositionEditor.tsx both calibrate a tip offset against this exact
+  // glyph's geometry. Swapping it means re-measuring via /debug/pin, not just changing this line.
+  pin: Location02Icon,
+  place: Location01Icon,
+  target: Target01Icon,
+  cursor: Cursor02Icon,
+  gps: Gps02Icon,
+  search: Search02Icon,
+  filter: FilterIcon,
+  clear: Cancel01Icon,
+  close: Cancel01Icon,
+  copy: Copy01Icon,
+  copied: CopyCheckIcon,
+  openExternalMap: MapsIcon,
+  loading: Loading01Icon,
+  github: Github,
+  beta: FlaskConicalIcon,
+
+  // suggestions & contribute
+  suggestions: BulbIcon,
+  send: SentIcon,
+  success: CheckmarkCircle02Icon,
+  upload: Upload01Icon,
+  contribute: FileAddIcon,
+  caption: CaptionsIcon,
+  photo: Image02Icon,
+  photos: ImageAdd02Icon,
+  files: Folder01Icon,
+  carouselPrev: ArrowLeft01Icon,
+  carouselNext: ArrowRight01Icon,
+
+  // admin fields & table columns
+  id: IdIcon,
+  text: TextIcon,
+  description: AlignLeftIcon,
+  aliases: AlignLeftIcon,
+  tag: Tag01Icon,
+  color: PaintBoardIcon,
+  edit: Edit02Icon,
+  add: PlusSignIcon,
+  save: FloppyDiskIcon,
+  delete: Delete02Icon,
+  thumbnail: FavouriteIcon,
+  moreActions: MoreHorizontalIcon,
+  check: CheckIcon,
+  reopen: RefreshIcon,
+  clock: Clock01Icon,
+  message: Message01Icon,
+  ramadan: MoonIcon,
+  phone: CallIcon,
+  email: Mail01Icon,
+
+  // submission file types
+  video: Video01Icon,
+  pdf: Pdf01Icon,
+  csv: Csv01Icon,
+  spreadsheet: FileSpreadsheetIcon,
+  fileGeneric: File01Icon,
+
+  // nav
+  navSubmissions: FileAttachmentIcon,
+  logout: LogoutIcon,
+
+  // least-obvious picks for concepts not wired to anything yet — "Special" currently covers admin
+  // offices, the clinic, the mosque, laundry, and the ATM (see prisma/seed-data.ts). splitting
+  // those into their own tags later means picking icons anyway, so these are pre-picked starting
+  // points, not currently referenced by any component.
+  auditorium: TheaterIcon,
+  service: IdCardLanyardIcon,
+  business: Briefcase01Icon,
+  health: ClinicIcon,
+  worship: Mosque01Icon,
+  laundry: WashingMachineIcon,
+  atm: Atm01Icon,
+} satisfies Record<string, HugeIcon>
