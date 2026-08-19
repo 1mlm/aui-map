@@ -33,7 +33,7 @@ export const SEED_PINS: {
     title: "Mohammed VI Library",
     aliases: ["M6L", "The Library", "Bibliothèque"],
     description:
-      "Main campus library — study floors, group rooms, and the quietest wifi on campus.",
+      "Main campus library. Study floors, group rooms, and wifi that covers the whole building. Stays open past midnight most nights, later during midterms, and 24/7 during finals.",
     tagId: "academic",
     coord: "33.539911, -5.107359",
     attachmentCount: 2,
@@ -79,7 +79,7 @@ export const SEED_PINS: {
   {
     id: "health-center",
     title: "Health Center",
-    description: "Campus clinic — walk-ins welcome, open weekdays.",
+    description: "Campus clinic. Walk-ins welcome, open weekdays.",
     tagId: "other",
     coord: "33.540264, -5.105466",
   },
@@ -139,7 +139,7 @@ export const SEED_PINS: {
     id: "linstant",
     title: "L'instant Cafeteria",
     aliases: ["Cafeteria", "L'instant", "Caf"],
-    description: "The default lunch spot — expect a line around noon.",
+    description: "The default lunch spot. Expect a line around noon.",
     tagId: "food",
     coord: "33.539231, -5.106101",
     attachmentCount: 3,

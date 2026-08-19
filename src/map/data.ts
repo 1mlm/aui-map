@@ -75,7 +75,7 @@ const rawMapItems: {
     title: "Mohammed VI Library",
     aliases: ["M6L", "The Library", "Bibliothèque"],
     description:
-      "Main campus library — study floors, group rooms, and the quietest wifi on campus.",
+      "Main campus library. Study floors, group rooms, and wifi that covers the whole building. Stays open past midnight most nights, later during midterms, and 24/7 during finals.",
     tag: "academic",
     coord: "33.539911, -5.107359",
     attachmentCount: 2,
@@ -121,7 +121,7 @@ const rawMapItems: {
   {
     id: "health-center",
     title: "Health Center",
-    description: "Campus clinic — walk-ins welcome, open weekdays.",
+    description: "Campus clinic. Walk-ins welcome, open weekdays.",
     tag: "other",
     coord: "33.540264, -5.105466",
   },
@@ -181,7 +181,7 @@ const rawMapItems: {
     id: "linstant",
     title: "L'instant Cafeteria",
     aliases: ["Cafeteria", "L'instant", "Caf"],
-    description: "The default lunch spot — expect a line around noon.",
+    description: "The default lunch spot. Expect a line around noon.",
     tag: "food",
     coord: "33.539231, -5.106101",
     attachmentCount: 3,
