@@ -38,21 +38,24 @@ export function FormDialog({
 }) {
   return (
     <Dialog {...{ open, onOpenChange }}>
-      <DialogContent className={cn("corner-squircle sm:max-w-md", className)}>
+      {/* capped at viewport height with the field list scrolling on its own — otherwise a dialog
+          with enough fields (this one included) grows past the viewport with no way to reach
+          the footer at all */}
+      <DialogContent className={cn("corner-squircle flex max-h-[85vh] flex-col sm:max-w-md", className)}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription className="sr-only">{description}</DialogDescription>
         </DialogHeader>
-        <div className="flex min-w-0 flex-col gap-4">
+        <div className="flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto">
           {children}
           <FormError>{error}</FormError>
-          <DialogFooter className={secondaryAction ? "sm:justify-between" : undefined}>
-            {secondaryAction}
-            <SubmitButton icon={submitIcon} {...{ pending }} onClick={onSubmit}>
-              {submitLabel}
-            </SubmitButton>
-          </DialogFooter>
         </div>
+        <DialogFooter className={secondaryAction ? "sm:justify-between" : undefined}>
+          {secondaryAction}
+          <SubmitButton icon={submitIcon} {...{ pending }} onClick={onSubmit}>
+            {submitLabel}
+          </SubmitButton>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
