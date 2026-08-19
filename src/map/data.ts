@@ -430,6 +430,7 @@ export const MAP_ITEMS: MapItem[] = rawMapItems.map(
     ramadanHours: null,
     phone: null,
     email: null,
+    links: [],
     tag: MAP_TAGS[tag],
     attachments: Array.from({ length: attachmentCount ?? 0 }, (_, i) => ({
       id: `${id}-${i}`,

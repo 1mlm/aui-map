@@ -16,6 +16,20 @@ export type MapItemAttachment = {
   fileName: string | null
 }
 
+export type PinLink = { label: string; url: string }
+
+function isPinLink(value: unknown): value is PinLink {
+  if (typeof value !== "object" || value === null) return false
+  const { label, url } = value as Record<string, unknown>
+  return typeof label === "string" && typeof url === "string"
+}
+
+// Pin.links is a Postgres Json column — defensive parsing here rather than trusting the db's
+// JsonValue shape, since nothing stops a stray write from putting something malformed in it
+export function parsePinLinks(value: unknown): PinLink[] {
+  return Array.isArray(value) ? value.filter(isPinLink) : []
+}
+
 export type MapItem = {
   id: string
   title: string
@@ -32,6 +46,7 @@ export type MapItem = {
   ramadanHours: string | null
   phone: string | null
   email: string | null
+  links: PinLink[]
   tag: MapItemTag
   attachments: MapItemAttachment[]
 }

@@ -1,5 +1,5 @@
 import { tagRowToMapItemTag } from "@/map/mapItemFromDb"
-import type { MapItemTag } from "@/map/types"
+import { type MapItemTag, parsePinLinks } from "@/map/types"
 import { prisma } from "@/utils/prisma"
 import type { AdminPin } from "./PinDialog"
 import { PinsTable } from "./PinsTable"
@@ -27,6 +27,7 @@ export default async function AdminPinsPage() {
     ramadanHours: pin.ramadanHours,
     phone: pin.phone,
     email: pin.email,
+    links: parsePinLinks(pin.links),
     tagId: pin.tagId,
     attachments: pin.attachments.map((attachment) => ({
       id: attachment.id,

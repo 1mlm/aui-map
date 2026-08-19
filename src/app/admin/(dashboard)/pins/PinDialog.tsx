@@ -7,7 +7,8 @@ import { FormDialog } from "@/components/FormDialog"
 import { Icon } from "@/components/Icon"
 import { ICONS } from "@/icons"
 import { MAP_BOUNDING_BOX } from "@/map/geo"
-import type { MapItemTag } from "@/map/types"
+import type { MapItemTag, PinLink } from "@/map/types"
+import { Button } from "@/shadcn/ui/button"
 import { Input } from "@/shadcn/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shadcn/ui/select"
 import { Textarea } from "@/shadcn/ui/textarea"
@@ -38,11 +39,69 @@ export type AdminPin = {
   ramadanHours: string | null
   phone: string | null
   email: string | null
+  links: PinLink[]
   tagId: string
   attachments: AttachmentRow[]
 }
 
 const INPUT_CLASS = "corner-squircle"
+
+// a client-only key so React can track each row across edits/deletes — PinLink itself has
+// no stable id, and label+url alone isn't unique while a row is still being typed into
+type EditableLink = PinLink & { key: string }
+
+function LinksEditor({
+  links,
+  onChange,
+}: {
+  links: EditableLink[]
+  onChange: (links: EditableLink[]) => void
+}) {
+  function updateLink(key: string, patch: Partial<PinLink>) {
+    onChange(links.map((link) => (link.key === key ? { ...link, ...patch } : link)))
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {links.map((link) => (
+        <div key={link.key} className="flex items-center gap-2">
+          <Input
+            placeholder="Label, e.g. Instagram"
+            value={link.label}
+            onChange={(e) => updateLink(link.key, { label: e.target.value })}
+            className={`${INPUT_CLASS} flex-1`}
+          />
+          <Input
+            placeholder="https://…"
+            value={link.url}
+            onChange={(e) => updateLink(link.key, { url: e.target.value })}
+            className={`${INPUT_CLASS} flex-[2]`}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="shrink-0 rounded-full corner-squircle"
+            onClick={() => onChange(links.filter((l) => l.key !== link.key))}
+            aria-label="Remove link"
+          >
+            <Icon icon={ICONS.delete} className="size-3.5" />
+          </Button>
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="self-start rounded-full corner-squircle"
+        onClick={() => onChange([...links, { key: crypto.randomUUID(), label: "", url: "" }])}
+      >
+        <Icon icon={ICONS.add} />
+        Add link
+      </Button>
+    </div>
+  )
+}
 
 export function PinDialog({
   pin,
@@ -66,6 +125,9 @@ export function PinDialog({
   const [ramadanHours, setRamadanHours] = useState(pin.ramadanHours ?? "")
   const [phone, setPhone] = useState(pin.phone ?? "")
   const [email, setEmail] = useState(pin.email ?? "")
+  const [links, setLinks] = useState<EditableLink[]>(
+    pin.links.map((link) => ({ ...link, key: crypto.randomUUID() })),
+  )
   const [tagId, setTagId] = useState(pin.tagId)
   const [position, setPosition] = useState({ latitude: pin.latitude, longitude: pin.longitude })
   const [attachments, setAttachments] = useState(pin.attachments)
@@ -99,6 +161,9 @@ export function PinDialog({
           ramadanHours: ramadanHours.trim() || null,
           phone: phone.trim() || null,
           email: email.trim() || null,
+          links: links
+            .map(({ label, url }) => ({ label: label.trim(), url: url.trim() }))
+            .filter((link) => link.label && link.url),
           ...position,
           tagId,
         })
@@ -284,6 +349,10 @@ export function PinDialog({
                 className={INPUT_CLASS}
               />
             </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <FieldLabel icon={ICONS.link}>Links (optional)</FieldLabel>
+            <LinksEditor {...{ links }} onChange={setLinks} />
           </div>
 
           {!isNew && (

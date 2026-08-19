@@ -27,6 +27,7 @@ const emptyPin = (tags: MapItemTag[]): AdminPin => ({
   ramadanHours: null,
   phone: null,
   email: null,
+  links: [],
   ...MAP_CENTER,
   tagId: tags[0]?.id ?? "",
   attachments: [],

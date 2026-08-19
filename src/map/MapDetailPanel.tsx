@@ -16,7 +16,7 @@ import { AttachmentCarousel, AttachmentStrip } from "./AttachmentCarousel"
 import { ContributeDialog } from "./ContributeDialog"
 import { tagChipClassName, TagChipIcon } from "./MapTagFilter"
 import { tagColorStyle } from "./tagColor"
-import type { MapItem, MapItemAttachment, MapItemTag } from "./types"
+import type { MapItem, MapItemAttachment, MapItemTag, PinLink } from "./types"
 
 const COPIED_FEEDBACK_MS = 1500
 
@@ -224,8 +224,23 @@ function HoursLine({ hours, ramadanHours }: { hours: string; ramadanHours: strin
   )
 }
 
+function LinkRow({ link }: { link: PinLink }) {
+  return (
+    <a
+      href={link.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-2 hover:underline"
+    >
+      <Icon icon={ICONS.link} className="shrink-0" />
+      <span className="truncate">{link.label}</span>
+      <Icon icon={ICONS.externalLink} className="shrink-0 opacity-70" style={{ width: "0.7rem", height: "0.7rem" }} />
+    </a>
+  )
+}
+
 function ContactInfo({ item }: { item: MapItem }) {
-  if (!item.hours && !item.phone && !item.email) return null
+  if (!item.hours && !item.phone && !item.email && item.links.length === 0) return null
 
   return (
     <div className="flex flex-col gap-1.5 text-sm opacity-90">
@@ -242,6 +257,9 @@ function ContactInfo({ item }: { item: MapItem }) {
           {item.email}
         </a>
       )}
+      {item.links.map((link) => (
+        <LinkRow key={link.url} {...{ link }} />
+      ))}
     </div>
   )
 }

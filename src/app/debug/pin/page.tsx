@@ -26,6 +26,7 @@ const items: MapItem[] = SURVEYED.map(({ title, coord, tag }, index) => ({
   ramadanHours: null,
   phone: null,
   email: null,
+  links: [],
   tag: MAP_TAGS[tag],
   attachments: [],
   ...parseCoordinates(coord),

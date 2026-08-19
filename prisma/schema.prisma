@@ -35,6 +35,9 @@ model Pin {
   ramadanHours String?
   phone        String?
   email        String?
+  // arbitrary named links (Instagram, a menu PDF, an external site...) — {label, url}[].
+  // shape isn't fixed enough per-pin to earn its own table, and it's small/admin-only data
+  links        Json         @default("[]")
   tagId        String
   tag          Tag          @relation(fields: [tagId], references: [id])
   attachments  Attachment[]

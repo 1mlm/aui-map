@@ -1,6 +1,6 @@
 import { resolveIcon } from "./iconRegistry"
 import type { TagColorName } from "./tagColor"
-import type { MapItem, MapItemTag } from "./types"
+import { type MapItem, type MapItemTag, parsePinLinks } from "./types"
 
 type TagRow = { id: string; label: string; icon: string; color: string | null }
 type PinRow = {
@@ -15,6 +15,7 @@ type PinRow = {
   ramadanHours: string | null
   phone: string | null
   email: string | null
+  links: unknown
   attachments: { id: string; url: string; caption: string | null; mimeType: string | null; fileName: string | null }[]
 }
 
@@ -46,6 +47,7 @@ export function pinRowToMapItem(pin: PinRow, tag: MapItemTag): MapItem {
     ramadanHours: pin.ramadanHours,
     phone: pin.phone,
     email: pin.email,
+    links: parsePinLinks(pin.links),
     tag,
     attachments: pin.attachments.map((attachment) => ({
       id: attachment.id,

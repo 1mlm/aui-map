@@ -2,6 +2,7 @@ import {
   AlignLeftIcon,
   ArrowLeft01Icon,
   ArrowRight01Icon,
+  ArrowUpRight01Icon,
   Atm01Icon,
   Briefcase01Icon,
   BulbIcon,
@@ -33,6 +34,7 @@ import {
   IdIcon,
   Image02Icon,
   ImageAdd02Icon,
+  Link01Icon,
   Loading01Icon,
   Location01Icon,
   Location02Icon,
@@ -117,6 +119,8 @@ export const ICONS = {
   ramadan: MoonIcon,
   phone: CallIcon,
   email: Mail01Icon,
+  link: Link01Icon,
+  externalLink: ArrowUpRight01Icon,
 
   // submission file types
   video: Video01Icon,

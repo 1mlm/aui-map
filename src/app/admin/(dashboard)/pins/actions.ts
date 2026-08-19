@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import type { PinLink } from "@/map/types"
 import { deleteFile, uploadFile } from "@/utils/blob"
 import { prisma } from "@/utils/prisma"
 import { requireAuth } from "@/utils/requireAuth"
@@ -17,6 +18,7 @@ export type PinInput = {
   ramadanHours: string | null
   phone: string | null
   email: string | null
+  links: PinLink[]
   tagId: string
 }
 
@@ -38,16 +40,17 @@ async function getAttachments(pinId: string) {
   return attachments.map((attachment) => ({ ...attachment, postedAt: attachment.postedAt.toISOString() }))
 }
 
-// admin-pasted, so it flows straight into window.open — reject anything that isn't a plain
-// https link (a javascript: url here would execute in the visitor's session on click)
-function assertValidMapsUrl(mapsUrl: string) {
-  const isHttps = URL.canParse(mapsUrl) && new URL(mapsUrl).protocol === "https:"
-  if (!isHttps) throw new Error("Maps link must be a valid https:// url.")
+// admin-pasted, so these flow straight into an href/window.open — reject anything that isn't
+// plain https (a javascript: url here would execute in the visitor's session on click)
+function assertValidHttpsUrl(url: string, label: string) {
+  const isHttps = URL.canParse(url) && new URL(url).protocol === "https:"
+  if (!isHttps) throw new Error(`${label} must be a valid https:// url.`)
 }
 
 export async function upsertPin(input: PinInput) {
   await requireAuth()
-  if (input.mapsUrl) assertValidMapsUrl(input.mapsUrl)
+  if (input.mapsUrl) assertValidHttpsUrl(input.mapsUrl, "Maps link")
+  for (const link of input.links) assertValidHttpsUrl(link.url, `"${link.label}" link`)
   const shared = {
     title: input.title,
     aliases: input.aliases,
@@ -59,6 +62,7 @@ export async function upsertPin(input: PinInput) {
     ramadanHours: input.ramadanHours,
     phone: input.phone,
     email: input.email,
+    links: input.links,
     tagId: input.tagId,
   }
   await prisma.pin.upsert({ where: { id: input.id }, create: { id: input.id, ...shared }, update: shared })
