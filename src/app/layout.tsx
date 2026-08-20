@@ -1,4 +1,5 @@
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata, Viewport } from "next";
 import { Outfit } from "next/font/google";
 import "@/shadcn/styles/globals.css";
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: PropsWithChildren) {
           <TooltipProvider>{children}</TooltipProvider>
         </NuqsAdapter>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
