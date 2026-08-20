@@ -34,6 +34,7 @@ import {
   IdIcon,
   Image02Icon,
   ImageAdd02Icon,
+  InformationCircleIcon,
   Link01Icon,
   Loading01Icon,
   Location01Icon,
@@ -85,6 +86,7 @@ export const ICONS = {
   loading: Loading01Icon,
   github: Github,
   beta: FlaskConicalIcon,
+  notice: InformationCircleIcon,
 
   // suggestions & contribute
   suggestions: BulbIcon,

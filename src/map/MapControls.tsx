@@ -13,8 +13,10 @@ import type { UserLocation } from "./UserLocationMarker"
 
 export function MapControls({
   location,
+  compact,
+  onOpenNotice,
   ...props
-}: SearchProps & FilterProps & { location: UserLocation }) {
+}: SearchProps & FilterProps & { location: UserLocation; compact: boolean; onOpenNotice: () => void }) {
   const { search, activeTagIds } = props
 
   const popoverButtons = [
@@ -81,6 +83,17 @@ export function MapControls({
       ))}
 
       <LocateButton {...{ location }} />
+
+      {compact && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <IconButton icon={ICONS.notice} onClick={onOpenNotice} aria-label="About this project" />
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={6}>
+            About this project
+          </TooltipContent>
+        </Tooltip>
+      )}
     </SquircleFuserContainer>
   )
 }

@@ -1,9 +1,11 @@
+"use client"
+
 import Image from "next/image"
-import { Icon } from "@/components/Icon"
-import { IconButton } from "@/components/IconButton"
+import { Icon, type HugeIcon } from "@/components/Icon"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
 import { ICONS } from "@/icons"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/shadcn/ui/tooltip"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/shadcn/ui/dialog"
+import { cn } from "@/shadcn/utils"
 
 const AUTHOR = {
   name: "Malik Lahlou",
@@ -11,45 +13,91 @@ const AUTHOR = {
   avatarUrl: "https://github.com/1mlm.png",
 }
 const REPO = { label: "1mlm/aui-map", url: "https://github.com/1mlm/aui-map" }
+const NEOCEDRUS = { name: "neoCedrus", url: "https://neocedrus.com/", avatarUrl: "https://github.com/neocedrus.png" }
 
-const pillClassName =
-  "-my-1 flex items-center gap-1.5 rounded-full corner-squircle py-1 pr-2 pl-1 font-medium transition-colors hover:bg-foreground/10"
+// fixed tilts handed out per tag rather than randomized on the client, so each one reads as
+// pinned on slightly crooked without risking a hydration mismatch from real randomness
+const TAG_ROTATIONS = ["rotate-[0.5deg]", "rotate-1", "-rotate-[0.5deg]", "-rotate-1"] as const
 
-export function MapCredit({ compact }: { compact?: boolean }) {
-  if (compact)
-    return (
-      <SquircleFuserContainer align="bottom-left" superClassName="absolute bottom-0 left-0">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <IconButton
-              icon={ICONS.github}
-              onClick={() => window.open(REPO.url, "_blank", "noopener,noreferrer")}
-              aria-label="Source Code"
-            />
-          </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={6}>
-            Source Code
-          </TooltipContent>
-        </Tooltip>
-      </SquircleFuserContainer>
-    )
+function CreditTag({
+  label,
+  avatarUrl,
+  icon,
+  href,
+  rotation,
+}: {
+  label: string
+  avatarUrl?: string
+  icon?: HugeIcon
+  href?: string
+  rotation: (typeof TAG_ROTATIONS)[number]
+}) {
+  const className = cn(
+    "relative -my-0.5 inline-flex items-center gap-1.5 rounded-full corner-squircle bg-white/5 px-2 py-0.5 font-semibold text-foreground outline-none transition-all duration-200 hover:-translate-y-2 hover:scale-105 hover:bg-white/10 focus-visible:-translate-y-2 focus-visible:scale-105 focus-visible:bg-white/10 active:-translate-y-2 active:scale-105 active:bg-white/10",
+    rotation,
+  )
+
+  const content = (
+    <>
+      {avatarUrl && <Image src={avatarUrl} alt="" width={18} height={18} className="rounded-full" />}
+      {!avatarUrl && icon && <Icon {...{ icon }} className="size-3.5" />}
+      {label}
+      {href && (
+        <Icon icon={ICONS.externalLink} className="absolute -top-1.5 -right-1.5 text-[0.5em] text-muted-foreground" />
+      )}
+    </>
+  )
+
+  if (!href) return <span className={className}>{content}</span>
 
   return (
-    <SquircleFuserContainer
-      align="bottom-left"
-      superClassName="absolute bottom-0 left-0"
-      className="gap-1.5 text-sm"
-    >
-      <span className="text-muted-foreground">Made with ❤️ by</span>
-      <a href={AUTHOR.githubUrl} target="_blank" rel="noopener noreferrer" className={pillClassName}>
-        <Image src={AUTHOR.avatarUrl} alt="" width={20} height={20} className="rounded-full" />
-        {AUTHOR.name}
-      </a>
-      <span className="text-muted-foreground">in</span>
-      <a href={REPO.url} target="_blank" rel="noopener noreferrer" className={pillClassName}>
-        <Icon icon={ICONS.github} className="ml-1" />
-        {REPO.label}
-      </a>
+    <a href={href} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className={className}>
+      {content}
+    </a>
+  )
+}
+
+export function NoticeDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  return (
+    <Dialog {...{ open, onOpenChange }}>
+      <DialogContent className="corner-squircle sm:max-w-md">
+        <DialogHeader className="gap-3.5">
+          <DialogTitle className="text-center text-xl">Hey! Quick notice:</DialogTitle>
+          <DialogDescription asChild>
+            <div className="flex flex-col gap-3 text-sm text-muted-foreground">
+              <p className="indent-6 !no-underline">
+                🤓 While I <span className="font-semibold text-foreground">do</span> work as a{" "}
+                <CreditTag
+                  label={NEOCEDRUS.name}
+                  avatarUrl={NEOCEDRUS.avatarUrl}
+                  href={NEOCEDRUS.url}
+                  rotation={TAG_ROTATIONS[2]}
+                />{" "}
+                team member for AUI, this project isn't owned by, affiliated with, or endorsed by neoCedrus or Al
+                Akhawayn University in any shape, way, or form. It's a fully solo project I built on my own time to
+                help newcomers find their way around campus.
+              </p>
+            </div>
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-wrap items-center gap-1.5 pt-1 text-sm text-muted-foreground">
+          Made with ❤️ by
+          <CreditTag label={AUTHOR.name} avatarUrl={AUTHOR.avatarUrl} href={AUTHOR.githubUrl} rotation={TAG_ROTATIONS[0]} />
+          on
+          <CreditTag label={REPO.label} icon={ICONS.github} href={REPO.url} rotation={TAG_ROTATIONS[3]} />
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+export function MapCredit({ onOpen }: { onOpen: () => void }) {
+  return (
+    <SquircleFuserContainer align="bottom-center" superClassName="absolute bottom-0 left-1/2 -translate-x-1/2">
+      <button type="button" onClick={onOpen} className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        Unofficial project by
+        <CreditTag label={AUTHOR.name} avatarUrl={AUTHOR.avatarUrl} rotation={TAG_ROTATIONS[1]} />
+      </button>
     </SquircleFuserContainer>
   )
 }

@@ -6,9 +6,9 @@ import { type ChangeEvent, useRef, useState, useTransition } from "react"
 import { Icon } from "@/components/Icon"
 import { ICONS } from "@/icons"
 import { Button } from "@/shadcn/ui/button"
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/shadcn/ui/context-menu"
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/shadcn/ui/context-menu"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/shadcn/ui/dialog"
 import { Input } from "@/shadcn/ui/input"
-import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover"
 import { formatRelativeDate } from "@/utils/date"
 import { iconForMimeType, isImageMimeType, isVideoMimeType } from "@/utils/mimeType"
 import { deleteAttachment, reorderAttachments, setAttachmentCaption, setThumbnail, uploadAttachment } from "./actions"
@@ -94,48 +94,6 @@ function AttachmentTile({
           className="group relative size-20 shrink-0 cursor-grab overflow-hidden rounded-xl corner-squircle bg-muted active:cursor-grabbing"
         >
           <AttachmentThumbnail {...{ attachment }} />
-          <div className="absolute inset-0 flex items-center justify-center gap-1 bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-            <Popover open={captionOpen} onOpenChange={setCaptionOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="secondary"
-                  className="size-7 rounded-full corner-squircle"
-                  disabled={disabled}
-                  aria-label="Edit caption"
-                >
-                  <Icon icon={ICONS.text} className="size-3.5" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="flex w-56 flex-col gap-2 corner-squircle">
-                <p className="text-xs text-muted-foreground">Posted {formatRelativeDate(attachment.postedAt)}</p>
-                <Input
-                  placeholder="Add a caption…"
-                  value={captionDraft}
-                  onChange={(e) => setCaptionDraft(e.target.value)}
-                  className="corner-squircle"
-                />
-                <Button size="sm" className="rounded-full corner-squircle" disabled={pending} onClick={saveCaption}>
-                  <Icon icon={ICONS.save} />
-                  Save caption
-                </Button>
-              </PopoverContent>
-            </Popover>
-            <Button
-              type="button"
-              size="icon"
-              variant="destructive"
-              className="size-7 rounded-full corner-squircle"
-              disabled={disabled}
-              onClick={() =>
-                startTransition(async () => onAttachmentsChange(await deleteAttachment(pinId, attachment.id)))
-              }
-              aria-label="Delete photo"
-            >
-              <Icon icon={ICONS.delete} className="size-3.5" />
-            </Button>
-          </div>
           {attachment.isThumbnail && (
             <span className="absolute top-1 left-1 rounded-full corner-squircle bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
               Thumbnail
@@ -144,6 +102,10 @@ function AttachmentTile({
         </Reorder.Item>
       </ContextMenuTrigger>
       <ContextMenuContent>
+        <ContextMenuItem disabled={disabled} onSelect={() => setCaptionOpen(true)}>
+          <Icon icon={ICONS.text} />
+          Edit caption
+        </ContextMenuItem>
         {isImageMimeType(attachment.mimeType) && (
           <ContextMenuItem
             disabled={disabled || attachment.isThumbnail}
@@ -153,7 +115,41 @@ function AttachmentTile({
             Set as thumbnail
           </ContextMenuItem>
         )}
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          variant="destructive"
+          disabled={disabled}
+          onSelect={() => startTransition(async () => onAttachmentsChange(await deleteAttachment(pinId, attachment.id)))}
+        >
+          <Icon icon={ICONS.delete} />
+          Delete photo
+        </ContextMenuItem>
       </ContextMenuContent>
+
+      <Dialog open={captionOpen} onOpenChange={setCaptionOpen}>
+        <DialogContent className="corner-squircle sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Icon icon={ICONS.text} />
+              Edit caption
+            </DialogTitle>
+            <DialogDescription className="sr-only">Edit the caption shown under this photo</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2">
+            <p className="text-xs text-muted-foreground">Posted {formatRelativeDate(attachment.postedAt)}</p>
+            <Input
+              placeholder="Add a caption…"
+              value={captionDraft}
+              onChange={(e) => setCaptionDraft(e.target.value)}
+              className="corner-squircle"
+            />
+            <Button size="sm" className="rounded-full corner-squircle" disabled={pending} onClick={saveCaption}>
+              <Icon icon={ICONS.save} />
+              Save caption
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </ContextMenu>
   )
 }

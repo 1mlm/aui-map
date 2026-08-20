@@ -6,7 +6,7 @@ import { useRef, useState } from "react"
 import { MapBrand } from "./MapBrand"
 import { MapCanvas } from "./MapCanvas"
 import { MapControls } from "./MapControls"
-import { MapCredit } from "./MapCredit"
+import { MapCredit, NoticeDialog } from "./MapCredit"
 import { MapDetailPanel } from "./MapDetailPanel"
 import type { MapItem, MapItemTag } from "./types"
 import { useAvailableSpace } from "./useAvailableSpace"
@@ -26,6 +26,7 @@ export function MapExperience({ items, tags }: { items: MapItem[]; tags: MapItem
   const [search, setSearch] = useState("")
   const [activeTagIds, setActiveTagIds] = useState<Set<string>>(new Set())
   const [hoveredTagId, setHoveredTagId] = useState<string | null>(null)
+  const [noticeOpen, setNoticeOpen] = useState(false)
   // in the url so a place can be linked to directly: /?focus=m6l
   const [selectedId, setSelectedId] = useQueryState("focus")
 
@@ -63,6 +64,8 @@ export function MapExperience({ items, tags }: { items: MapItem[]; tags: MapItem
           onToggle={toggleTag}
           onSearchChange={setSearch}
           onHoverTag={setHoveredTagId}
+          compact={!space.showsFullCredit}
+          onOpenNotice={() => setNoticeOpen(true)}
           {...{ search, activeTagIds, hoveredTagId, location }}
         />
 
@@ -76,7 +79,8 @@ export function MapExperience({ items, tags }: { items: MapItem[]; tags: MapItem
           )}
         </AnimatePresence>
 
-        <MapCredit compact={!space.showsFullCredit} />
+        {space.showsFullCredit && <MapCredit onOpen={() => setNoticeOpen(true)} />}
+        <NoticeDialog open={noticeOpen} onOpenChange={setNoticeOpen} />
       </div>
     </div>
   )

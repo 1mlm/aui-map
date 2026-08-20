@@ -438,6 +438,7 @@ export const MAP_ITEMS: MapItem[] = rawMapItems.map(
       caption: null,
       mimeType: null,
       fileName: null,
+      postedAt: new Date(),
     })),
     ...parseCoordinates(coord),
   }),

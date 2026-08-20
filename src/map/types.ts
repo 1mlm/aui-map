@@ -14,6 +14,7 @@ export type MapItemAttachment = {
   caption: string | null
   mimeType: string | null
   fileName: string | null
+  postedAt: Date
 }
 
 export type PinLink = { label: string; url: string }

@@ -5,6 +5,7 @@ import Image from "next/image"
 import { useState } from "react"
 import { Icon } from "@/components/Icon"
 import { IconButton } from "@/components/IconButton"
+import { DateCell } from "@/components/table/CustomTableCell"
 import { ICONS } from "@/icons"
 import { Dialog, DialogContent, DialogTitle } from "@/shadcn/ui/dialog"
 import { cn } from "@/shadcn/utils"
@@ -168,7 +169,7 @@ export function AttachmentCarousel({
 }) {
   const [index, setIndex] = useState(startIndex)
   const hasMultiple = attachments.length > 1
-  const caption = attachments[index].caption
+  const { caption, postedAt } = attachments[index]
   const step = (by: number) => setIndex((i) => (i + by + attachments.length) % attachments.length)
 
   const stepButtons = [
@@ -226,12 +227,15 @@ export function AttachmentCarousel({
           )}
         </div>
 
-        {caption && (
-          <p className="flex shrink-0 items-center justify-center gap-1.5 px-6 pb-5 text-center text-sm text-white/60">
-            <Icon icon={ICONS.caption} className="size-4 shrink-0" />
-            {caption}
-          </p>
-        )}
+        <div className="flex shrink-0 flex-col items-center gap-1 px-6 pb-5 text-center text-sm text-white/60">
+          {caption && (
+            <p className="flex items-center justify-center gap-1.5">
+              <Icon icon={ICONS.caption} className="size-4 shrink-0" />
+              {caption}
+            </p>
+          )}
+          <DateCell date={postedAt} />
+        </div>
       </DialogContent>
     </Dialog>
   )

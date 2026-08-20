@@ -3,6 +3,7 @@
 import Image from "next/image"
 import { useTransition } from "react"
 import { Icon } from "@/components/Icon"
+import { DateCell } from "@/components/table/CustomTableCell"
 import { ICONS } from "@/icons"
 import { Button } from "@/shadcn/ui/button"
 import { iconForMimeType, isImageMimeType } from "@/utils/mimeType"
@@ -42,7 +43,12 @@ function SubmissionCard({ submission }: { submission: PendingSubmission }) {
     <div className="flex flex-col gap-2 overflow-hidden rounded-lg corner-squircle border border-border">
       <SubmissionPreview {...{ submission }} />
       <div className="flex flex-col gap-2 p-3">
-        <span className="text-sm font-medium">{submission.pinTitle}</span>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-medium">{submission.pinTitle}</span>
+          <span className="text-xs text-muted-foreground">
+            <DateCell date={new Date(submission.submittedAt)} />
+          </span>
+        </div>
         {submission.caption && <p className="text-xs text-muted-foreground">{submission.caption}</p>}
         <div className="flex gap-2">
           <Button

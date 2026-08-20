@@ -16,7 +16,14 @@ type PinRow = {
   phone: string | null
   email: string | null
   links: unknown
-  attachments: { id: string; url: string; caption: string | null; mimeType: string | null; fileName: string | null }[]
+  attachments: {
+    id: string
+    url: string
+    caption: string | null
+    mimeType: string | null
+    fileName: string | null
+    postedAt: Date
+  }[]
 }
 
 // the one place a db row turns into the shapes the map/admin ui actually render —
@@ -55,6 +62,7 @@ export function pinRowToMapItem(pin: PinRow, tag: MapItemTag): MapItem {
       caption: attachment.caption,
       mimeType: attachment.mimeType,
       fileName: attachment.fileName,
+      postedAt: attachment.postedAt,
     })),
   }
 }
