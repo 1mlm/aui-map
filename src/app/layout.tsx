@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
 import { Outfit } from "next/font/google";
 import "@/shadcn/styles/globals.css";
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: PropsWithChildren) {
         <NuqsAdapter>
           <TooltipProvider>{children}</TooltipProvider>
         </NuqsAdapter>
+        <Analytics />
       </body>
     </html>
   );
