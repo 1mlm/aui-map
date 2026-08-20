@@ -33,7 +33,7 @@ function CreditTag({
   rotation: (typeof TAG_ROTATIONS)[number]
 }) {
   const className = cn(
-    "relative -my-0.5 inline-flex items-center gap-1.5 rounded-full corner-squircle bg-white/5 px-2 py-0.5 font-semibold text-foreground outline-none transition-all duration-200 hover:-translate-y-2 hover:scale-105 hover:bg-white/10 focus-visible:-translate-y-2 focus-visible:scale-105 focus-visible:bg-white/10 active:-translate-y-2 active:scale-105 active:bg-white/10",
+    "relative -my-0.5 inline-flex w-fit shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full corner-squircle bg-white/5 py-0.5 pr-4 pl-2 font-semibold text-foreground outline-none transition-all duration-200 hover:-translate-y-2 hover:scale-105 hover:bg-white/10 focus-visible:-translate-y-2 focus-visible:scale-105 focus-visible:bg-white/10 active:-translate-y-2 active:scale-105 active:bg-white/10",
     rotation,
   )
 
@@ -43,7 +43,7 @@ function CreditTag({
       {!avatarUrl && icon && <Icon {...{ icon }} className="size-3.5" />}
       {label}
       {href && (
-        <Icon icon={ICONS.externalLink} className="absolute -top-1.5 -right-1.5 text-[0.5em] text-muted-foreground" />
+        <Icon icon={ICONS.externalLink} className="absolute top-0.5 right-0.5 text-[0.5em] text-muted-foreground" />
       )}
     </>
   )
@@ -60,11 +60,23 @@ function CreditTag({
 export function NoticeDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   return (
     <Dialog {...{ open, onOpenChange }}>
-      <DialogContent className="corner-squircle sm:max-w-md">
+      <DialogContent className="corner-squircle rotate-[0.25deg] gap-5 overflow-visible p-6 sm:max-w-md">
+        {/* next/image would freeze the animation, this is decorative so a plain img is fine */}
+        {/* biome-ignore lint/performance/noImgElement: gif needs to stay animated */}
+        <img
+          src="/grinning-face-with-sweat.gif"
+          alt=""
+          className="pointer-events-none absolute -top-8 -left-8 hidden size-16 -rotate-12 select-none sm:block"
+        />
         <DialogHeader className="gap-3.5">
-          <DialogTitle className="text-center text-xl">Hey! Quick notice:</DialogTitle>
+          <DialogTitle className="text-center text-xl">Hey! Quick notice</DialogTitle>
           <DialogDescription asChild>
             <div className="flex flex-col gap-3 text-sm text-muted-foreground">
+              <p className="indent-6 !no-underline">
+                This interactive map is an independent, unofficial project. It's{" "}
+                <span className="font-semibold text-foreground">NOT</span> owned, affiliated with, endorsed by, or
+                run by Al Akhawayn University in any way.
+              </p>
               <p className="indent-6 !no-underline">
                 🤓 While I <span className="font-semibold text-foreground">do</span> work as a{" "}
                 <CreditTag
@@ -73,14 +85,16 @@ export function NoticeDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                   href={NEOCEDRUS.url}
                   rotation={TAG_ROTATIONS[2]}
                 />{" "}
-                team member for AUI, this project isn't owned by, affiliated with, or endorsed by neoCedrus or Al
-                Akhawayn University in any shape, way, or form. It's a fully solo project I built on my own time to
-                help newcomers find their way around campus.
+                team member for AUI, this project isn't owned by, affiliated with, or endorsed by neoCedrus either,
+                in any shape, way, or form.
+              </p>
+              <p className="text-center !no-underline">
+                It's a fully solo project I built on my own time to help newcomers find their way around campus 😋
               </p>
             </div>
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-wrap items-center gap-1.5 pt-1 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-center gap-1.5 text-sm text-muted-foreground">
           Made with ❤️ by
           <CreditTag label={AUTHOR.name} avatarUrl={AUTHOR.avatarUrl} href={AUTHOR.githubUrl} rotation={TAG_ROTATIONS[0]} />
           on
@@ -95,7 +109,7 @@ export function MapCredit({ onOpen }: { onOpen: () => void }) {
   return (
     <SquircleFuserContainer align="bottom-center" superClassName="absolute bottom-0 left-1/2 -translate-x-1/2">
       <button type="button" onClick={onOpen} className="flex items-center gap-1.5 text-sm text-muted-foreground">
-        Unofficial project by
+        Made with ❤️ by
         <CreditTag label={AUTHOR.name} avatarUrl={AUTHOR.avatarUrl} rotation={TAG_ROTATIONS[1]} />
       </button>
     </SquircleFuserContainer>
