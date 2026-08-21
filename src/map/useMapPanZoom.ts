@@ -7,9 +7,9 @@ import {
   clampPanToOverhang,
   distanceBetween,
   midpointOf,
-  panAnchoredAt,
   type Pan,
   type Point,
+  panAnchoredAt,
 } from "./panZoomMath"
 
 // the image sits in a square box already sized to cover the viewport, so 1 is the smallest
@@ -66,13 +66,21 @@ export function useMapPanZoom() {
 
   const activePointers = useRef(new Map<number, Point>())
   const panOrigin = useRef<{ pointer: Point; pan: Pan } | null>(null)
-  const pinchOrigin = useRef<{ distance: number; scale: number; midpoint: Point; pan: Pan } | null>(
-    null,
-  )
+  const pinchOrigin = useRef<{
+    distance: number
+    scale: number
+    midpoint: Point
+    pan: Pan
+  } | null>(null)
   const lastTap = useRef<{ time: number; point: Point } | null>(null)
+  // tracked on every pointerdown so the right-click/long-press context menu (opened by Radix,
+  // which doesn't hand back the triggering coordinate) can read where it was actually opened
+  const lastPointerClientPosition = useRef<Point>({ x: 0, y: 0 })
   const wheelSettleTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const limitFlashTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const zoomingFilterClearTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const zoomingFilterClearTimeout = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null)
   // the container never scrolls and only resizes, so its rect is cached instead of re-measured
   // on every wheel tick and pointermove — getBoundingClientRect() forces a synchronous layout
   const rect = useRef<DOMRect | null>(null)
@@ -86,13 +94,17 @@ export function useMapPanZoom() {
   function flashLimit() {
     if (limitFlashTimeout.current) clearTimeout(limitFlashTimeout.current)
     setHitLimit(true)
-    limitFlashTimeout.current = setTimeout(() => setHitLimit(false), LIMIT_FLASH_MS)
+    limitFlashTimeout.current = setTimeout(
+      () => setHitLimit(false),
+      LIMIT_FLASH_MS,
+    )
   }
 
   // for continuous, non-animated viewport changes (wheel ticks, pinch move, drag pan): flip
   // filters off now, and schedule them back on unless another change pushes the deadline out first
   function markMoving() {
-    if (zoomingFilterClearTimeout.current) clearTimeout(zoomingFilterClearTimeout.current)
+    if (zoomingFilterClearTimeout.current)
+      clearTimeout(zoomingFilterClearTimeout.current)
     isMoving.set(1)
     zoomingFilterClearTimeout.current = setTimeout(
       () => isMoving.set(0),
@@ -103,21 +115,32 @@ export function useMapPanZoom() {
   // for an animated scale change (double-tap, settle-back spring): the debounce above would
   // restore the filters mid-spring, so this ties the clear to the animation's own completion
   function animateMoving(target: number) {
-    if (zoomingFilterClearTimeout.current) clearTimeout(zoomingFilterClearTimeout.current)
+    if (zoomingFilterClearTimeout.current)
+      clearTimeout(zoomingFilterClearTimeout.current)
     isMoving.set(1)
     animate(scale, target, SNAP_SPRING).then(() => isMoving.set(0))
   }
 
   // the one path every zoom interaction goes through: clamp the requested scale, keep `origin`
   // anchored under the cursor/fingers, then keep the pan inside the image
-  function zoomTo(requestedScale: number, origin: Point, { animated = false } = {}) {
+  function zoomTo(
+    requestedScale: number,
+    origin: Point,
+    { animated = false } = {},
+  ) {
     if (!rect.current) return
     const fromScale = scale.get()
     const toScale = clamp(requestedScale, OVERZOOM_FLOOR, MAX_SCALE)
     if (requestedScale > MAX_SCALE) flashLimit()
     if (toScale === fromScale) return
 
-    const anchored = panAnchoredAt(origin, rect.current, getPan(), fromScale, toScale)
+    const anchored = panAnchoredAt(
+      origin,
+      rect.current,
+      getPan(),
+      fromScale,
+      toScale,
+    )
     const pan = clampPanToOverhang(anchored, toScale, rect.current)
 
     if (!animated) {
@@ -142,7 +165,9 @@ export function useMapPanZoom() {
 
   function toggleZoom(origin: Point) {
     const isZoomedIn = scale.get() > restingScale.current + 0.1
-    zoomTo(isZoomedIn ? restingScale.current : DOUBLE_TAP_SCALE, origin, { animated: true })
+    zoomTo(isZoomedIn ? restingScale.current : DOUBLE_TAP_SCALE, origin, {
+      animated: true,
+    })
   }
 
   // the resting scale depends on the viewport's shape, which isn't known until the container is
@@ -174,22 +199,34 @@ export function useMapPanZoom() {
       zoomTo(scale.get() * (1 + delta), { x: e.clientX, y: e.clientY })
 
       if (wheelSettleTimeout.current) clearTimeout(wheelSettleTimeout.current)
-      wheelSettleTimeout.current = setTimeout(settleScale, WHEEL_SETTLE_DELAY_MS)
+      wheelSettleTimeout.current = setTimeout(
+        settleScale,
+        WHEEL_SETTLE_DELAY_MS,
+      )
     }
     el.addEventListener("wheel", handleWheel, { passive: false })
     return () => el.removeEventListener("wheel", handleWheel)
   })
 
   function handlePointerDown(e: React.PointerEvent) {
+    // recorded before the early returns below — a long-press/right-click on a pin (itself a
+    // button) still needs to open the context menu at the right coordinate
+    lastPointerClientPosition.current = { x: e.clientX, y: e.clientY }
+
     // let pins/buttons handle their own taps instead of the viewport capturing the pointer
     // and swallowing their click
     if ((e.target as HTMLElement).closest("button")) return
+    // right/middle mouse buttons are for the context menu, not panning
+    if (e.pointerType === "mouse" && e.button !== 0) return
 
     e.currentTarget.setPointerCapture(e.pointerId)
     activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
 
     if (activePointers.current.size === 1) {
-      panOrigin.current = { pointer: { x: e.clientX, y: e.clientY }, pan: getPan() }
+      panOrigin.current = {
+        pointer: { x: e.clientX, y: e.clientY },
+        pan: getPan(),
+      }
       return
     }
     if (activePointers.current.size === 2) {
@@ -218,7 +255,13 @@ export function useMapPanZoom() {
         OVERZOOM_FLOOR,
         MAX_SCALE,
       )
-      const anchored = panAnchoredAt(pinch.midpoint, rect.current, pinch.pan, pinch.scale, toScale)
+      const anchored = panAnchoredAt(
+        pinch.midpoint,
+        rect.current,
+        pinch.pan,
+        pinch.scale,
+        toScale,
+      )
       markMoving()
       scale.set(toScale)
       setPan(clampPanToOverhang(anchored, toScale, rect.current))
@@ -241,7 +284,8 @@ export function useMapPanZoom() {
     const wasSingleTap =
       activePointers.current.size === 1 &&
       panOrigin.current &&
-      distanceBetween(panOrigin.current.pointer, releasePoint) < DOUBLE_TAP_MAX_DISTANCE_PX
+      distanceBetween(panOrigin.current.pointer, releasePoint) <
+        DOUBLE_TAP_MAX_DISTANCE_PX
 
     activePointers.current.delete(e.pointerId)
     if (activePointers.current.size < 2) pinchOrigin.current = null
@@ -250,7 +294,8 @@ export function useMapPanZoom() {
     panOrigin.current = remaining ? { pointer: remaining, pan: getPan() } : null
 
     if (activePointers.current.size === 0) settleScale()
-    if (wasSingleTap && e.pointerType === "touch") registerTap(releasePoint, e.timeStamp)
+    if (wasSingleTap && e.pointerType === "touch")
+      registerTap(releasePoint, e.timeStamp)
   }
 
   // touch has no dblclick event, so consecutive taps close together in time and space get
@@ -277,12 +322,14 @@ export function useMapPanZoom() {
     y,
     isMoving,
     hitLimit,
+    getLastPointerClientPosition: () => lastPointerClientPosition.current,
     gestureHandlers: {
       onPointerDown: handlePointerDown,
       onPointerMove: handlePointerMove,
       onPointerUp: handlePointerUp,
       onPointerCancel: handlePointerUp,
-      onDoubleClick: (e: React.MouseEvent) => toggleZoom({ x: e.clientX, y: e.clientY }),
+      onDoubleClick: (e: React.MouseEvent) =>
+        toggleZoom({ x: e.clientX, y: e.clientY }),
     },
   }
 }
