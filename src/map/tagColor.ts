@@ -3,7 +3,9 @@ import colors from "tailwindcss/colors"
 // tailwind's palette also exports flat keywords (inherit, current, transparent, black, white) that
 // have no shade scale, so they're filtered out of the tag colors
 type ShadeScales = {
-  [Name in keyof typeof colors as (typeof colors)[Name] extends string ? never : Name]: (typeof colors)[Name]
+  [Name in keyof typeof colors as (typeof colors)[Name] extends string
+    ? never
+    : Name]: (typeof colors)[Name]
 }
 
 export type TagColorName = keyof ShadeScales
@@ -39,8 +41,10 @@ const getShades = (name: TagColorName = "neutral") => palette[name]
 export const tagSolidColor = (name?: TagColorName) => getShades(name)[500]
 
 // pins run a shade deeper than the filter pills: they sit on bright satellite imagery rather than
-// a dark panel, so the lighter shades wash out against it
-export const tagPinFillColor = (name?: TagColorName) => getShades(name)[600]
+// a dark panel, so the lighter shades wash out against it. Tailwind's 600 shade on its own is
+// neon against that imagery, so it's pulled back toward gray — hues stay distinct, nothing screams
+export const tagPinFillColor = (name?: TagColorName) =>
+  `color-mix(in oklch, ${getShades(name)[600]} 60%, gray)`
 // 950 is as dark as tailwind goes and still reads washed out against the satellite image, so the
 // outline keeps going past the scale by mixing it down toward black
 export const tagPinOutlineColor = (name?: TagColorName) =>
