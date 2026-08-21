@@ -13,4 +13,7 @@ export const { dynamic, dynamicParams, revalidate, generateStaticParams, GET } =
   createSerwistRoute({
     swSrc: "src/app/sw.ts",
     additionalPrecacheEntries: [{ url: "/~offline", revision }],
+    // defaults to false (esbuild-wasm) on non-Windows, which isn't installed — force native
+    // esbuild everywhere so this doesn't silently differ between local (Windows) and Vercel (Linux)
+    useNativeEsbuild: true,
   })
