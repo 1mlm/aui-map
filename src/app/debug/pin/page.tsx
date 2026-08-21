@@ -28,6 +28,7 @@ const items: MapItem[] = SURVEYED.map(({ title, coord, tag }, index) => ({
   email: null,
   links: [],
   tag: MAP_TAGS[tag],
+  underConstruction: false,
   attachments: [],
   ...parseCoordinates(coord),
 }))
@@ -41,7 +42,10 @@ function measureDrawnTip(pin: Element) {
   if (!path || !svg || !matrix) return null
 
   const box = path.getBBox()
-  const point = Object.assign(svg.createSVGPoint(), { x: box.x + box.width / 2, y: box.y + box.height })
+  const point = Object.assign(svg.createSVGPoint(), {
+    x: box.x + box.width / 2,
+    y: box.y + box.height,
+  })
   return point.matrixTransform(matrix)
 }
 
@@ -58,7 +62,9 @@ export default function PinDebugPage() {
     const measure = () => {
       setErrors(
         items.map((item) => {
-          const target = boxRef.current?.querySelector(`[data-target='${item.id}']`)
+          const target = boxRef.current?.querySelector(
+            `[data-target='${item.id}']`,
+          )
           const pin = boxRef.current?.querySelector(`[data-pin='${item.id}']`)
           const tip = pin && measureDrawnTip(pin)
           if (!target || !tip) return `${item.title}: not rendered`
@@ -93,8 +99,8 @@ export default function PinDebugPage() {
         />
       </label>
       <p className="opacity-70">
-        the magenta crosshair is the coordinate. hover a pin, select it, drag the slider — the
-        numbers below must stay at zero through all of it.
+        the magenta crosshair is the coordinate. hover a pin, select it, drag
+        the slider — the numbers below must stay at zero through all of it.
       </p>
       <ul className="font-mono">
         {errors.map((line) => (
@@ -108,23 +114,37 @@ export default function PinDebugPage() {
           style={{ transform: `scale(${scale})` }}
           ref={boxRef}
         >
-          <Image src="/auimap.webp" alt="" fill unoptimized className="opacity-60" />
+          <Image
+            src="/auimap.webp"
+            alt=""
+            fill
+            unoptimized
+            className="opacity-60"
+          />
           {MAP_ITEMS.map((item) => (
             <span
               key={item.id}
               className="pointer-events-none absolute -translate-1/2 text-[5px] whitespace-nowrap text-lime-300"
-              style={positionToStyle(latLongToPosition(item.latitude, item.longitude))}
+              style={positionToStyle(
+                latLongToPosition(item.latitude, item.longitude),
+              )}
             >
               ×{item.id}
             </span>
           ))}
           {items.map((item) => (
             <div key={item.id}>
-              <Crosshair id={item.id} latitude={item.latitude} longitude={item.longitude} />
+              <Crosshair
+                id={item.id}
+                latitude={item.latitude}
+                longitude={item.longitude}
+              />
               <div data-pin={item.id}>
                 <MapPin
                   selected={item.id === selectedId}
-                  onSelect={() => setSelectedId(item.id === selectedId ? null : item.id)}
+                  onSelect={() =>
+                    setSelectedId(item.id === selectedId ? null : item.id)
+                  }
                   previewing={false}
                   matchesPreview={false}
                   {...{ item, viewportScale }}
@@ -138,7 +158,15 @@ export default function PinDebugPage() {
   )
 }
 
-function Crosshair({ id, latitude, longitude }: { id: string; latitude: number; longitude: number }) {
+function Crosshair({
+  id,
+  latitude,
+  longitude,
+}: {
+  id: string
+  latitude: number
+  longitude: number
+}) {
   return (
     <div
       data-target={id}

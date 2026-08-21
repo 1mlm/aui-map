@@ -22,6 +22,7 @@ async function seedPins() {
       latitude,
       longitude,
       tagId: pin.tagId,
+      underConstruction: pin.underConstruction ?? false,
     }
     await prisma.pin.upsert({
       where: { id: pin.id },

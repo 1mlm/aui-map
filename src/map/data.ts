@@ -2,7 +2,6 @@ import {
   BedIcon,
   Building06Icon,
   Car,
-  ConstructionIcon,
   FootballIcon,
   MoreIcon,
   Restaurant02Icon,
@@ -14,25 +13,18 @@ import type { MapItem, MapItemTag } from "./types"
 const SMALL_PIN_SCALE = 0.8
 
 export const MAP_TAGS = {
-  construction: {
-    id: "construction",
-    label: "In construction",
-    icon: ConstructionIcon,
-    color: "yellow",
-    sizeScale: 1,
-  },
   unknownHousing: {
     id: "unknownHousing",
     label: "Housing",
     icon: BedIcon,
-    color: "slate",
+    color: "blue",
     sizeScale: 1,
   },
   food: {
     id: "food",
     label: "Food",
     icon: Restaurant02Icon,
-    color: "amber",
+    color: "orange",
     sizeScale: SMALL_PIN_SCALE,
   },
   sports: {
@@ -46,21 +38,21 @@ export const MAP_TAGS = {
     id: "other",
     label: "Special",
     icon: MoreIcon,
-    color: "mauve",
+    color: "fuchsia",
     sizeScale: SMALL_PIN_SCALE,
   },
   parking: {
     id: "parking",
     label: "Parking",
     icon: Car,
-    color: "mist",
+    color: "sky",
     sizeScale: 1,
   },
   academic: {
     id: "academic",
     label: "Academic",
     icon: Building06Icon,
-    color: "taupe",
+    color: "red",
     sizeScale: 1,
   },
   auditorium: {
@@ -84,6 +76,7 @@ const rawMapItems: {
   // exactly what you'd copy out of Google Maps, "latitude, longitude"
   coord: string
   attachmentCount?: number
+  underConstruction?: boolean
 }[] = [
   {
     id: "m6l",
@@ -235,8 +228,9 @@ const rawMapItems: {
     id: "scb",
     title: "Student Center Building",
     aliases: ["SCB", "Student Center"],
-    tag: "construction",
+    tag: "academic",
     coord: "33.540049, -5.105190",
+    underConstruction: true,
   },
   {
     id: "business-office",
@@ -324,8 +318,9 @@ const rawMapItems: {
   {
     id: "b57",
     title: "B57",
-    tag: "construction",
+    tag: "unknownHousing",
     coord: "33.542751, -5.106217",
+    underConstruction: true,
   },
   {
     id: "atm",
@@ -442,7 +437,16 @@ const getShortestName = (names: string[]) =>
   )
 
 export const MAP_ITEMS: MapItem[] = rawMapItems.map(
-  ({ id, title, aliases = [], description, tag, coord, attachmentCount }) => ({
+  ({
+    id,
+    title,
+    aliases = [],
+    description,
+    tag,
+    coord,
+    attachmentCount,
+    underConstruction = false,
+  }) => ({
     id,
     title,
     aliases,
@@ -455,6 +459,7 @@ export const MAP_ITEMS: MapItem[] = rawMapItems.map(
     email: null,
     links: [],
     tag: MAP_TAGS[tag],
+    underConstruction,
     attachments: Array.from({ length: attachmentCount ?? 0 }, (_, i) => ({
       id: `${id}-${i}`,
       url: "/auimap.webp",

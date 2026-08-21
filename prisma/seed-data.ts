@@ -14,24 +14,17 @@ export const SEED_TAGS: {
   sizeScale: number
 }[] = [
   {
-    id: "construction",
-    label: "In construction",
-    icon: "ConstructionIcon",
-    color: "yellow",
-    sizeScale: 1,
-  },
-  {
     id: "unknownHousing",
     label: "Housing",
     icon: "BedIcon",
-    color: "slate",
+    color: "blue",
     sizeScale: 1,
   },
   {
     id: "food",
     label: "Food",
     icon: "Restaurant02Icon",
-    color: "amber",
+    color: "orange",
     sizeScale: SMALL_PIN_SCALE,
   },
   {
@@ -45,15 +38,15 @@ export const SEED_TAGS: {
     id: "other",
     label: "Special",
     icon: "MoreIcon",
-    color: "mauve",
+    color: "fuchsia",
     sizeScale: SMALL_PIN_SCALE,
   },
-  { id: "parking", label: "Parking", icon: "Car", color: "mist", sizeScale: 1 },
+  { id: "parking", label: "Parking", icon: "Car", color: "sky", sizeScale: 1 },
   {
     id: "academic",
     label: "Academic",
     icon: "Building06Icon",
-    color: "taupe",
+    color: "red",
     sizeScale: 1,
   },
   {
@@ -74,6 +67,7 @@ export const SEED_PINS: {
   // exactly what you'd copy out of Google Maps, "latitude, longitude"
   coord: string
   attachmentCount?: number
+  underConstruction?: boolean
 }[] = [
   {
     id: "m6l",
@@ -230,8 +224,9 @@ export const SEED_PINS: {
     id: "scb",
     title: "Student Center Building",
     aliases: ["SCB", "Student Center"],
-    tagId: "construction",
+    tagId: "academic",
     coord: "33.540049, -5.105190",
+    underConstruction: true,
   },
   {
     id: "business-office",
@@ -319,8 +314,9 @@ export const SEED_PINS: {
   {
     id: "b57",
     title: "B57",
-    tagId: "construction",
+    tagId: "unknownHousing",
     coord: "33.542751, -5.106217",
+    underConstruction: true,
   },
   {
     id: "atm",

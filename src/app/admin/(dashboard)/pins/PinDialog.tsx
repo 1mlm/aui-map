@@ -9,8 +9,15 @@ import { ICONS } from "@/icons"
 import { MAP_BOUNDING_BOX } from "@/map/geo"
 import type { MapItemTag, PinLink } from "@/map/types"
 import { Button } from "@/shadcn/ui/button"
+import { Checkbox } from "@/shadcn/ui/checkbox"
 import { Input } from "@/shadcn/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shadcn/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shadcn/ui/select"
 import { Textarea } from "@/shadcn/ui/textarea"
 import { deletePin, upsertPin } from "./actions"
 import { AttachmentManager, type AttachmentRow } from "./AttachmentManager"
@@ -41,6 +48,7 @@ export type AdminPin = {
   email: string | null
   links: PinLink[]
   tagId: string
+  underConstruction: boolean
   attachments: AttachmentRow[]
 }
 
@@ -58,7 +66,9 @@ function LinksEditor({
   onChange: (links: EditableLink[]) => void
 }) {
   function updateLink(key: string, patch: Partial<PinLink>) {
-    onChange(links.map((link) => (link.key === key ? { ...link, ...patch } : link)))
+    onChange(
+      links.map((link) => (link.key === key ? { ...link, ...patch } : link)),
+    )
   }
 
   return (
@@ -94,7 +104,9 @@ function LinksEditor({
         variant="outline"
         size="sm"
         className="self-start rounded-full corner-squircle"
-        onClick={() => onChange([...links, { key: crypto.randomUUID(), label: "", url: "" }])}
+        onClick={() =>
+          onChange([...links, { key: crypto.randomUUID(), label: "", url: "" }])
+        }
       >
         <Icon icon={ICONS.add} />
         Add link
@@ -129,7 +141,13 @@ export function PinDialog({
     pin.links.map((link) => ({ ...link, key: crypto.randomUUID() })),
   )
   const [tagId, setTagId] = useState(pin.tagId)
-  const [position, setPosition] = useState({ latitude: pin.latitude, longitude: pin.longitude })
+  const [underConstruction, setUnderConstruction] = useState(
+    pin.underConstruction,
+  )
+  const [position, setPosition] = useState({
+    latitude: pin.latitude,
+    longitude: pin.longitude,
+  })
   const [attachments, setAttachments] = useState(pin.attachments)
   const [idTouched, setIdTouched] = useState(!isNew)
   const [pending, startTransition] = useTransition()
@@ -166,10 +184,15 @@ export function PinDialog({
             .filter((link) => link.label && link.url),
           ...position,
           tagId,
+          underConstruction,
         })
         onOpenChange(false)
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Couldn't save — that id might already be in use.")
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Couldn't save — that id might already be in use.",
+        )
       }
     })
   }
@@ -186,7 +209,11 @@ export function PinDialog({
           {isNew ? "New pin" : pin.title}
         </span>
       }
-      description={isNew ? "Add a new pin to the map." : "Edit this pin's details, position, and photos."}
+      description={
+        isNew
+          ? "Add a new pin to the map."
+          : "Edit this pin's details, position, and photos."
+      }
       onSubmit={handleSave}
       submitIcon={ICONS.save}
       submitLabel={isNew ? "Create pin" : "Save changes"}
@@ -284,6 +311,19 @@ export function PinDialog({
               </SelectContent>
             </Select>
           </div>
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={underConstruction}
+              onCheckedChange={(checked) =>
+                setUnderConstruction(checked === true)
+              }
+            />
+            <Icon
+              icon={ICONS.construction}
+              className="size-4 text-muted-foreground"
+            />
+            In construction
+          </label>
           <div className="flex flex-col gap-1.5">
             <FieldLabel icon={ICONS.openExternalMap} htmlFor="pin-maps-url">
               Google Maps link (optional)
@@ -296,7 +336,8 @@ export function PinDialog({
               className={INPUT_CLASS}
             />
             <p className="text-muted-foreground text-xs">
-              Overrides the maps menu's Google Maps option. Leave blank to just search these coordinates.
+              Overrides the maps menu's Google Maps option. Leave blank to just
+              search these coordinates.
             </p>
           </div>
           <div className="flex flex-col gap-1.5">
@@ -358,7 +399,11 @@ export function PinDialog({
           {!isNew && (
             <div className="flex flex-col gap-1.5">
               <FieldLabel icon={ICONS.photos}>Photos</FieldLabel>
-              <AttachmentManager pinId={id} {...{ attachments }} onAttachmentsChange={setAttachments} />
+              <AttachmentManager
+                pinId={id}
+                {...{ attachments }}
+                onAttachmentsChange={setAttachments}
+              />
             </div>
           )}
         </div>

@@ -52,4 +52,5 @@ export type MapItem = {
   links: PinLink[]
   tag: MapItemTag
   attachments: MapItemAttachment[]
+  underConstruction: boolean
 }

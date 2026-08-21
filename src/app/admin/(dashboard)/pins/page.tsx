@@ -7,7 +7,9 @@ import { PinsTable } from "./PinsTable"
 export default async function AdminPinsPage() {
   const [pinRows, tagRows] = await Promise.all([
     prisma.pin.findMany({
-      include: { attachments: { orderBy: [{ isThumbnail: "desc" }, { order: "asc" }] } },
+      include: {
+        attachments: { orderBy: [{ isThumbnail: "desc" }, { order: "asc" }] },
+      },
       orderBy: { title: "asc" },
     }),
     prisma.tag.findMany({ orderBy: { label: "asc" } }),
@@ -29,6 +31,7 @@ export default async function AdminPinsPage() {
     email: pin.email,
     links: parsePinLinks(pin.links),
     tagId: pin.tagId,
+    underConstruction: pin.underConstruction,
     attachments: pin.attachments.map((attachment) => ({
       id: attachment.id,
       url: attachment.url,

@@ -20,6 +20,7 @@ export type PinInput = {
   email: string | null
   links: PinLink[]
   tagId: string
+  underConstruction: boolean
 }
 
 async function getAttachments(pinId: string) {
@@ -37,7 +38,10 @@ async function getAttachments(pinId: string) {
       postedAt: true,
     },
   })
-  return attachments.map((attachment) => ({ ...attachment, postedAt: attachment.postedAt.toISOString() }))
+  return attachments.map((attachment) => ({
+    ...attachment,
+    postedAt: attachment.postedAt.toISOString(),
+  }))
 }
 
 // admin-pasted, so these flow straight into an href/window.open — reject anything that isn't
@@ -50,7 +54,8 @@ function assertValidHttpsUrl(url: string, label: string) {
 export async function upsertPin(input: PinInput) {
   await requireAuth()
   if (input.mapsUrl) assertValidHttpsUrl(input.mapsUrl, "Maps link")
-  for (const link of input.links) assertValidHttpsUrl(link.url, `"${link.label}" link`)
+  for (const link of input.links)
+    assertValidHttpsUrl(link.url, `"${link.label}" link`)
   const shared = {
     title: input.title,
     aliases: input.aliases,
@@ -64,15 +69,23 @@ export async function upsertPin(input: PinInput) {
     email: input.email,
     links: input.links,
     tagId: input.tagId,
+    underConstruction: input.underConstruction,
   }
-  await prisma.pin.upsert({ where: { id: input.id }, create: { id: input.id, ...shared }, update: shared })
+  await prisma.pin.upsert({
+    where: { id: input.id },
+    create: { id: input.id, ...shared },
+    update: shared,
+  })
   revalidatePath("/")
   revalidatePath("/admin/pins")
 }
 
 export async function deletePin(id: string) {
   await requireAuth()
-  const attachments = await prisma.attachment.findMany({ where: { pinId: id }, select: { url: true } })
+  const attachments = await prisma.attachment.findMany({
+    where: { pinId: id },
+    select: { url: true },
+  })
   await prisma.pin.delete({ where: { id } })
   await Promise.all(attachments.map((attachment) => deleteFile(attachment.url)))
   revalidatePath("/")
@@ -81,22 +94,37 @@ export async function deletePin(id: string) {
 
 export async function setThumbnail(pinId: string, attachmentId: string) {
   await requireAuth()
-  const attachment = await prisma.attachment.findUniqueOrThrow({ where: { id: attachmentId } })
+  const attachment = await prisma.attachment.findUniqueOrThrow({
+    where: { id: attachmentId },
+  })
   if (attachment.mimeType && !attachment.mimeType.startsWith("image/")) {
     throw new Error("Only images can be set as the thumbnail.")
   }
   await prisma.$transaction([
-    prisma.attachment.updateMany({ where: { pinId }, data: { isThumbnail: false } }),
-    prisma.attachment.update({ where: { id: attachmentId }, data: { isThumbnail: true } }),
+    prisma.attachment.updateMany({
+      where: { pinId },
+      data: { isThumbnail: false },
+    }),
+    prisma.attachment.update({
+      where: { id: attachmentId },
+      data: { isThumbnail: true },
+    }),
   ])
   revalidatePath("/")
   revalidatePath("/admin/pins")
   return getAttachments(pinId)
 }
 
-export async function setAttachmentCaption(pinId: string, attachmentId: string, caption: string) {
+export async function setAttachmentCaption(
+  pinId: string,
+  attachmentId: string,
+  caption: string,
+) {
   await requireAuth()
-  await prisma.attachment.update({ where: { id: attachmentId }, data: { caption: caption || null } })
+  await prisma.attachment.update({
+    where: { id: attachmentId },
+    data: { caption: caption || null },
+  })
   revalidatePath("/")
   revalidatePath("/admin/pins")
   return getAttachments(pinId)
@@ -106,7 +134,9 @@ export async function setAttachmentCaption(pinId: string, attachmentId: string, 
 export async function reorderAttachments(pinId: string, orderedIds: string[]) {
   await requireAuth()
   await prisma.$transaction(
-    orderedIds.map((id, order) => prisma.attachment.update({ where: { id }, data: { order } })),
+    orderedIds.map((id, order) =>
+      prisma.attachment.update({ where: { id }, data: { order } }),
+    ),
   )
   revalidatePath("/")
   revalidatePath("/admin/pins")
@@ -115,7 +145,9 @@ export async function reorderAttachments(pinId: string, orderedIds: string[]) {
 
 export async function deleteAttachment(pinId: string, attachmentId: string) {
   await requireAuth()
-  const attachment = await prisma.attachment.delete({ where: { id: attachmentId } })
+  const attachment = await prisma.attachment.delete({
+    where: { id: attachmentId },
+  })
   await deleteFile(attachment.url)
   revalidatePath("/")
   revalidatePath("/admin/pins")

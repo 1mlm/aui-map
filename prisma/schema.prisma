@@ -41,6 +41,9 @@ model Pin {
   // arbitrary named links (Instagram, a menu PDF, an external site...) — {label, url}[].
   // shape isn't fixed enough per-pin to earn its own table, and it's small/admin-only data
   links        Json         @default("[]")
+  // replaces the old "In construction" tag — a pin keeps its real category (academic, housing...)
+  // and just gets a small in-progress cue overlaid on top, instead of losing that category
+  underConstruction Boolean @default(false)
   tagId        String
   tag          Tag          @relation(fields: [tagId], references: [id])
   attachments  Attachment[]

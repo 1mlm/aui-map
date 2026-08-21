@@ -3,7 +3,11 @@
 import { Suspense, useState } from "react"
 import { Icon } from "@/components/Icon"
 import { SearchBar } from "@/components/SearchBar"
-import { CustomTable, type CustomTableColumn, type CustomTableEnumValue } from "@/components/table/CustomTable"
+import {
+  CustomTable,
+  type CustomTableColumn,
+  type CustomTableEnumValue,
+} from "@/components/table/CustomTable"
 import { ICONS } from "@/icons"
 import { formatCoordinates } from "@/map/geo"
 import type { MapItemTag } from "@/map/types"
@@ -30,16 +34,25 @@ const emptyPin = (tags: MapItemTag[]): AdminPin => ({
   links: [],
   ...MAP_CENTER,
   tagId: tags[0]?.id ?? "",
+  underConstruction: false,
   attachments: [],
 })
 
-function PinsTableInner({ pins, tags }: { pins: AdminPin[]; tags: MapItemTag[] }) {
+function PinsTableInner({
+  pins,
+  tags,
+}: {
+  pins: AdminPin[]
+  tags: MapItemTag[]
+}) {
   const [resultCount, setResultCount] = useState(pins.length)
   const [editingPin, setEditingPin] = useState<AdminPin | null>(null)
   const [creating, setCreating] = useState(false)
   const [viewingPhotosOf, setViewingPhotosOf] = useState<AdminPin | null>(null)
 
-  const tagOptions = Object.fromEntries(tags.map((tag) => [tag.id, toTagEnumValue(tag)]))
+  const tagOptions = Object.fromEntries(
+    tags.map((tag) => [tag.id, toTagEnumValue(tag)]),
+  )
 
   const columns: CustomTableColumn<AdminPin>[] = [
     {
@@ -70,7 +83,12 @@ function PinsTableInner({ pins, tags }: { pins: AdminPin[]; tags: MapItemTag[] }
       label: "Aliases",
       icon: ICONS.aliases,
       type: "tags",
-      getTags: (pin) => pin.aliases.map((alias) => ({ label: alias, icon: ICONS.aliases, color: "gray" })),
+      getTags: (pin) =>
+        pin.aliases.map((alias) => ({
+          label: alias,
+          icon: ICONS.aliases,
+          color: "gray",
+        })),
     },
     {
       id: "coordinates",
@@ -86,7 +104,10 @@ function PinsTableInner({ pins, tags }: { pins: AdminPin[]; tags: MapItemTag[] }
       type: "buttons",
       getButtons: (pin) =>
         pin.attachments.length === 0 ? (
-          <Icon icon={ICONS.clear} className="mx-auto text-muted-foreground/50" />
+          <Icon
+            icon={ICONS.clear}
+            className="mx-auto text-muted-foreground/50"
+          />
         ) : (
           <Button
             variant="secondary"
@@ -105,7 +126,12 @@ function PinsTableInner({ pins, tags }: { pins: AdminPin[]; tags: MapItemTag[] }
       icon: ICONS.edit,
       type: "buttons",
       getButtons: (pin) => (
-        <Button variant="ghost" size="sm" className="rounded-full corner-squircle" onClick={() => setEditingPin(pin)}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="rounded-full corner-squircle"
+          onClick={() => setEditingPin(pin)}
+        >
           <Icon icon={ICONS.edit} />
           Edit
         </Button>
@@ -116,8 +142,15 @@ function PinsTableInner({ pins, tags }: { pins: AdminPin[]; tags: MapItemTag[] }
   return (
     <div className="flex flex-col gap-4 p-6">
       <div className="flex items-center gap-3">
-        <SearchBar className="flex-1" placeholder="Search pins..." trailing={`${resultCount} ${resultCount === 1 ? "pin" : "pins"}`} />
-        <Button className="rounded-full corner-squircle" onClick={() => setCreating(true)}>
+        <SearchBar
+          className="flex-1"
+          placeholder="Search pins..."
+          trailing={`${resultCount} ${resultCount === 1 ? "pin" : "pins"}`}
+        />
+        <Button
+          className="rounded-full corner-squircle"
+          onClick={() => setCreating(true)}
+        >
           <Icon icon={ICONS.add} />
           New pin
         </Button>

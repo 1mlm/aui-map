@@ -24,6 +24,14 @@ const PREVIEW_DIM_OPACITY = 0.2
 const PIN_TILT_OPTIONS_DEG = [-1, 0, 0.5, 1, 1.5]
 const SELECTED_TILT_DEG = 3
 
+// scattered around the icon rather than centered on it — a construction cue, not a halo. each
+// twinkles on its own delay so they don't all pulse in lockstep
+const UNDER_CONSTRUCTION_SPARKLES = [
+  { top: "0%", left: "75%", delay: 0 },
+  { top: "15%", left: "5%", delay: 0.5 },
+  { top: "65%", left: "90%", delay: 1 },
+]
+
 // stays the same for a given pin every time, so the tilt reads as each pin's own personality
 // rather than jittering on every re-render — a real Math.random() would do the latter
 function tiltForPin(id: string) {
@@ -158,6 +166,30 @@ export function MapPin({
               }}
               className="pin-filter relative block size-11"
             />
+            {item.underConstruction && (
+              <span className="pointer-events-none absolute inset-0 opacity-50">
+                {UNDER_CONSTRUCTION_SPARKLES.map(({ top, left, delay }) => (
+                  <motion.span
+                    key={`${top}-${left}`}
+                    className="absolute -translate-1/2"
+                    style={{ top, left }}
+                    animate={{ opacity: [0.15, 1, 0.15], scale: [0.6, 1, 0.6] }}
+                    transition={{
+                      duration: 1.8,
+                      repeat: Infinity,
+                      delay,
+                      ease: "easeInOut",
+                    }}
+                  >
+                    <Icon
+                      icon={ICONS.sparkles}
+                      className="size-2.5"
+                      style={{ color: fill }}
+                    />
+                  </motion.span>
+                ))}
+              </span>
+            )}
           </motion.button>
         </motion.div>
       </TooltipTrigger>

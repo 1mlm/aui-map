@@ -14,6 +14,7 @@ import {
   CheckmarkCircle02Icon,
   ClinicIcon,
   Clock01Icon,
+  ConstructionIcon,
   Copy01Icon,
   CopyCheckIcon,
   Csv01Icon,
@@ -52,6 +53,7 @@ import {
   RefreshIcon,
   Search02Icon,
   SentIcon,
+  SparklesIcon,
   Tag01Icon,
   Target01Icon,
   TextIcon,
@@ -123,6 +125,8 @@ export const ICONS = {
   email: Mail01Icon,
   link: Link01Icon,
   externalLink: ArrowUpRight01Icon,
+  construction: ConstructionIcon,
+  sparkles: SparklesIcon,
 
   // submission file types
   video: Video01Icon,
