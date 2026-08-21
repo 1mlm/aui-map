@@ -15,10 +15,18 @@ import { useUserLocation } from "./useUserLocation"
 function matchesSearch(item: MapItem, query: string) {
   if (!query) return true
   const q = query.toLowerCase()
-  return [item.title, ...item.aliases].some((name) => name.toLowerCase().includes(q))
+  return [item.title, ...item.aliases].some((name) =>
+    name.toLowerCase().includes(q),
+  )
 }
 
-export function MapExperience({ items, tags }: { items: MapItem[]; tags: MapItemTag[] }) {
+export function MapExperience({
+  items,
+  tags,
+}: {
+  items: MapItem[]
+  tags: MapItemTag[]
+}) {
   const shellRef = useRef<HTMLDivElement>(null)
   const space = useAvailableSpace(shellRef)
   const location = useUserLocation()
@@ -33,7 +41,8 @@ export function MapExperience({ items, tags }: { items: MapItem[]; tags: MapItem
   const selected = items.find((item) => item.id === selectedId) ?? null
   const visibleItems = items.filter(
     (item) =>
-      matchesSearch(item, search) && (activeTagIds.size === 0 || activeTagIds.has(item.tag.id)),
+      matchesSearch(item, search) &&
+      (activeTagIds.size === 0 || activeTagIds.has(item.tag.id)),
   )
 
   const toggleTag = (tagId: string) =>
@@ -66,7 +75,7 @@ export function MapExperience({ items, tags }: { items: MapItem[]; tags: MapItem
           onHoverTag={setHoveredTagId}
           compact={!space.showsFullCredit}
           onOpenNotice={() => setNoticeOpen(true)}
-          {...{ search, activeTagIds, hoveredTagId, location }}
+          {...{ search, activeTagIds, hoveredTagId }}
         />
 
         <AnimatePresence>
@@ -79,7 +88,9 @@ export function MapExperience({ items, tags }: { items: MapItem[]; tags: MapItem
           )}
         </AnimatePresence>
 
-        {space.showsFullCredit && <MapCredit onOpen={() => setNoticeOpen(true)} />}
+        {space.showsFullCredit && (
+          <MapCredit onOpen={() => setNoticeOpen(true)} />
+        )}
         <NoticeDialog open={noticeOpen} onOpenChange={setNoticeOpen} />
       </div>
     </div>
