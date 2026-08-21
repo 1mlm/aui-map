@@ -10,7 +10,6 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
-  ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/shadcn/ui/context-menu"
 import { cn } from "@/shadcn/utils"
@@ -22,10 +21,10 @@ import {
   positionToStyle,
   screenPointToPosition,
 } from "./geo"
-import { MapPin, PIN_TIP_FRACTION, PinInnerShadowFilter } from "./MapPin"
-import { tagPinFillColor, tagPinOutlineColor, tagSolidColor } from "./tagColor"
+import { MapPin, PIN_TIP_FRACTION } from "./MapPin"
 import type { MapItem } from "./types"
 import { type UserLocation, UserLocationMarker } from "./UserLocationMarker"
+import type { CompassPermission } from "./useCompassHeading"
 import { useMapPanZoom } from "./useMapPanZoom"
 
 const SURVEYED_COORD_TOAST_MS = 3000
@@ -34,13 +33,15 @@ const COPIED_FEEDBACK_MS = 1500
 // a marker for wherever the map's context menu was opened — never a real place, just a way to
 // see exactly which point the menu's coordinates/directions refer to
 function DroppedPinMarker({ position }: { position: NormalizedPosition }) {
-  const fill = tagPinFillColor("red")
-  const outline = tagPinOutlineColor("red")
-  const glow = tagSolidColor("red")
+  // white rather than one of the tag colors, and half-see-through — this isn't a real place, just
+  // a faint "you clicked here" cue, so it shouldn't compete with the actual pins around it
+  const fill = "white"
+  const outline = "white"
+  const glow = "white"
 
   return (
     <div
-      className="pointer-events-none absolute"
+      className="pointer-events-none absolute opacity-25"
       style={{
         ...positionToStyle(position),
         transform: `translate(-50%, ${-PIN_TIP_FRACTION * 100}%)`,
@@ -100,18 +101,6 @@ function DroppedPinMenuContent({ position }: { position: NormalizedPosition }) {
         <Icon icon={ICONS.openExternalMap} />
         Open in Waze
       </ContextMenuItem>
-      <ContextMenuSeparator />
-      <ContextMenuItem asChild onSelect={() => triggerHaptic()}>
-        <a
-          href="/auimap.webp"
-          download="aui-campus-map.webp"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Icon icon={ICONS.upload} className="rotate-180" />
-          Download background map image
-        </a>
-      </ContextMenuItem>
     </>
   )
 }
@@ -121,12 +110,18 @@ export function MapCanvas({
   selectedId,
   onSelect,
   userPosition,
+  compassHeading,
+  compassPermission,
+  onRequestCompass,
   hoveredTagId,
 }: {
   items: MapItem[]
   selectedId: string | null
   onSelect: (id: string | null) => void
   userPosition: UserLocation["position"]
+  compassHeading: number | null
+  compassPermission: CompassPermission
+  onRequestCompass: () => void
   hoveredTagId: string | null
 }) {
   const panZoom = useMapPanZoom()
@@ -138,11 +133,21 @@ export function MapCanvas({
 
   useEffect(() => () => clearTimeout(surveyedCoordTimer.current), [])
 
-  // toggled imperatively instead of through React state, so 69 pins dropping their shadow
-  // filters mid-gesture doesn't itself cost a render — see useMapPanZoom's isMoving for why
+  // toggled imperatively instead of through React state, so dropping the selected pin's glow
+  // filter mid-gesture doesn't itself cost a render — see useMapPanZoom's isMoving for why
   useMotionValueEvent(panZoom.isMoving, "change", (value) => {
     imageBoxRef.current?.toggleAttribute("data-moving", value === 1)
   })
+
+  // the moment the user's location is first found, zoom in and center on them — but only if
+  // they haven't touched the map yet themselves, and only ever this once. Later position updates
+  // from the same watchPosition (useUserLocation) must not keep yanking the view back to them
+  const hasAutoLocated = useRef(false)
+  useEffect(() => {
+    if (!userPosition || hasAutoLocated.current) return
+    hasAutoLocated.current = true
+    if (!panZoom.hasInteracted.current) panZoom.centerOn(userPosition)
+  }, [userPosition, panZoom])
 
   // ctrl/cmd + click reads the coordinate under the cursor and copies it in data.ts's format, so
   // new map items can be surveyed straight off the satellite image
@@ -221,7 +226,12 @@ export function MapCanvas({
                 draggable={false}
                 className="pointer-events-none"
               />
-              <UserLocationMarker position={userPosition} />
+              <UserLocationMarker
+                position={userPosition}
+                heading={compassHeading}
+                compassPermission={compassPermission}
+                onRequestCompass={onRequestCompass}
+              />
               {items.map((item) => (
                 <MapPin
                   key={item.id}
@@ -257,8 +267,6 @@ export function MapCanvas({
               <span className="font-mono">{surveyedCoord}</span>
             </SquircleFuserContainer>
           )}
-
-          <PinInnerShadowFilter />
         </div>
       </ContextMenuTrigger>
       {contextMenuPosition && (

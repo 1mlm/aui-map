@@ -8,8 +8,9 @@ import {
   distanceBetween,
   midpointOf,
   type Pan,
-  type Point,
   panAnchoredAt,
+  panCenteredOn,
+  type Point,
 } from "./panZoomMath"
 
 // the image sits in a square box already sized to cover the viewport, so 1 is the smallest
@@ -36,6 +37,12 @@ const LIMIT_FLASH_MS = 180
 // pinch move) before assuming the gesture is done and turning them back on
 const ZOOMING_FILTER_CLEAR_DELAY_MS = 200
 const SNAP_SPRING = { type: "spring", stiffness: 260, damping: 26 } as const
+// quick and snappy — this is a "found you" nudge on first load, not a gesture settling
+const LOCATE_TRANSITION = {
+  type: "tween",
+  duration: 0.2,
+  ease: "easeOut",
+} as const
 
 // the scale the map opens at, and returns to when a double-tap zooms back out
 function restingScaleFor(rect: DOMRect) {
@@ -63,6 +70,10 @@ export function useMapPanZoom() {
   const isMoving = useMotionValue(0)
   const [hitLimit, setHitLimit] = useState(false)
   const restingScale = useRef(DEFAULT_SCALE)
+  // true the moment the user first touches the map themselves — drag, pinch, wheel, or a tap that
+  // lands on a pin. Read once, on the geolocation fix, to decide whether auto-centering on them
+  // would still be welcome or would now just be yanking the view out from under them
+  const hasInteracted = useRef(false)
 
   const activePointers = useRef(new Map<number, Point>())
   const panOrigin = useRef<{ pointer: Point; pan: Pan } | null>(null)
@@ -163,6 +174,24 @@ export function useMapPanZoom() {
     animate(y, pan.y, SNAP_SPRING)
   }
 
+  // the one-time "found you" nudge: zooms in on and centers a normalized map point, quickly. Only
+  // ever called for the user's own location, and only once — see hasInteracted above
+  function centerOn([nx, ny]: [number, number]) {
+    if (!rect.current) return
+    const toScale = DOUBLE_TAP_SCALE
+    const pan = clampPanToOverhang(
+      panCenteredOn(nx, ny, toScale, rect.current),
+      toScale,
+      rect.current,
+    )
+    if (zoomingFilterClearTimeout.current)
+      clearTimeout(zoomingFilterClearTimeout.current)
+    isMoving.set(1)
+    animate(scale, toScale, LOCATE_TRANSITION).then(() => isMoving.set(0))
+    animate(x, pan.x, LOCATE_TRANSITION)
+    animate(y, pan.y, LOCATE_TRANSITION)
+  }
+
   function toggleZoom(origin: Point) {
     const isZoomedIn = scale.get() > restingScale.current + 0.1
     zoomTo(isZoomedIn ? restingScale.current : DOUBLE_TAP_SCALE, origin, {
@@ -193,6 +222,7 @@ export function useMapPanZoom() {
     const el = containerRef.current
     if (!el) return
     const handleWheel = (e: WheelEvent) => {
+      hasInteracted.current = true
       e.preventDefault()
       // ctrlKey means a trackpad pinch rather than a scroll, which reports smaller deltas
       const delta = e.ctrlKey ? -e.deltaY * 0.02 : -e.deltaY * 0.01
@@ -209,6 +239,7 @@ export function useMapPanZoom() {
   })
 
   function handlePointerDown(e: React.PointerEvent) {
+    hasInteracted.current = true
     // recorded before the early returns below — a long-press/right-click on a pin (itself a
     // button) still needs to open the context menu at the right coordinate
     lastPointerClientPosition.current = { x: e.clientX, y: e.clientY }
@@ -322,6 +353,8 @@ export function useMapPanZoom() {
     y,
     isMoving,
     hitLimit,
+    hasInteracted,
+    centerOn,
     getLastPointerClientPosition: () => lastPointerClientPosition.current,
     gestureHandlers: {
       onPointerDown: handlePointerDown,

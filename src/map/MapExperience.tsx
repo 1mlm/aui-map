@@ -10,6 +10,7 @@ import { MapCredit, NoticeDialog } from "./MapCredit"
 import { MapDetailPanel } from "./MapDetailPanel"
 import type { MapItem, MapItemTag } from "./types"
 import { useAvailableSpace } from "./useAvailableSpace"
+import { useCompassHeading } from "./useCompassHeading"
 import { useUserLocation } from "./useUserLocation"
 
 function matchesSearch(item: MapItem, query: string) {
@@ -30,6 +31,7 @@ export function MapExperience({
   const shellRef = useRef<HTMLDivElement>(null)
   const space = useAvailableSpace(shellRef)
   const location = useUserLocation()
+  const compass = useCompassHeading()
 
   const [search, setSearch] = useState("")
   const [activeTagIds, setActiveTagIds] = useState<Set<string>>(new Set())
@@ -63,6 +65,9 @@ export function MapExperience({
           items={visibleItems}
           onSelect={setSelectedId}
           userPosition={location.position}
+          compassHeading={compass.heading}
+          compassPermission={compass.permission}
+          onRequestCompass={compass.requestPermission}
           {...{ selectedId, hoveredTagId }}
         />
 

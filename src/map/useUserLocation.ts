@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { isWithinCampusBounds, latLongToPosition } from "./geo"
 
-// fetches the browser's geolocation silently on mount — no button, no toast, no error UI. The
+// watches the browser's geolocation silently from mount — no button, no toast, no error UI. The
 // browser handles the permission prompt on its own; if it's denied (or was denied before), this
 // just quietly never gets a position
 export function useUserLocation() {
@@ -11,7 +11,7 @@ export function useUserLocation() {
 
   useEffect(() => {
     if (!navigator.geolocation) return
-    navigator.geolocation.getCurrentPosition(
+    const watchId = navigator.geolocation.watchPosition(
       ({ coords }) => {
         if (!isWithinCampusBounds(coords.latitude, coords.longitude)) return
         setPosition(latLongToPosition(coords.latitude, coords.longitude))
@@ -19,6 +19,7 @@ export function useUserLocation() {
       () => {},
       { enableHighAccuracy: true, timeout: 10_000 },
     )
+    return () => navigator.geolocation.clearWatch(watchId)
   }, [])
 
   return { position }

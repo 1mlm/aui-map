@@ -22,6 +22,7 @@ import { ContributeDialog } from "./ContributeDialog"
 import { TagChipIcon, tagChipClassName } from "./MapTagFilter"
 import { tagColorStyle } from "./tagColor"
 import type { MapItem, MapItemAttachment, MapItemTag, PinLink } from "./types"
+import { useDismissKey } from "./useDismissKey"
 
 const COPIED_FEEDBACK_MS = 1500
 // collapsed shows the essentials without covering the map entirely; expanded is a drag/tap away
@@ -50,6 +51,7 @@ export function MapDetailPanel({
   )
   const [contributeOpen, setContributeOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  useDismissKey(onClose)
 
   // dragging the handle up/down resizes the sheet; dragging it well past collapsed dismisses,
   // matching the swipe-to-dismiss threshold pattern AttachmentCarousel uses for its own drag gesture

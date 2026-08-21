@@ -17,10 +17,12 @@ import { pinCounterScale } from "./useMapPanZoom"
 export const PIN_TIP_FRACTION = 22 / 24
 const PIN_HEAD_FRACTION = 11 / 24
 
-const INNER_SHADOW_FILTER_ID = "pin-inner-shadow"
 const PREVIEW_DIM_OPACITY = 0.2
-// a small, deliberately subtle set rather than a continuous range — reads as a nudge, not a spin
+// a small, deliberately subtle set rather than a continuous range — reads as a nudge, not a spin.
+// only for hover and the tag-preview wiggle — selection uses SELECTED_TILT_DEG instead, which is
+// meant to actually read as a tilt
 const PIN_TILT_OPTIONS_DEG = [-1, 0, 0.5, 1, 1.5]
+const SELECTED_TILT_DEG = 3
 
 // stays the same for a given pin every time, so the tilt reads as each pin's own personality
 // rather than jittering on every re-render — a real Math.random() would do the latter
@@ -30,37 +32,6 @@ function tiltForPin(id: string) {
     7,
   )
   return PIN_TILT_OPTIONS_DEG[Math.abs(hash) % PIN_TILT_OPTIONS_DEG.length]
-}
-
-// box-shadow (so tailwind's inset-shadow-*) paints the element's rectangle and would draw a square
-// around the teardrop, and css filters have no inset drop-shadow — an svg filter is the only thing
-// that reads the drawn shape's alpha. Rendered once by MapCanvas, referenced by every pin.
-export function PinInnerShadowFilter() {
-  return (
-    <svg aria-hidden className="absolute size-0">
-      <title>Pin inner shadow filter</title>
-      <filter
-        id={INNER_SHADOW_FILTER_ID}
-        x="-50%"
-        y="-50%"
-        width="200%"
-        height="200%"
-      >
-        <feOffset dy="1.2" />
-        <feGaussianBlur stdDeviation="0.9" result="blurred" />
-        {/* everything the blurred copy leaves uncovered inside the pin is where light wouldn't reach */}
-        <feComposite
-          operator="out"
-          in="SourceGraphic"
-          in2="blurred"
-          result="recess"
-        />
-        <feFlood floodColor="black" floodOpacity="0.45" />
-        <feComposite operator="in" in2="recess" />
-        <feComposite operator="over" in2="SourceGraphic" />
-      </filter>
-    </svg>
-  )
 }
 
 export function MapPin({
@@ -85,7 +56,15 @@ export function MapPin({
   const fill = tagPinFillColor(item.tag.color)
   const outline = tagPinOutlineColor(item.tag.color)
   const tilt = tiltForPin(item.id)
-  const restingTilt = selected || (previewing && matchesPreview) ? tilt : 0
+  // same left/right split as the personality tilt, just at a magnitude that actually reads as
+  // a tilt rather than a nudge — each pin leans the same way whether it's picking its hover
+  // nudge or its selected tilt, so the two never fight each other mid-transition
+  const selectedTilt = tilt >= 0 ? SELECTED_TILT_DEG : -SELECTED_TILT_DEG
+  const restingTilt = selected
+    ? selectedTilt
+    : previewing && matchesPreview
+      ? tilt
+      : 0
   const sizeScale = item.tag.sizeScale
 
   return (
@@ -112,6 +91,19 @@ export function MapPin({
           }}
           className="absolute"
         >
+          {/* a plain radial-gradient, not a filter — filters are what made per-pin shadows janky
+              before (see useMapPanZoom's isMoving). Sits on this div rather than the button below
+              so it only rides the map's zoom counter-scale, not the hover/tap/selection bump */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute h-2 w-4 rounded-full"
+            style={{
+              left: "50%",
+              top: `${PIN_TIP_FRACTION * 100}%`,
+              transform: `translate(-50%, -50%) scale(${sizeScale})`,
+              background: `radial-gradient(closest-side, rgba(0,0,0,${selected ? 0.4 : 0.3}), rgba(0,0,0,0) 75%)`,
+            }}
+          />
           <motion.button
             type="button"
             onClick={(e) => {
@@ -129,7 +121,7 @@ export function MapPin({
             }}
             whileHover={{
               scale: (selected ? 1.45 : 1.25) * sizeScale,
-              rotate: tilt,
+              rotate: selected ? selectedTilt : tilt,
             }}
             whileTap={{ scale: 0.9 * sizeScale }}
             style={{ originX: 0.5, originY: PIN_TIP_FRACTION }}
@@ -164,7 +156,7 @@ export function MapPin({
                 color: outline,
                 filter: selected ? `drop-shadow(0 0 6px ${fill})` : undefined,
               }}
-              className="pin-filter relative block size-7"
+              className="pin-filter relative block size-11"
             />
           </motion.button>
         </motion.div>

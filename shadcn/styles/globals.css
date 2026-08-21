@@ -92,15 +92,30 @@
   button:not(:disabled), [role="button"]:not(:disabled) {
     cursor: pointer;
     }
+  /* radix's menu items are role="menuitem"/"menuitemcheckbox"/"menuitemradio", not "button", so
+     the rule above misses them — shadcn's own primitives ship with cursor-default on these.
+     !important because tailwind's own cursor-default utility sits in a later layer, which
+     normally beats @layer base regardless of selector specificity */
+  [data-slot="context-menu-item"]:not([data-disabled]),
+  [data-slot="context-menu-sub-trigger"]:not([data-disabled]),
+  [data-slot="context-menu-checkbox-item"]:not([data-disabled]),
+  [data-slot="context-menu-radio-item"]:not([data-disabled]),
+  [data-slot="dropdown-menu-item"]:not([data-disabled]),
+  [data-slot="dropdown-menu-sub-trigger"]:not([data-disabled]),
+  [data-slot="dropdown-menu-checkbox-item"]:not([data-disabled]),
+  [data-slot="dropdown-menu-radio-item"]:not([data-disabled]) {
+    cursor: pointer !important;
+    }
   html {
     @apply font-sans;
     }
 }
 
-/* re-rasterizing 69 pins' shadow filters on every frame is what makes panning/zooming janky —
-   dropped here while the map is actively moving (useMapPanZoom's isMoving), restored once it
-   settles. !important because tailwind's own filter/drop-shadow utilities sit in a later layer,
-   which normally beats @layer base regardless of selector specificity */
+/* re-rasterizing a filter on every frame is what makes panning/zooming janky, so the selected
+   pin's glow (MapPin.tsx's only remaining `filter`) drops out here while the map is actively
+   moving (useMapPanZoom's isMoving), restored once it settles. !important because tailwind's own
+   filter/drop-shadow utilities sit in a later layer, which normally beats @layer base regardless
+   of selector specificity */
 [data-moving] .pin-filter {
   filter: none !important;
 }
