@@ -52,7 +52,7 @@ export const MAP_TAGS = {
     id: "academic",
     label: "Academic",
     icon: Building06Icon,
-    color: "red",
+    color: "brown",
     sizeScale: 1,
   },
   auditorium: {
