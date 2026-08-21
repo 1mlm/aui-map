@@ -2,20 +2,67 @@ import type { IconName } from "@/map/iconRegistry"
 
 // the one-time starting content for both the dev and prod databases — after the
 // initial seed, each environment's data is edited independently through /admin
+// smaller than 1 for things that sit inside/next to a building rather than being one — see
+// Tag.sizeScale in prisma/schema.prisma
+const SMALL_PIN_SCALE = 0.8
+
 export const SEED_TAGS: {
   id: string
   label: string
   icon: IconName
   color: string | null
+  sizeScale: number
 }[] = [
-  { id: "construction", label: "In construction", icon: "ConstructionIcon", color: "yellow" },
-  { id: "unknownHousing", label: "Housing", icon: "BedIcon", color: "slate" },
-  { id: "food", label: "Food", icon: "Restaurant02Icon", color: "amber" },
-  { id: "sports", label: "Sports", icon: "FootballIcon", color: "green" },
-  { id: "other", label: "Special", icon: "MoreIcon", color: "mauve" },
-  { id: "parking", label: "Parking", icon: "Car", color: "mist" },
-  { id: "academic", label: "Academic", icon: "Building06Icon", color: "taupe" },
-  { id: "auditorium", label: "Auditorium", icon: "TheaterIcon", color: "cyan" },
+  {
+    id: "construction",
+    label: "In construction",
+    icon: "ConstructionIcon",
+    color: "yellow",
+    sizeScale: 1,
+  },
+  {
+    id: "unknownHousing",
+    label: "Housing",
+    icon: "BedIcon",
+    color: "slate",
+    sizeScale: 1,
+  },
+  {
+    id: "food",
+    label: "Food",
+    icon: "Restaurant02Icon",
+    color: "amber",
+    sizeScale: SMALL_PIN_SCALE,
+  },
+  {
+    id: "sports",
+    label: "Sports",
+    icon: "FootballIcon",
+    color: "green",
+    sizeScale: SMALL_PIN_SCALE,
+  },
+  {
+    id: "other",
+    label: "Special",
+    icon: "MoreIcon",
+    color: "mauve",
+    sizeScale: SMALL_PIN_SCALE,
+  },
+  { id: "parking", label: "Parking", icon: "Car", color: "mist", sizeScale: 1 },
+  {
+    id: "academic",
+    label: "Academic",
+    icon: "Building06Icon",
+    color: "taupe",
+    sizeScale: 1,
+  },
+  {
+    id: "auditorium",
+    label: "Auditorium",
+    icon: "TheaterIcon",
+    color: "cyan",
+    sizeScale: SMALL_PIN_SCALE,
+  },
 ]
 
 export const SEED_PINS: {
@@ -42,13 +89,19 @@ export const SEED_PINS: {
     id: "field",
     title: "AUI Sports Field",
     aliases: ["The Track", "Stade"],
-    description: "Full-size grass pitch with a jogging track alongside. Currently under renovation.",
+    description:
+      "Full-size grass pitch with a jogging track alongside. Currently under renovation.",
     tagId: "sports",
     coord: "33.540742, -5.108640",
   },
   { id: "b4", title: "B4", tagId: "academic", coord: "33.538956, -5.107404" },
   { id: "b8", title: "B8", tagId: "academic", coord: "33.538582, -5.107859" },
-  { id: "b8b", title: "B 8/B", tagId: "academic", coord: "33.538249, -5.108226" },
+  {
+    id: "b8b",
+    title: "B 8/B",
+    tagId: "academic",
+    coord: "33.538249, -5.108226",
+  },
   {
     id: "nab",
     title: "NAB",
@@ -87,7 +140,8 @@ export const SEED_PINS: {
     id: "pool",
     title: "Pool",
     aliases: ["Piscine"],
-    description: "Indoor Olympic pool, 8 lanes, kept around 27 to 28°C year round. Open daily with lifeguards on duty.",
+    description:
+      "Indoor Olympic pool, 8 lanes, kept around 27 to 28°C year round. Open daily with lifeguards on duty.",
     tagId: "sports",
     coord: "33.539597, -5.109371",
   },
@@ -95,7 +149,8 @@ export const SEED_PINS: {
     id: "gym",
     title: "Fitness Center",
     aliases: ["The Gym", "Salle de sport"],
-    description: "Weight room, cardio room, and a table tennis room, right by the main field.",
+    description:
+      "Weight room, cardio room, and a table tennis room, right by the main field.",
     tagId: "sports",
     coord: "33.539916, -5.109399",
     attachmentCount: 2,
@@ -107,7 +162,8 @@ export const SEED_PINS: {
   {
     id: "b7",
     title: "B7",
-    description: "Mix of classrooms, labs, amphitheaters and professor offices. The first floor also houses the Writing Center for free help with English papers.",
+    description:
+      "Mix of classrooms, labs, amphitheaters and professor offices. The first floor also houses the Writing Center for free help with English papers.",
     tagId: "academic",
     coord: "33.537796, -5.107795",
   },
@@ -115,7 +171,8 @@ export const SEED_PINS: {
     id: "masjid",
     title: "AUI Masjid",
     aliases: ["Mosque", "Mosquée", "The Masjid"],
-    description: "Campus mosque for the five daily prayers. Roughly central between the library and the academic buildings.",
+    description:
+      "Campus mosque for the five daily prayers. Roughly central between the library and the academic buildings.",
     tagId: "other",
     coord: "33.539462, -5.106816",
   },
@@ -179,7 +236,8 @@ export const SEED_PINS: {
   {
     id: "business-office",
     title: "Business Office",
-    description: "Issues and unblocks the Cash Wallet card. It's the only payment method accepted at campus dining.",
+    description:
+      "Issues and unblocks the Cash Wallet card. It's the only payment method accepted at campus dining.",
     tagId: "other",
     coord: "33.538962, -5.105741",
   },
@@ -195,7 +253,8 @@ export const SEED_PINS: {
     id: "laundry",
     title: "Landromat",
     aliases: ["Laundry"],
-    description: "Full-service basement laundry. Drop off your clothes and an attendant washes, dries, and folds them for you.",
+    description:
+      "Full-service basement laundry. Drop off your clothes and an attendant washes, dries, and folds them for you.",
     tagId: "other",
     coord: "33.541022, -5.107031",
   },
@@ -267,7 +326,8 @@ export const SEED_PINS: {
     id: "atm",
     title: "ATM",
     aliases: ["Guichet"],
-    description: "Basement of Building 33. 4 ATMs, plus AUI's post office branch right next door.",
+    description:
+      "Basement of Building 33. 4 ATMs, plus AUI's post office branch right next door.",
     tagId: "other",
     coord: "33.539215, -5.105056",
   },

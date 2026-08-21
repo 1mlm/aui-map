@@ -3,7 +3,11 @@
 import { Suspense, useState } from "react"
 import { Icon } from "@/components/Icon"
 import { SearchBar } from "@/components/SearchBar"
-import { CustomTable, type CustomTableColumn, type CustomTableEnumValue } from "@/components/table/CustomTable"
+import {
+  CustomTable,
+  type CustomTableColumn,
+  type CustomTableEnumValue,
+} from "@/components/table/CustomTable"
 import { ICONS } from "@/icons"
 import { CURATED_TAG_COLORS } from "@/map/tagColor"
 import { Button } from "@/shadcn/ui/button"
@@ -12,10 +16,20 @@ import { type AdminTag, TagDialog } from "./TagDialog"
 export type TagRow = AdminTag
 
 const colorOptions: Record<string, CustomTableEnumValue> = Object.fromEntries(
-  CURATED_TAG_COLORS.map((name) => [name, { label: name, icon: ICONS.color, color: name }]),
+  CURATED_TAG_COLORS.map((name) => [
+    name,
+    { label: name, icon: ICONS.color, color: name },
+  ]),
 )
 
-const emptyTag: AdminTag = { id: "", label: "", icon: "MoreIcon", color: null, pinCount: 0 }
+const emptyTag: AdminTag = {
+  id: "",
+  label: "",
+  icon: "MoreIcon",
+  color: null,
+  sizeScale: 1,
+  pinCount: 0,
+}
 
 function TagsTableInner({ tags }: { tags: TagRow[] }) {
   const [resultCount, setResultCount] = useState(tags.length)
@@ -62,7 +76,12 @@ function TagsTableInner({ tags }: { tags: TagRow[] }) {
       icon: ICONS.edit,
       type: "buttons",
       getButtons: (tag) => (
-        <Button variant="ghost" size="sm" className="rounded-full corner-squircle" onClick={() => setEditingTag(tag)}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="rounded-full corner-squircle"
+          onClick={() => setEditingTag(tag)}
+        >
           <Icon icon={ICONS.edit} />
           Edit
         </Button>
@@ -73,8 +92,15 @@ function TagsTableInner({ tags }: { tags: TagRow[] }) {
   return (
     <div className="flex flex-col gap-4 p-6">
       <div className="flex items-center gap-3">
-        <SearchBar className="flex-1" placeholder="Search tags..." trailing={`${resultCount} ${resultCount === 1 ? "tag" : "tags"}`} />
-        <Button className="rounded-full corner-squircle" onClick={() => setCreating(true)}>
+        <SearchBar
+          className="flex-1"
+          placeholder="Search tags..."
+          trailing={`${resultCount} ${resultCount === 1 ? "tag" : "tags"}`}
+        />
+        <Button
+          className="rounded-full corner-squircle"
+          onClick={() => setCreating(true)}
+        >
           <Icon icon={ICONS.add} />
           New tag
         </Button>
@@ -96,7 +122,14 @@ function TagsTableInner({ tags }: { tags: TagRow[] }) {
           onOpenChange={(open) => !open && setEditingTag(null)}
         />
       )}
-      {creating && <TagDialog tag={emptyTag} isNew={true} open={creating} onOpenChange={setCreating} />}
+      {creating && (
+        <TagDialog
+          tag={emptyTag}
+          isNew={true}
+          open={creating}
+          onOpenChange={setCreating}
+        />
+      )}
     </div>
   )
 }

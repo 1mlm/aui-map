@@ -6,6 +6,8 @@ export type MapItemTag = {
   label: string
   icon: HugeIcon
   color?: TagColorName
+  // pin size multiplier — see Tag.sizeScale in prisma/schema.prisma
+  sizeScale: number
 }
 
 export type MapItemAttachment = {

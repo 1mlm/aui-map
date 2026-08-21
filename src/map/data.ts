@@ -7,9 +7,11 @@ import {
   MoreIcon,
   Restaurant02Icon,
   TheaterIcon,
-} from "@hugeicons/core-free-icons";
-import { parseCoordinates } from "./geo";
-import type { MapItem, MapItemTag } from "./types";
+} from "@hugeicons/core-free-icons"
+import { parseCoordinates } from "./geo"
+import type { MapItem, MapItemTag } from "./types"
+
+const SMALL_PIN_SCALE = 0.8
 
 export const MAP_TAGS = {
   construction: {
@@ -17,58 +19,71 @@ export const MAP_TAGS = {
     label: "In construction",
     icon: ConstructionIcon,
     color: "yellow",
+    sizeScale: 1,
   },
   unknownHousing: {
     id: "unknownHousing",
     label: "Housing",
     icon: BedIcon,
     color: "slate",
+    sizeScale: 1,
   },
-  food: { id: "food", label: "Food", icon: Restaurant02Icon, color: "amber" },
+  food: {
+    id: "food",
+    label: "Food",
+    icon: Restaurant02Icon,
+    color: "amber",
+    sizeScale: SMALL_PIN_SCALE,
+  },
   sports: {
     id: "sports",
     label: "Sports",
     icon: FootballIcon,
     color: "green",
+    sizeScale: SMALL_PIN_SCALE,
   },
   other: {
     id: "other",
     label: "Special",
     icon: MoreIcon,
     color: "mauve",
+    sizeScale: SMALL_PIN_SCALE,
   },
   parking: {
     id: "parking",
     label: "Parking",
     icon: Car,
     color: "mist",
+    sizeScale: 1,
   },
   academic: {
     id: "academic",
     label: "Academic",
     icon: Building06Icon,
     color: "taupe",
+    sizeScale: 1,
   },
   auditorium: {
     id: "auditorium",
     label: "Auditorium",
     icon: TheaterIcon,
     color: "cyan",
+    sizeScale: SMALL_PIN_SCALE,
   },
-} satisfies Record<string, MapItemTag>;
+} satisfies Record<string, MapItemTag>
 
-type TagId = keyof typeof MAP_TAGS;
+type TagId = keyof typeof MAP_TAGS
 
 const rawMapItems: {
   // short readable handle, and the value of the ?focus= query param that opens this item
-  id: string;
-  title: string;
-  aliases?: string[];
-  description?: string;
-  tag: TagId;
+  id: string
+  title: string
+  aliases?: string[]
+  description?: string
+  tag: TagId
   // exactly what you'd copy out of Google Maps, "latitude, longitude"
-  coord: string;
-  attachmentCount?: number;
+  coord: string
+  attachmentCount?: number
 }[] = [
   {
     id: "m6l",
@@ -84,7 +99,8 @@ const rawMapItems: {
     id: "field",
     title: "AUI Sports Field",
     aliases: ["The Track", "Stade"],
-    description: "Full-size grass pitch with a jogging track alongside. Currently under renovation.",
+    description:
+      "Full-size grass pitch with a jogging track alongside. Currently under renovation.",
     tag: "sports",
     coord: "33.540742, -5.108640",
   },
@@ -129,7 +145,8 @@ const rawMapItems: {
     id: "pool",
     title: "Pool",
     aliases: ["Piscine"],
-    description: "Indoor Olympic pool, 8 lanes, kept around 27 to 28°C year round. Open daily with lifeguards on duty.",
+    description:
+      "Indoor Olympic pool, 8 lanes, kept around 27 to 28°C year round. Open daily with lifeguards on duty.",
     tag: "sports",
     coord: "33.539597, -5.109371",
   },
@@ -137,7 +154,8 @@ const rawMapItems: {
     id: "gym",
     title: "Fitness Center",
     aliases: ["The Gym", "Salle de sport"],
-    description: "Weight room, cardio room, and a table tennis room, right by the main field.",
+    description:
+      "Weight room, cardio room, and a table tennis room, right by the main field.",
     tag: "sports",
     coord: "33.539916, -5.109399",
     attachmentCount: 2,
@@ -149,7 +167,8 @@ const rawMapItems: {
   {
     id: "b7",
     title: "B7",
-    description: "Mix of classrooms, labs, amphitheaters and professor offices. The first floor also houses the Writing Center for free help with English papers.",
+    description:
+      "Mix of classrooms, labs, amphitheaters and professor offices. The first floor also houses the Writing Center for free help with English papers.",
     tag: "academic",
     coord: "33.537796, -5.107795",
   },
@@ -157,7 +176,8 @@ const rawMapItems: {
     id: "masjid",
     title: "AUI Masjid",
     aliases: ["Mosque", "Mosquée", "The Masjid"],
-    description: "Campus mosque for the five daily prayers. Roughly central between the library and the academic buildings.",
+    description:
+      "Campus mosque for the five daily prayers. Roughly central between the library and the academic buildings.",
     tag: "other",
     coord: "33.539462, -5.106816",
   },
@@ -221,7 +241,8 @@ const rawMapItems: {
   {
     id: "business-office",
     title: "Business Office",
-    description: "Issues and unblocks the Cash Wallet card. It's the only payment method accepted at campus dining.",
+    description:
+      "Issues and unblocks the Cash Wallet card. It's the only payment method accepted at campus dining.",
     tag: "other",
     coord: "33.538962, -5.105741",
   },
@@ -237,7 +258,8 @@ const rawMapItems: {
     id: "laundry",
     title: "Landromat",
     aliases: ["Laundry"],
-    description: "Full-service basement laundry. Drop off your clothes and an attendant washes, dries, and folds them for you.",
+    description:
+      "Full-service basement laundry. Drop off your clothes and an attendant washes, dries, and folds them for you.",
     tag: "other",
     coord: "33.541022, -5.107031",
   },
@@ -309,7 +331,8 @@ const rawMapItems: {
     id: "atm",
     title: "ATM",
     aliases: ["Guichet"],
-    description: "Basement of Building 33. 4 ATMs, plus AUI's post office branch right next door.",
+    description:
+      "Basement of Building 33. 4 ATMs, plus AUI's post office branch right next door.",
     tag: "other",
     coord: "33.539215, -5.105056",
   },
@@ -411,12 +434,12 @@ const rawMapItems: {
     tag: "unknownHousing",
     coord: "33.540816, -5.104819",
   },
-];
+]
 
 const getShortestName = (names: string[]) =>
   names.reduce((shortest, name) =>
     name.length < shortest.length ? name : shortest,
-  );
+  )
 
 export const MAP_ITEMS: MapItem[] = rawMapItems.map(
   ({ id, title, aliases = [], description, tag, coord, attachmentCount }) => ({
@@ -442,9 +465,9 @@ export const MAP_ITEMS: MapItem[] = rawMapItems.map(
     })),
     ...parseCoordinates(coord),
   }),
-);
+)
 
 // the filter bar offers every tag in use, in the order they're declared above
 export const MAP_FILTER_TAGS = (Object.keys(MAP_TAGS) as TagId[])
   .filter((id) => MAP_ITEMS.some((item) => item.tag.id === id))
-  .map((id) => MAP_TAGS[id]);
+  .map((id) => MAP_TAGS[id])

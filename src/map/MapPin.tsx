@@ -25,7 +25,10 @@ const PIN_TILT_OPTIONS_DEG = [-1, 0, 0.5, 1, 1.5]
 // stays the same for a given pin every time, so the tilt reads as each pin's own personality
 // rather than jittering on every re-render — a real Math.random() would do the latter
 function tiltForPin(id: string) {
-  const hash = [...id].reduce((seed, char) => (seed * 31 + char.charCodeAt(0)) | 0, 7)
+  const hash = [...id].reduce(
+    (seed, char) => (seed * 31 + char.charCodeAt(0)) | 0,
+    7,
+  )
   return PIN_TILT_OPTIONS_DEG[Math.abs(hash) % PIN_TILT_OPTIONS_DEG.length]
 }
 
@@ -36,11 +39,22 @@ export function PinInnerShadowFilter() {
   return (
     <svg aria-hidden className="absolute size-0">
       <title>Pin inner shadow filter</title>
-      <filter id={INNER_SHADOW_FILTER_ID} x="-50%" y="-50%" width="200%" height="200%">
+      <filter
+        id={INNER_SHADOW_FILTER_ID}
+        x="-50%"
+        y="-50%"
+        width="200%"
+        height="200%"
+      >
         <feOffset dy="1.2" />
         <feGaussianBlur stdDeviation="0.9" result="blurred" />
         {/* everything the blurred copy leaves uncovered inside the pin is where light wouldn't reach */}
-        <feComposite operator="out" in="SourceGraphic" in2="blurred" result="recess" />
+        <feComposite
+          operator="out"
+          in="SourceGraphic"
+          in2="blurred"
+          result="recess"
+        />
         <feFlood floodColor="black" floodOpacity="0.45" />
         <feComposite operator="in" in2="recess" />
         <feComposite operator="over" in2="SourceGraphic" />
@@ -72,6 +86,7 @@ export function MapPin({
   const outline = tagPinOutlineColor(item.tag.color)
   const tilt = tiltForPin(item.id)
   const restingTilt = selected || (previewing && matchesPreview) ? tilt : 0
+  const sizeScale = item.tag.sizeScale
 
   return (
     <Tooltip>
@@ -87,8 +102,14 @@ export function MapPin({
             scale: counterScale,
             originX: 0.5,
             originY: PIN_TIP_FRACTION,
+            // a selected pin always wins regardless of size; otherwise a smaller-scale tag (food,
+            // sports, auditoriums...) stacks in front of the normal-size buildings it sits next to,
+            // so it doesn't get lost underneath one
+            zIndex: selected ? 1000 : Math.round((2 - sizeScale) * 10),
           }}
-          animate={{ opacity: previewing && !matchesPreview ? PREVIEW_DIM_OPACITY : 1 }}
+          animate={{
+            opacity: previewing && !matchesPreview ? PREVIEW_DIM_OPACITY : 1,
+          }}
           className="absolute"
         >
           <motion.button
@@ -102,24 +123,47 @@ export function MapPin({
               onSelect()
             }}
             className="pin-filter block cursor-pointer touch-none"
-            animate={{ scale: selected ? 1.3 : 1, rotate: restingTilt }}
-            whileHover={{ scale: selected ? 1.45 : 1.25, rotate: tilt }}
-            whileTap={{ scale: 0.9 }}
+            animate={{
+              scale: (selected ? 1.3 : 1) * sizeScale,
+              rotate: restingTilt,
+            }}
+            whileHover={{
+              scale: (selected ? 1.45 : 1.25) * sizeScale,
+              rotate: tilt,
+            }}
+            whileTap={{ scale: 0.9 * sizeScale }}
             style={{ originX: 0.5, originY: PIN_TIP_FRACTION }}
           >
             {selected && (
-              <span
-                className="absolute left-1/2 size-5 -translate-1/2 animate-ping rounded-full opacity-50"
-                style={{ backgroundColor: fill, top: `${PIN_HEAD_FRACTION * 100}%` }}
-              />
+              <>
+                {/* a steady glow so the selection reads even between the ping's pulses, not just
+                    during them */}
+                <span
+                  className="absolute left-1/2 size-5 -translate-1/2 rounded-full opacity-70 blur-[3px]"
+                  style={{
+                    backgroundColor: fill,
+                    top: `${PIN_HEAD_FRACTION * 100}%`,
+                  }}
+                />
+                <span
+                  className="absolute left-1/2 size-5 -translate-1/2 animate-ping rounded-full opacity-70"
+                  style={{
+                    backgroundColor: fill,
+                    top: `${PIN_HEAD_FRACTION * 100}%`,
+                  }}
+                />
+              </>
             )}
             <Icon
               icon={ICONS.pin}
               fill={fill}
               strokeWidth={1.8}
-              // the stroke follows currentColor, and color-mix() only parses reliably as a css
-              // property — as hugeicons' `color` svg attribute it can silently fall back
-              style={{ color: outline }}
+              style={{
+                // the stroke follows currentColor, and color-mix() only parses reliably as a css
+                // property — as hugeicons' `color` svg attribute it can silently fall back
+                color: outline,
+                filter: selected ? `drop-shadow(0 0 6px ${fill})` : undefined,
+              }}
               className="pin-filter relative block size-7"
             />
           </motion.button>

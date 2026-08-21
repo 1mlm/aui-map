@@ -8,13 +8,16 @@ datasource db {
 }
 
 model Tag {
-  id    String  @id
-  label String
+  id        String  @id
+  label     String
   // key into the app's icon registry (src/map/iconRegistry.ts) — a HugeIcon's
   // path data isn't something postgres can hold, so only the lookup key is stored
-  icon  String
-  color String?
-  pins  Pin[]
+  icon      String
+  color     String?
+  // pin size multiplier — 1 (normal) for buildings, smaller (e.g. 0.8) for things like food
+  // stands or auditoriums that sit inside/next to a building and shouldn't compete with it visually
+  sizeScale Float   @default(1)
+  pins      Pin[]
 }
 
 model Pin {

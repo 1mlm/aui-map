@@ -2,7 +2,13 @@ import { resolveIcon } from "./iconRegistry"
 import type { TagColorName } from "./tagColor"
 import { type MapItem, type MapItemTag, parsePinLinks } from "./types"
 
-type TagRow = { id: string; label: string; icon: string; color: string | null }
+type TagRow = {
+  id: string
+  label: string
+  icon: string
+  color: string | null
+  sizeScale: number
+}
 type PinRow = {
   id: string
   title: string
@@ -29,7 +35,9 @@ type PinRow = {
 // the one place a db row turns into the shapes the map/admin ui actually render —
 // server-only, since it resolves icon strings via the registry
 export const getShortestName = (names: string[]) =>
-  names.reduce((shortest, name) => (name.length < shortest.length ? name : shortest))
+  names.reduce((shortest, name) =>
+    name.length < shortest.length ? name : shortest,
+  )
 
 export function tagRowToMapItemTag(tag: TagRow): MapItemTag {
   return {
@@ -37,6 +45,7 @@ export function tagRowToMapItemTag(tag: TagRow): MapItemTag {
     label: tag.label,
     icon: resolveIcon(tag.icon),
     color: (tag.color ?? undefined) as TagColorName | undefined,
+    sizeScale: tag.sizeScale,
   }
 }
 

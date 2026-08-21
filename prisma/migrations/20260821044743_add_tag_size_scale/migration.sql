@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Tag" ADD COLUMN     "sizeScale" DOUBLE PRECISION NOT NULL DEFAULT 1;
