@@ -1,4 +1,5 @@
-import type { NextConfig } from "next";
+import { withSerwist } from "@serwist/turbopack"
+import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
@@ -15,6 +16,22 @@ const nextConfig: NextConfig = {
       { hostname: "*.public.blob.vercel-storage.com" },
     ],
   },
-};
+  async headers() {
+    return [
+      {
+        // the 2.4mb campus map background never changes at this path — a new image gets a new
+        // filename instead — so it's safe to tell browsers to keep it indefinitely rather than
+        // revalidating on every visit
+        source: "/auimap.webp",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+    ]
+  },
+}
 
-export default nextConfig;
+export default withSerwist(nextConfig)
