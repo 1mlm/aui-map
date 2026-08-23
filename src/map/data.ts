@@ -460,6 +460,7 @@ export const MAP_ITEMS: MapItem[] = rawMapItems.map(
     links: [],
     tag: MAP_TAGS[tag],
     underConstruction,
+    updatedAt: new Date(),
     attachments: Array.from({ length: attachmentCount ?? 0 }, (_, i) => ({
       id: `${id}-${i}`,
       url: "/auimap.webp",

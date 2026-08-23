@@ -99,6 +99,10 @@ model Submission {
 model Suggestion {
   id          String   @id @default(cuid())
   message     String
+  // an optional attachment (screenshot, etc.) — most feedback is text-only, hence nullable
+  fileUrl     String?
+  fileName    String?
+  mimeType    String?
   submittedAt DateTime @default(now())
   resolved    Boolean  @default(false)
 }

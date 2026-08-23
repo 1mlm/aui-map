@@ -53,4 +53,5 @@ export type MapItem = {
   tag: MapItemTag
   attachments: MapItemAttachment[]
   underConstruction: boolean
+  updatedAt: Date
 }

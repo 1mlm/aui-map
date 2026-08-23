@@ -46,12 +46,8 @@ export function MapControls({
     },
   ]
 
-  return (
-    <SquircleFuserContainer
-      align="top-right"
-      superClassName="pointer-events-auto absolute top-0 right-0"
-      className="gap-2"
-    >
+  const buttons = (
+    <>
       {popoverButtons.map(
         ({
           id,
@@ -105,6 +101,27 @@ export function MapControls({
           </TooltipContent>
         </Tooltip>
       )}
+    </>
+  )
+
+  // compact (mobile-width) screens have no viewport-corner "frame" for the pill to fuse into —
+  // it just reads as an oddly notched shape floating in space — so it goes standalone and
+  // centered there instead of docking to the corner the way it does with room to spare
+  if (compact) {
+    return (
+      <div className="pointer-events-auto absolute top-4 left-1/2 flex -translate-x-1/2 items-center justify-center gap-2.5 rounded-full corner-squircle bg-background px-4 py-2.5 drop-shadow-lg drop-shadow-black/40">
+        {buttons}
+      </div>
+    )
+  }
+
+  return (
+    <SquircleFuserContainer
+      align="top-right"
+      superClassName="pointer-events-auto absolute top-0 right-0"
+      className="gap-2"
+    >
+      {buttons}
     </SquircleFuserContainer>
   )
 }

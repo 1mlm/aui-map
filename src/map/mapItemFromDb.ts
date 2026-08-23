@@ -23,6 +23,7 @@ type PinRow = {
   email: string | null
   links: unknown
   underConstruction: boolean
+  updatedAt: Date
   attachments: {
     id: string
     url: string
@@ -67,6 +68,7 @@ export function pinRowToMapItem(pin: PinRow, tag: MapItemTag): MapItem {
     links: parsePinLinks(pin.links),
     tag,
     underConstruction: pin.underConstruction,
+    updatedAt: pin.updatedAt,
     attachments: pin.attachments.map((attachment) => ({
       id: attachment.id,
       url: attachment.url,

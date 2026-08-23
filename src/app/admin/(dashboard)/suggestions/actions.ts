@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { deleteFile } from "@/utils/blob"
 import { prisma } from "@/utils/prisma"
 import { requireAuth } from "@/utils/requireAuth"
 
@@ -12,6 +13,7 @@ export async function setSuggestionResolved(id: string, resolved: boolean) {
 
 export async function deleteSuggestion(id: string) {
   await requireAuth()
-  await prisma.suggestion.delete({ where: { id } })
+  const suggestion = await prisma.suggestion.delete({ where: { id } })
+  if (suggestion.fileUrl) await deleteFile(suggestion.fileUrl)
   revalidatePath("/admin/suggestions")
 }

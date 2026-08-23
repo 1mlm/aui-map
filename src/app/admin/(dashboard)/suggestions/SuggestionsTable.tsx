@@ -10,11 +10,15 @@ import {
 } from "@/components/table/CustomTable"
 import { ICONS } from "@/icons"
 import { Button } from "@/shadcn/ui/button"
+import { iconForMimeType } from "@/utils/mimeType"
 import { deleteSuggestion, setSuggestionResolved } from "./actions"
 
 export type SuggestionRow = {
   id: string
   message: string
+  fileUrl: string | null
+  fileName: string | null
+  mimeType: string | null
   submittedAt: string
   resolved: boolean
 }
@@ -75,6 +79,34 @@ function SuggestionsTableInner({
       getDate: (suggestion) => new Date(suggestion.submittedAt),
     },
     {
+      id: "file",
+      label: "File",
+      icon: ICONS.photos,
+      type: "buttons",
+      getButtons: (suggestion) =>
+        suggestion.fileUrl ? (
+          <a
+            href={suggestion.fileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Button
+              variant="secondary"
+              size="sm"
+              className="rounded-full corner-squircle"
+            >
+              <Icon icon={iconForMimeType(suggestion.mimeType)} />
+              {suggestion.fileName ?? "File"}
+            </Button>
+          </a>
+        ) : (
+          <Icon
+            icon={ICONS.clear}
+            className="mx-auto text-muted-foreground/50"
+          />
+        ),
+    },
+    {
       id: "resolved",
       label: "Resolved",
       icon: ICONS.check,
@@ -93,15 +125,15 @@ function SuggestionsTableInner({
   return (
     <div className="flex flex-col gap-4 p-6">
       <SearchBar
-        placeholder="Search suggestions..."
-        trailing={`${resultCount} ${resultCount === 1 ? "suggestion" : "suggestions"}`}
+        placeholder="Search feedback..."
+        trailing={`${resultCount} feedback`}
       />
       <CustomTable
         {...{ columns }}
         items={suggestions}
         getItemId={(suggestion) => suggestion.id}
-        emptyLabel="suggestions"
-        exportFilePrefix="suggestions"
+        emptyLabel="feedback"
+        exportFilePrefix="feedback"
         paginate={false}
         onVisibleCountChange={setResultCount}
       />

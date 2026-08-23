@@ -6,6 +6,7 @@ import { useState } from "react"
 import { Icon } from "@/components/Icon"
 import { IconButton } from "@/components/IconButton"
 import { SquircleFuser } from "@/components/SquircleFuser"
+import { DateCell } from "@/components/table/CustomTableCell"
 import { ICONS } from "@/icons"
 import {
   DropdownMenu,
@@ -180,7 +181,11 @@ export function MapDetailPanel({
           onAdd={() => setContributeOpen(true)}
         />
 
-        <div className="mt-auto">
+        <div className="mt-auto flex flex-col gap-1.5">
+          <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+            Last updated
+            <DateCell date={item.updatedAt} />
+          </div>
           <MapsMenuButton {...{ item }} />
         </div>
       </motion.div>
