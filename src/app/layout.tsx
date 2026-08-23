@@ -10,9 +10,38 @@ import { TooltipProvider } from "@/shadcn/ui/tooltip"
 
 const outfit = Outfit()
 
+const TITLE = "AUI Map"
+const DESCRIPTION =
+  "Every academic, athletic, housing, and administrative building, restaurant, and service on Al Akhawayn University's campus. Complete with images, contacts, and offline mode."
+
 export const metadata: Metadata = {
-  title: "AUI Map",
-  description: "Interactive campus map for Al Akhawayn University.",
+  metadataBase: new URL("https://auimap.ma"),
+  title: TITLE,
+  description: DESCRIPTION,
+  keywords: [
+    "AUI Map",
+    "Al Akhawayn University",
+    "AUI campus map",
+    "Ifrane",
+    "Morocco university map",
+    "interactive campus map",
+  ],
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    url: "/",
+    siteName: "AUI Map",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+  },
   appleWebApp: {
     title: "AUI Map",
     statusBarStyle: "black-translucent",
