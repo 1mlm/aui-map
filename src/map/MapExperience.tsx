@@ -109,6 +109,8 @@ export function MapExperience({
           onHoverTag={setHoveredTagId}
           compact={!space.showsFullCredit}
           onOpenNotice={() => setNoticeOpen(true)}
+          locationStatus={location.status}
+          onRequestLocation={location.requestLocation}
           {...{ search, activeTagIds, hoveredTagId }}
         />
 

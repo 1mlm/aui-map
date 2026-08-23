@@ -1,5 +1,7 @@
 "use client"
 
+import { Icon } from "@/components/Icon"
+import { ICONS } from "@/icons"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shadcn/ui/tooltip"
 import { triggerHaptic } from "@/utils/haptics"
 import { positionToStyle } from "./geo"
@@ -18,7 +20,7 @@ const COMPASS_PROMPT_TEXT: Record<
 }
 
 const DOT_POSITION_CLASS =
-  "absolute z-0 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-500 ring-4 ring-blue-500/30"
+  "absolute z-0 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-500 ring-2 ring-white shadow-[0_1px_6px_rgba(0,0,0,0.5)]"
 
 // the blue dot, drawn inside the map's coordinate space rather than over the viewport. On iOS,
 // compass heading needs a real tap to grant orientation permission, so the dot doubles as that
@@ -43,11 +45,17 @@ export function UserLocationMarker({
         <span
           className="absolute inset-x-0 bottom-1/2 flex justify-center"
           style={{
-            transform: `rotate(${heading}deg)`,
+            // the icon points down by default, so a flat rotate(heading) would have it facing the
+            // wrong way at heading 0 (north/up) — the extra 180 flips its rest pose to point up
+            transform: `rotate(${heading + 180}deg)`,
             transformOrigin: "50% 100%",
           }}
         >
-          <span className="mb-1 size-0 border-x-[6px] border-b-[10px] border-x-transparent border-b-blue-500" />
+          <Icon
+            icon={ICONS.heading}
+            strokeWidth={2.5}
+            className="mb-0.5 size-3.5 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"
+          />
         </span>
       )}
     </>

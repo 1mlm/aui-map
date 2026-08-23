@@ -30,6 +30,14 @@ const PREVIEW_DIM_OPACITY = 0.2
 const PIN_TILT_OPTIONS_DEG = [-1, 0, 0.5, 1, 1.5]
 const SELECTED_TILT_DEG = 3
 const UNDER_CONSTRUCTION_OPACITY = 0.6
+// pins solid at 100% read as an opaque wall once a cluster gets dense enough to overlap — a
+// little see-through keeps the buildings/paths underneath legible without the pin itself
+// reading as faded or broken
+const PIN_OPACITY = 0.9
+// how far the invisible tap target extends past the icon's own edges, in the pin's own unscaled
+// 32px box — sized so even a small-tag pin (0.8x) at the map's most zoomed-out still clears the
+// 24px minimum touch target after every scale it goes through (tag size, zoom, selection)
+const HIT_SLOP_PX = 8
 
 // stays the same for a given pin every time, so the tilt reads as each pin's own personality
 // rather than jittering on every re-render — a real Math.random() would do the latter
@@ -139,7 +147,7 @@ export function MapPin({
             }}
             onBlur={() => setKeyboardFocused(false)}
             aria-label={item.title}
-            className="pin-filter block cursor-pointer touch-none outline-none"
+            className="pin-filter relative block cursor-pointer touch-none outline-none"
             animate={{
               scale: (selected ? 1.3 : 1) * sizeScale,
               rotate: restingTilt,
@@ -151,6 +159,14 @@ export function MapPin({
             whileTap={{ scale: 0.9 * sizeScale }}
             style={{ originX: 0.5, originY: PIN_TIP_FRACTION }}
           >
+            {/* invisible — expands the tap target without changing anything visible. Grows/shrinks
+                with the same scale as everything else here, so it stays centered and proportional
+                through every zoom level and tag size rather than needing its own position math */}
+            <span
+              aria-hidden
+              className="absolute"
+              style={{ inset: -HIT_SLOP_PX }}
+            />
             {showGlow && (
               <>
                 {/* a steady glow so the selection/focus reads even between the ping's pulses, not
@@ -186,7 +202,7 @@ export function MapPin({
                 filter: showGlow ? `drop-shadow(0 0 6px ${fill})` : undefined,
                 opacity: item.underConstruction
                   ? UNDER_CONSTRUCTION_OPACITY
-                  : undefined,
+                  : PIN_OPACITY,
               }}
               className="pin-filter relative block size-8"
             />

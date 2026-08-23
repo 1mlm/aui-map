@@ -1,5 +1,6 @@
 import {
   AlignLeftIcon,
+  ArrowDown02Icon,
   ArrowExpandDiagonal01Icon,
   ArrowLeft01Icon,
   ArrowRight01Icon,
@@ -31,6 +32,7 @@ import {
   FloppyDiskIcon,
   Folder01Icon,
   Github,
+  Gps02Icon,
   IdCardLanyardIcon,
   IdIcon,
   Image02Icon,
@@ -87,6 +89,8 @@ export const ICONS = {
   github: Github,
   beta: FlaskConicalIcon,
   notice: InformationCircleIcon,
+  locate: Gps02Icon,
+  heading: ArrowDown02Icon,
 
   // suggestions & contribute
   suggestions: BulbIcon,

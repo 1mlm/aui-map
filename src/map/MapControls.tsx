@@ -5,15 +5,31 @@ import { SquircleFuserContainer } from "@/components/SquircleFuser"
 import { ICONS } from "@/icons"
 import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shadcn/ui/tooltip"
+import type { LocationStatus } from "./useUserLocation"
 import { SearchField, type SearchProps } from "./MapSearch"
 import { type FilterProps, TagPills } from "./MapTagFilter"
 import { SuggestionForm } from "./SuggestionForm"
 
+const LOCATE_TOOLTIP_TEXT: Record<LocationStatus, string> = {
+  idle: "Use my location",
+  requesting: "Finding you…",
+  granted: "Locate me",
+  denied: "Location unavailable",
+}
+
 export function MapControls({
   compact,
   onOpenNotice,
+  locationStatus,
+  onRequestLocation,
   ...props
-}: SearchProps & FilterProps & { compact: boolean; onOpenNotice: () => void }) {
+}: SearchProps &
+  FilterProps & {
+    compact: boolean
+    onOpenNotice: () => void
+    locationStatus: LocationStatus
+    onRequestLocation: () => void
+  }) {
   const { search, activeTagIds } = props
 
   const popoverButtons = [
@@ -86,6 +102,25 @@ export function MapControls({
           </span>
         ),
       )}
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <IconButton
+            icon={
+              locationStatus === "requesting" ? ICONS.loading : ICONS.locate
+            }
+            iconClassName={
+              locationStatus === "requesting" ? "animate-spin" : undefined
+            }
+            onClick={onRequestLocation}
+            tone={locationStatus === "granted" ? "primary" : "subtle"}
+            aria-label={LOCATE_TOOLTIP_TEXT[locationStatus]}
+          />
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={6}>
+          {LOCATE_TOOLTIP_TEXT[locationStatus]}
+        </TooltipContent>
+      </Tooltip>
 
       {compact && (
         <Tooltip>
