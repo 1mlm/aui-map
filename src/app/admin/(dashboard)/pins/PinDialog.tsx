@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { DelayedButton } from "@/components/DelayedButton"
+import { Disclosure } from "@/components/Disclosure"
 import { FieldLabel } from "@/components/FieldLabel"
 import { FormDialog } from "@/components/FormDialog"
 import { Icon } from "@/components/Icon"
@@ -19,8 +20,8 @@ import {
   SelectValue,
 } from "@/shadcn/ui/select"
 import { Textarea } from "@/shadcn/ui/textarea"
-import { deletePin, upsertPin } from "./actions"
 import { AttachmentManager, type AttachmentRow } from "./AttachmentManager"
+import { deletePin, upsertPin } from "./actions"
 import { PinPositionEditor } from "./PinPositionEditor"
 
 export const MAP_CENTER = {
@@ -243,112 +244,129 @@ export function PinDialog({
         )
       }
     >
-      <div className="grid gap-6 sm:grid-cols-[1fr_auto]">
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel icon={ICONS.text} htmlFor="pin-title">
-              Title
-            </FieldLabel>
-            <Input
-              id="pin-title"
-              placeholder="e.g. Mohammed VI Library"
-              value={title}
-              onChange={(e) => handleTitleChange(e.target.value)}
-              className={INPUT_CLASS}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel icon={ICONS.id} htmlFor="pin-id">
-              Id (used in ?focus= links)
-            </FieldLabel>
-            <Input
-              id="pin-id"
-              placeholder="e.g. m6l"
-              value={id}
-              onChange={(e) => {
-                setIdTouched(true)
-                setId(slugify(e.target.value))
-              }}
-              className={INPUT_CLASS}
-            />
-            {!isNew && (
-              <p className="text-muted-foreground text-xs">
-                Renaming this breaks any ?focus= link already pointing at the
-                old id.
-              </p>
-            )}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel icon={ICONS.aliases} htmlFor="pin-aliases">
-              Aliases
-            </FieldLabel>
-            <Input
-              id="pin-aliases"
-              placeholder="e.g. M6L, The Library"
-              value={aliasesText}
-              onChange={(e) => setAliasesText(e.target.value)}
-              className={INPUT_CLASS}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel icon={ICONS.description} htmlFor="pin-description">
-              Description
-            </FieldLabel>
-            <Textarea
-              id="pin-description"
-              placeholder="A short blurb shown in the pin's detail panel"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              className={INPUT_CLASS}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel icon={ICONS.tag} htmlFor="pin-tag">
-              Tag
-            </FieldLabel>
-            <Select value={tagId} onValueChange={setTagId}>
-              <SelectTrigger id="pin-tag" className={INPUT_CLASS}>
-                <SelectValue placeholder="Choose a tag" />
-              </SelectTrigger>
-              <SelectContent>
-                {tags.map((tag) => (
-                  <SelectItem key={tag.id} value={tag.id}>
-                    {tag.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <label className="flex items-center gap-2 text-sm">
-            <Checkbox
-              checked={underConstruction}
-              onCheckedChange={(checked) =>
-                setUnderConstruction(checked === true)
-              }
-            />
-            <Icon
-              icon={ICONS.construction}
-              className="size-4 text-muted-foreground"
-            />
-            In construction
-          </label>
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel icon={ICONS.openExternalMap} htmlFor="pin-maps-url">
-              Google Maps link (optional)
-            </FieldLabel>
-            <Input
-              id="pin-maps-url"
-              placeholder="Paste a Google Maps place link for reviews & photos"
-              value={mapsUrl}
-              onChange={(e) => setMapsUrl(e.target.value)}
-              className={INPUT_CLASS}
-            />
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel icon={ICONS.text} htmlFor="pin-title">
+            Title
+          </FieldLabel>
+          <Input
+            id="pin-title"
+            placeholder="e.g. Mohammed VI Library"
+            value={title}
+            onChange={(e) => handleTitleChange(e.target.value)}
+            className={INPUT_CLASS}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel icon={ICONS.id} htmlFor="pin-id">
+            Id (used in ?focus= links)
+          </FieldLabel>
+          <Input
+            id="pin-id"
+            placeholder="e.g. m6l"
+            value={id}
+            onChange={(e) => {
+              setIdTouched(true)
+              setId(slugify(e.target.value))
+            }}
+            className={INPUT_CLASS}
+          />
+          {!isNew && (
             <p className="text-muted-foreground text-xs">
-              Overrides the maps menu's Google Maps option. Leave blank to just
-              search these coordinates.
+              Renaming this breaks any ?focus= link already pointing at the old
+              id.
             </p>
+          )}
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel icon={ICONS.aliases} htmlFor="pin-aliases">
+            Aliases
+          </FieldLabel>
+          <Input
+            id="pin-aliases"
+            placeholder="e.g. M6L, The Library"
+            value={aliasesText}
+            onChange={(e) => setAliasesText(e.target.value)}
+            className={INPUT_CLASS}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel icon={ICONS.description} htmlFor="pin-description">
+            Description
+          </FieldLabel>
+          <Textarea
+            id="pin-description"
+            placeholder="A short blurb shown in the pin's detail panel"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={2}
+            className={INPUT_CLASS}
+          />
+        </div>
+        <PinPositionEditor {...position} onChange={setPosition} />
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel icon={ICONS.tag} htmlFor="pin-tag">
+            Tag
+          </FieldLabel>
+          <Select value={tagId} onValueChange={setTagId}>
+            <SelectTrigger id="pin-tag" className={INPUT_CLASS}>
+              <SelectValue placeholder="Choose a tag" />
+            </SelectTrigger>
+            <SelectContent>
+              {tags.map((tag) => (
+                <SelectItem key={tag.id} value={tag.id}>
+                  {tag.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <label
+          htmlFor="pin-under-construction"
+          className="flex items-center gap-2 text-sm"
+        >
+          <Checkbox
+            id="pin-under-construction"
+            checked={underConstruction}
+            onCheckedChange={(checked) =>
+              setUnderConstruction(checked === true)
+            }
+          />
+          <Icon
+            icon={ICONS.construction}
+            className="size-4 text-muted-foreground"
+          />
+          In construction
+        </label>
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel icon={ICONS.openExternalMap} htmlFor="pin-maps-url">
+            Google Maps link (optional)
+          </FieldLabel>
+          <Input
+            id="pin-maps-url"
+            placeholder="Paste a Google Maps place link for reviews & photos"
+            value={mapsUrl}
+            onChange={(e) => setMapsUrl(e.target.value)}
+            className={INPUT_CLASS}
+          />
+          <p className="text-muted-foreground text-xs">
+            Overrides the maps menu's Google Maps option. Leave blank to just
+            search these coordinates.
+          </p>
+        </div>
+
+        {!isNew && pin.uuid && (
+          <div className="flex flex-col gap-1.5">
+            <FieldLabel icon={ICONS.photos}>Photos</FieldLabel>
+            <AttachmentManager
+              pinId={pin.uuid}
+              {...{ attachments }}
+              onAttachmentsChange={setAttachments}
+            />
           </div>
+        )}
+
+        <Disclosure label="Show additional options">
           <div className="flex flex-col gap-1.5">
             <FieldLabel icon={ICONS.clock} htmlFor="pin-hours">
               Hours (optional)
@@ -404,20 +422,7 @@ export function PinDialog({
             <FieldLabel icon={ICONS.link}>Links (optional)</FieldLabel>
             <LinksEditor {...{ links }} onChange={setLinks} />
           </div>
-
-          {!isNew && pin.uuid && (
-            <div className="flex flex-col gap-1.5">
-              <FieldLabel icon={ICONS.photos}>Photos</FieldLabel>
-              <AttachmentManager
-                pinId={pin.uuid}
-                {...{ attachments }}
-                onAttachmentsChange={setAttachments}
-              />
-            </div>
-          )}
-        </div>
-
-        <PinPositionEditor {...position} onChange={setPosition} />
+        </Disclosure>
       </div>
     </FormDialog>
   )

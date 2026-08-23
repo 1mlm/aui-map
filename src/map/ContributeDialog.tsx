@@ -1,14 +1,32 @@
 "use client"
 
-import { type ChangeEvent, useEffect, useRef, useState, useTransition } from "react"
+import { upload } from "@vercel/blob/client"
+import {
+  type ChangeEvent,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react"
 import { FieldLabel } from "@/components/FieldLabel"
+import { FormError } from "@/components/FormError"
 import { Icon } from "@/components/Icon"
 import { ICONS } from "@/icons"
 import { Button } from "@/shadcn/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/shadcn/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/shadcn/ui/dialog"
 import { Textarea } from "@/shadcn/ui/textarea"
 import { triggerHaptic } from "@/utils/haptics"
-import { iconForMimeType, isImageMimeType, isVideoMimeType } from "@/utils/mimeType"
+import {
+  iconForMimeType,
+  isImageMimeType,
+  isVideoMimeType,
+} from "@/utils/mimeType"
 import { submitContribution } from "./contributeActions"
 
 const SUCCESS_CLOSE_DELAY_MS = 1600
@@ -26,13 +44,24 @@ function FilePreview({ file }: { file: File }) {
 
   if (isImageMimeType(file.type)) {
     // biome-ignore lint/performance/noImgElement: local blob: preview, next/image can't load blob urls
-    return <img src={previewUrl} alt="" className="max-h-40 w-full rounded-xl corner-squircle object-cover" />
+    return (
+      <img
+        src={previewUrl}
+        alt=""
+        className="max-h-40 w-full rounded-xl corner-squircle object-cover"
+      />
+    )
   }
 
   if (isVideoMimeType(file.type)) {
     return (
       // biome-ignore lint/a11y/useMediaCaption: local preview of a file that hasn't been submitted yet
-      <video src={previewUrl} controls playsInline className="max-h-40 w-full rounded-xl corner-squircle" />
+      <video
+        src={previewUrl}
+        controls
+        playsInline
+        className="max-h-40 w-full rounded-xl corner-squircle"
+      />
     )
   }
 
@@ -72,19 +101,39 @@ export function ContributeDialog({
       return
     }
     setError(null)
-    const formData = new FormData()
-    formData.set("file", file)
-    formData.set("caption", caption)
     startTransition(async () => {
-      await submitContribution(pinId, formData)
-      triggerHaptic("success")
-      setSubmitted(true)
-      setTimeout(() => {
-        onOpenChange(false)
-        setSubmitted(false)
-        setFile(null)
-        setCaption("")
-      }, SUCCESS_CLOSE_DELAY_MS)
+      try {
+        // uploads straight to Blob storage from the browser (bypasses the 4.5mb body limit a
+        // server action would hit), then just tells the db the file landed
+        const blob = await upload(
+          `aui-map/${crypto.randomUUID()}-${file.name}`,
+          file,
+          {
+            access: "public",
+            handleUploadUrl: "/api/contribute/upload",
+            multipart: true,
+          },
+        )
+        await submitContribution(
+          pinId,
+          { url: blob.url, fileName: file.name, mimeType: file.type || null },
+          caption.trim() || null,
+        )
+        triggerHaptic("success")
+        setSubmitted(true)
+        setTimeout(() => {
+          onOpenChange(false)
+          setSubmitted(false)
+          setFile(null)
+          setCaption("")
+        }, SUCCESS_CLOSE_DELAY_MS)
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Couldn't send that — try again.",
+        )
+      }
     })
   }
 
@@ -104,7 +153,8 @@ export function ContributeDialog({
                 Contribute a file
               </DialogTitle>
               <DialogDescription>
-                Suggest a photo, menu, floor plan, or anything else useful for {pinTitle}.
+                Suggest a photo, menu, floor plan, or anything else useful for{" "}
+                {pinTitle}.
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col gap-3">
@@ -130,7 +180,12 @@ export function ContributeDialog({
                   <span className="text-sm">Choose a file</span>
                 </button>
               )}
-              <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={handleFileChange}
+              />
               <div className="flex flex-col gap-1.5">
                 <FieldLabel icon={ICONS.caption} htmlFor="contribute-caption">
                   Caption
@@ -144,7 +199,7 @@ export function ContributeDialog({
                   className="corner-squircle"
                 />
               </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              <FormError>{error}</FormError>
               <Button
                 className="w-full rounded-full corner-squircle"
                 disabled={pending}

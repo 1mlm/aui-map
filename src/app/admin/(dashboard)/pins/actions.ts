@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { Prisma } from "@/generated/prisma/client"
 import type { PinLink } from "@/map/types"
-import { deleteFile, uploadFile } from "@/utils/blob"
+import { deleteFile } from "@/utils/blob"
 import { prisma } from "@/utils/prisma"
 import { requireAuth } from "@/utils/requireAuth"
 
@@ -169,22 +169,22 @@ export async function deleteAttachment(pinId: string, attachmentId: string) {
   return getAttachments(pinId)
 }
 
-export async function uploadAttachment(pinId: string, formData: FormData) {
+// the file is already sitting in Blob storage by the time this runs — AttachmentManager
+// uploads it client-side first (see src/app/api/admin/attachments/upload) to stay under the
+// 4.5mb body limit a server action would otherwise hit, then calls this just to persist the row
+export async function createAttachment(
+  pinId: string,
+  blob: { url: string; fileName: string; mimeType: string | null },
+) {
   await requireAuth()
-  const file = formData.get("file")
-  if (!(file instanceof File)) throw new Error("No file provided")
-  const caption = formData.get("caption")
-
-  const url = await uploadFile(file)
   const order = await prisma.attachment.count({ where: { pinId } })
   await prisma.attachment.create({
     data: {
       pinId,
-      url,
+      url: blob.url,
       order,
-      mimeType: file.type || null,
-      fileName: file.name,
-      caption: typeof caption === "string" && caption ? caption : null,
+      mimeType: blob.mimeType,
+      fileName: blob.fileName,
     },
   })
 
