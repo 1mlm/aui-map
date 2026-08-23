@@ -1,6 +1,11 @@
 "use client"
 
-import { type MotionValue, motion, useTransform } from "motion/react"
+import {
+  type MotionValue,
+  motion,
+  useMotionValueEvent,
+  useTransform,
+} from "motion/react"
 import { useState } from "react"
 import { Icon } from "@/components/Icon"
 import { ICONS } from "@/icons"
@@ -38,10 +43,9 @@ const HIT_SLOP_PX = 8
 export type PinSizeTuning = {
   // how much a pin shrinks as you zoom in — see useMapPanZoom's pinCounterScale
   growthExponent: number
-  // the map-zoom (not the pin's own barely-shrinking size) past which the name label appears —
-  // a single cutoff, not a fade: it's either there or it isn't
-  labelShowScale: number
-  labelFontSize: number
+  // the map-zoom past which every pin's own tooltip stays open on its own, no hover/tap needed —
+  // a single cutoff, not a fade: it's either open or it isn't
+  tooltipShowScale: number
   // pins solid at 100% read as an opaque wall once a cluster gets dense enough to overlap — a
   // little see-through keeps the buildings/paths underneath legible without the pin itself
   // reading as faded or broken
@@ -50,8 +54,7 @@ export type PinSizeTuning = {
 
 export const DEFAULT_PIN_SIZE_TUNING: PinSizeTuning = {
   growthExponent: DEFAULT_PIN_GROWTH_EXPONENT,
-  labelShowScale: 4,
-  labelFontSize: 11,
+  tooltipShowScale: 4,
   pinOpacity: 0.95,
 }
 
@@ -92,9 +95,22 @@ export function MapPin({
   const counterScale = useTransform(viewportScale, (scale) =>
     pinCounterScale(scale, sizeTuning.growthExponent),
   )
-  const showLabel = useTransform(viewportScale, (scale) =>
-    scale > sizeTuning.labelShowScale ? 1 : 0,
+  // past this zoom, every pin's tooltip stays open on its own — no hover/tap needed to read a
+  // name once you're zoomed in enough. Real state, not a motion value: Radix's `open` prop needs
+  // a plain boolean, and this only actually changes on the rare frame that crosses the threshold
+  const [zoomedPastTooltipThreshold, setZoomedPastTooltipThreshold] = useState(
+    () => viewportScale.get() > sizeTuning.tooltipShowScale,
   )
+  useMotionValueEvent(viewportScale, "change", (scale) => {
+    const next = scale > sizeTuning.tooltipShowScale
+    setZoomedPastTooltipThreshold((current) =>
+      current === next ? current : next,
+    )
+  })
+  // hover/focus still drives it normally below the threshold; forcing `open` past it doesn't
+  // stop Radix from calling this on mouse leave, so this stays the last hover-only intent and
+  // the OR below lets the zoom threshold win over it whenever it applies
+  const [hoverOpen, setHoverOpen] = useState(false)
   const fill = tagPinFillColor(item.tag.color, tuning)
   const outline = tagPinOutlineColor(item.tag.color)
   const tilt = tiltForPin(item.id)
@@ -115,7 +131,10 @@ export function MapPin({
   const sizeScale = item.tag.sizeScale
 
   return (
-    <Tooltip>
+    <Tooltip
+      open={zoomedPastTooltipThreshold || hoverOpen}
+      onOpenChange={setHoverOpen}
+    >
       <TooltipTrigger asChild>
         {/* Two nested scales on purpose: the outer one is owned by the map's zoom motion value,
             the inner by hover/tap/selection. Sharing one element would let whileHover overwrite
@@ -215,22 +234,6 @@ export function MapPin({
                 )}
               </>
             )}
-            {/* zoomed-in-only name label, so a building is identifiable without a tap — a real
-                child of the button (not a separately-scaled sibling) so it's rigidly fused to
-                the pin: same hover/selection/tilt motion, no separate scale math to keep in sync.
-                Rendered before the icon so the icon's own paint order tucks over its left edge,
-                reading as one attached flag rather than a floating label */}
-            <motion.span
-              aria-hidden
-              className="pointer-events-none absolute left-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-foreground/90 py-1 pr-2.5 pl-4 font-medium text-background"
-              style={{
-                top: `${PIN_HEAD_FRACTION * 100}%`,
-                opacity: showLabel,
-                fontSize: sizeTuning.labelFontSize,
-              }}
-            >
-              {item.shortestName}
-            </motion.span>
             <Icon
               icon={ICONS.pin}
               fill={fill}

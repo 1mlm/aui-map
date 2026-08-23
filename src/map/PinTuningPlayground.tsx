@@ -4,9 +4,9 @@ import { useControls } from "leva"
 import type { PinSizeTuning } from "./MapPin"
 
 // dev-only tool (see the dynamic-import gate in MapExperience.tsx) — lets you retune how pins
-// shrink on zoom and when their name label appears, live against the real map, before deciding
-// what to commit as the new defaults. Never ships to real visitors: the whole component is
-// behind a NODE_ENV check + next/dynamic
+// shrink on zoom and when their tooltip stays open on its own, live against the real map, before
+// deciding what to commit as the new defaults. Never ships to real visitors: the whole component
+// is behind a NODE_ENV check + next/dynamic
 export function PinTuningPlayground({
   tuning,
   onTuningChange,
@@ -24,23 +24,14 @@ export function PinTuningPlayground({
       onChange: (growthExponent: number) =>
         onTuningChange({ ...tuning, growthExponent }),
     },
-    labelShowScale: {
-      value: tuning.labelShowScale,
+    tooltipShowScale: {
+      value: tuning.tooltipShowScale,
       min: 1.45,
       max: 5,
       step: 0.05,
-      label: "label zoom threshold",
-      onChange: (labelShowScale: number) =>
-        onTuningChange({ ...tuning, labelShowScale }),
-    },
-    labelFontSize: {
-      value: tuning.labelFontSize,
-      min: 6,
-      max: 18,
-      step: 0.5,
-      label: "label font size",
-      onChange: (labelFontSize: number) =>
-        onTuningChange({ ...tuning, labelFontSize }),
+      label: "tooltip zoom threshold",
+      onChange: (tooltipShowScale: number) =>
+        onTuningChange({ ...tuning, tooltipShowScale }),
     },
     pinOpacity: {
       value: tuning.pinOpacity,
