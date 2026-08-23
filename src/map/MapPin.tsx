@@ -23,14 +23,7 @@ const PREVIEW_DIM_OPACITY = 0.2
 // meant to actually read as a tilt
 const PIN_TILT_OPTIONS_DEG = [-1, 0, 0.5, 1, 1.5]
 const SELECTED_TILT_DEG = 3
-
-// scattered around the icon rather than centered on it — a construction cue, not a halo. each
-// twinkles on its own delay so they don't all pulse in lockstep
-const UNDER_CONSTRUCTION_SPARKLES = [
-  { top: "0%", left: "75%", delay: 0 },
-  { top: "15%", left: "5%", delay: 0.5 },
-  { top: "65%", left: "90%", delay: 1 },
-]
+const UNDER_CONSTRUCTION_OPACITY = 0.6
 
 // stays the same for a given pin every time, so the tilt reads as each pin's own personality
 // rather than jittering on every re-render — a real Math.random() would do the latter
@@ -100,16 +93,20 @@ export function MapPin({
           className="absolute"
         >
           {/* a plain radial-gradient, not a filter — filters are what made per-pin shadows janky
-              before (see useMapPanZoom's isMoving). Sits on this div rather than the button below
-              so it only rides the map's zoom counter-scale, not the hover/tap/selection bump */}
+              before (see useMapPanZoom's isMoving), and a filter drop-shadow has to be stripped
+              during that same movement, which just made the shadow flicker in and out while
+              dragging. This is a background, not a filter, so it never needs to be suppressed —
+              it's what gives the pin contrast against busy satellite imagery even mid-drag. Sits
+              on this div rather than the button below so it only rides the map's zoom
+              counter-scale, not the hover/tap/selection bump */}
           <span
             aria-hidden
-            className="pointer-events-none absolute h-2 w-4 rounded-full"
+            className="pointer-events-none absolute h-3 w-6 rounded-full"
             style={{
               left: "50%",
               top: `${PIN_TIP_FRACTION * 100}%`,
               transform: `translate(-50%, -50%) scale(${sizeScale})`,
-              background: `radial-gradient(closest-side, rgba(0,0,0,${selected ? 0.4 : 0.3}), rgba(0,0,0,0) 75%)`,
+              background: `radial-gradient(closest-side, rgba(0,0,0,${selected ? 0.65 : 0.55}), rgba(0,0,0,0) 75%)`,
             }}
           />
           <motion.button
@@ -163,33 +160,12 @@ export function MapPin({
                 // property — as hugeicons' `color` svg attribute it can silently fall back
                 color: outline,
                 filter: selected ? `drop-shadow(0 0 6px ${fill})` : undefined,
+                opacity: item.underConstruction
+                  ? UNDER_CONSTRUCTION_OPACITY
+                  : undefined,
               }}
-              className="pin-filter relative block size-11"
+              className="pin-filter relative block size-8"
             />
-            {item.underConstruction && (
-              <span className="pointer-events-none absolute inset-0 opacity-50">
-                {UNDER_CONSTRUCTION_SPARKLES.map(({ top, left, delay }) => (
-                  <motion.span
-                    key={`${top}-${left}`}
-                    className="absolute -translate-1/2"
-                    style={{ top, left }}
-                    animate={{ opacity: [0.15, 1, 0.15], scale: [0.6, 1, 0.6] }}
-                    transition={{
-                      duration: 1.8,
-                      repeat: Infinity,
-                      delay,
-                      ease: "easeInOut",
-                    }}
-                  >
-                    <Icon
-                      icon={ICONS.sparkles}
-                      className="size-2.5"
-                      style={{ color: fill }}
-                    />
-                  </motion.span>
-                ))}
-              </span>
-            )}
           </motion.button>
         </motion.div>
       </TooltipTrigger>

@@ -53,7 +53,6 @@ import {
   RefreshIcon,
   Search02Icon,
   SentIcon,
-  SparklesIcon,
   Tag01Icon,
   Target01Icon,
   TextIcon,
@@ -126,7 +125,6 @@ export const ICONS = {
   link: Link01Icon,
   externalLink: ArrowUpRight01Icon,
   construction: ConstructionIcon,
-  sparkles: SparklesIcon,
 
   // submission file types
   video: Video01Icon,
