@@ -12,7 +12,7 @@ import { ICONS } from "@/icons"
 import { formatCoordinates } from "@/map/geo"
 import type { MapItemTag } from "@/map/types"
 import { Button } from "@/shadcn/ui/button"
-import { type AdminPin, MAP_CENTER, PinDialog } from "./PinDialog"
+import { type AdminPin, PinDialog } from "./PinDialog"
 import { PinPhotosDialog } from "./PinPhotosDialog"
 
 const toTagEnumValue = (tag: MapItemTag): CustomTableEnumValue => ({
@@ -21,7 +21,7 @@ const toTagEnumValue = (tag: MapItemTag): CustomTableEnumValue => ({
   color: tag.color ?? "gray",
 })
 
-const emptyPin = (tags: MapItemTag[]): AdminPin => ({
+const emptyPin = (): AdminPin => ({
   uuid: null,
   id: "",
   title: "",
@@ -33,8 +33,9 @@ const emptyPin = (tags: MapItemTag[]): AdminPin => ({
   phone: null,
   email: null,
   links: [],
-  ...MAP_CENTER,
-  tagId: tags[0]?.id ?? "",
+  latitude: Number.NaN,
+  longitude: Number.NaN,
+  tagId: "",
   underConstruction: false,
   attachments: [],
 })
@@ -177,7 +178,7 @@ function PinsTableInner({
       )}
       {creating && (
         <PinDialog
-          pin={emptyPin(tags)}
+          pin={emptyPin()}
           isNew={true}
           open={creating}
           onOpenChange={setCreating}

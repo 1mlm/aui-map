@@ -6,8 +6,8 @@ import { Disclosure } from "@/components/Disclosure"
 import { FieldLabel } from "@/components/FieldLabel"
 import { FormDialog } from "@/components/FormDialog"
 import { Icon } from "@/components/Icon"
+import { EnumBadge } from "@/components/table/CustomTableCell"
 import { ICONS } from "@/icons"
-import { MAP_BOUNDING_BOX } from "@/map/geo"
 import type { MapItemTag, PinLink } from "@/map/types"
 import { Button } from "@/shadcn/ui/button"
 import { Checkbox } from "@/shadcn/ui/checkbox"
@@ -23,11 +23,6 @@ import { Textarea } from "@/shadcn/ui/textarea"
 import { AttachmentManager, type AttachmentRow } from "./AttachmentManager"
 import { deletePin, upsertPin } from "./actions"
 import { PinPositionEditor } from "./PinPositionEditor"
-
-export const MAP_CENTER = {
-  latitude: (MAP_BOUNDING_BOX.topLat + MAP_BOUNDING_BOX.bottomLat) / 2,
-  longitude: (MAP_BOUNDING_BOX.leftLong + MAP_BOUNDING_BOX.rightLong) / 2,
-}
 
 const slugify = (text: string) =>
   text
@@ -155,6 +150,7 @@ export function PinDialog({
   const [idTouched, setIdTouched] = useState(!isNew)
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const selectedTag = tags.find((tag) => tag.id === tagId)
 
   function handleTitleChange(value: string) {
     setTitle(value)
@@ -165,6 +161,10 @@ export function PinDialog({
     setError(null)
     if (!id || !title || !tagId) {
       setError("Title, id, and tag are required.")
+      return
+    }
+    if (Number.isNaN(position.latitude) || Number.isNaN(position.longitude)) {
+      setError("Latitude and longitude are required.")
       return
     }
     startTransition(async () => {
@@ -310,49 +310,32 @@ export function PinDialog({
           </FieldLabel>
           <Select value={tagId} onValueChange={setTagId}>
             <SelectTrigger id="pin-tag" className={INPUT_CLASS}>
-              <SelectValue placeholder="Choose a tag" />
+              <SelectValue placeholder="Choose a tag">
+                {selectedTag && (
+                  <EnumBadge
+                    value={{
+                      label: selectedTag.label,
+                      icon: selectedTag.icon,
+                      color: selectedTag.color ?? "gray",
+                    }}
+                  />
+                )}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {tags.map((tag) => (
                 <SelectItem key={tag.id} value={tag.id}>
-                  {tag.label}
+                  <EnumBadge
+                    value={{
+                      label: tag.label,
+                      icon: tag.icon,
+                      color: tag.color ?? "gray",
+                    }}
+                  />
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-        </div>
-        <label
-          htmlFor="pin-under-construction"
-          className="flex items-center gap-2 text-sm"
-        >
-          <Checkbox
-            id="pin-under-construction"
-            checked={underConstruction}
-            onCheckedChange={(checked) =>
-              setUnderConstruction(checked === true)
-            }
-          />
-          <Icon
-            icon={ICONS.construction}
-            className="size-4 text-muted-foreground"
-          />
-          In construction
-        </label>
-        <div className="flex flex-col gap-1.5">
-          <FieldLabel icon={ICONS.openExternalMap} htmlFor="pin-maps-url">
-            Google Maps link (optional)
-          </FieldLabel>
-          <Input
-            id="pin-maps-url"
-            placeholder="Paste a Google Maps place link for reviews & photos"
-            value={mapsUrl}
-            onChange={(e) => setMapsUrl(e.target.value)}
-            className={INPUT_CLASS}
-          />
-          <p className="text-muted-foreground text-xs">
-            Overrides the maps menu's Google Maps option. Leave blank to just
-            search these coordinates.
-          </p>
         </div>
 
         {!isNew && pin.uuid && (
@@ -367,6 +350,39 @@ export function PinDialog({
         )}
 
         <Disclosure label="Show additional options">
+          <label
+            htmlFor="pin-under-construction"
+            className="flex items-center gap-2 text-sm"
+          >
+            <Checkbox
+              id="pin-under-construction"
+              checked={underConstruction}
+              onCheckedChange={(checked) =>
+                setUnderConstruction(checked === true)
+              }
+            />
+            <Icon
+              icon={ICONS.construction}
+              className="size-4 text-muted-foreground"
+            />
+            In construction
+          </label>
+          <div className="flex flex-col gap-1.5">
+            <FieldLabel icon={ICONS.openExternalMap} htmlFor="pin-maps-url">
+              Google Maps link (optional)
+            </FieldLabel>
+            <Input
+              id="pin-maps-url"
+              placeholder="Paste a Google Maps place link for reviews & photos"
+              value={mapsUrl}
+              onChange={(e) => setMapsUrl(e.target.value)}
+              className={INPUT_CLASS}
+            />
+            <p className="text-muted-foreground text-xs">
+              Overrides the maps menu's Google Maps option. Leave blank to just
+              search these coordinates.
+            </p>
+          </div>
           <div className="flex flex-col gap-1.5">
             <FieldLabel icon={ICONS.clock} htmlFor="pin-hours">
               Hours (optional)

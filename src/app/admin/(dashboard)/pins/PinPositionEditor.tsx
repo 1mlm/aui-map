@@ -9,6 +9,11 @@ import { Input } from "@/shadcn/ui/input"
 // MapCanvas): "34.123456, -5.123456" — pasting one of those into either field fills both
 const COORDINATE_PAIR = /^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/
 
+// NaN is the "empty" sentinel for a coordinate that hasn't been filled in yet — keeps the
+// value type plain `number` (matching the saved-pin shape) instead of widening to `number | null`
+const inputTextToCoordinate = (text: string) =>
+  text === "" ? Number.NaN : Number(text)
+
 export function PinPositionEditor({
   latitude,
   longitude,
@@ -36,9 +41,13 @@ export function PinPositionEditor({
           id="pin-latitude"
           type="number"
           step="any"
-          value={latitude}
+          placeholder="e.g. 33.53667"
+          value={Number.isNaN(latitude) ? "" : latitude}
           onChange={(e) =>
-            onChange({ latitude: Number(e.target.value), longitude })
+            onChange({
+              latitude: inputTextToCoordinate(e.target.value),
+              longitude,
+            })
           }
           onPaste={handlePaste}
           className="corner-squircle"
@@ -52,9 +61,13 @@ export function PinPositionEditor({
           id="pin-longitude"
           type="number"
           step="any"
-          value={longitude}
+          placeholder="e.g. -5.10861"
+          value={Number.isNaN(longitude) ? "" : longitude}
           onChange={(e) =>
-            onChange({ latitude, longitude: Number(e.target.value) })
+            onChange({
+              latitude,
+              longitude: inputTextToCoordinate(e.target.value),
+            })
           }
           onPaste={handlePaste}
           className="corner-squircle"
