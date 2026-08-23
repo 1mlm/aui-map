@@ -111,6 +111,7 @@ function TagsTableInner({ tags }: { tags: TagRow[] }) {
         getItemId={(tag) => tag.id}
         emptyLabel="tags"
         exportFilePrefix="tags"
+        paginate={false}
         onVisibleCountChange={setResultCount}
       />
 

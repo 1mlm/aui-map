@@ -4,12 +4,20 @@ import { Suspense, useState, useTransition } from "react"
 import { DelayedButton } from "@/components/DelayedButton"
 import { Icon } from "@/components/Icon"
 import { SearchBar } from "@/components/SearchBar"
-import { CustomTable, type CustomTableColumn } from "@/components/table/CustomTable"
+import {
+  CustomTable,
+  type CustomTableColumn,
+} from "@/components/table/CustomTable"
 import { ICONS } from "@/icons"
 import { Button } from "@/shadcn/ui/button"
 import { deleteSuggestion, setSuggestionResolved } from "./actions"
 
-export type SuggestionRow = { id: string; message: string; submittedAt: string; resolved: boolean }
+export type SuggestionRow = {
+  id: string
+  message: string
+  submittedAt: string
+  resolved: boolean
+}
 
 function SuggestionRowActions({ suggestion }: { suggestion: SuggestionRow }) {
   const [pending, startTransition] = useTransition()
@@ -21,7 +29,11 @@ function SuggestionRowActions({ suggestion }: { suggestion: SuggestionRow }) {
         size="sm"
         className="rounded-full corner-squircle"
         disabled={pending}
-        onClick={() => startTransition(() => setSuggestionResolved(suggestion.id, !suggestion.resolved))}
+        onClick={() =>
+          startTransition(() =>
+            setSuggestionResolved(suggestion.id, !suggestion.resolved),
+          )
+        }
       >
         <Icon icon={suggestion.resolved ? ICONS.reopen : ICONS.check} />
         {suggestion.resolved ? "Reopen" : "Resolve"}
@@ -40,7 +52,11 @@ function SuggestionRowActions({ suggestion }: { suggestion: SuggestionRow }) {
   )
 }
 
-function SuggestionsTableInner({ suggestions }: { suggestions: SuggestionRow[] }) {
+function SuggestionsTableInner({
+  suggestions,
+}: {
+  suggestions: SuggestionRow[]
+}) {
   const [resultCount, setResultCount] = useState(suggestions.length)
 
   const columns: CustomTableColumn<SuggestionRow>[] = [
@@ -86,6 +102,7 @@ function SuggestionsTableInner({ suggestions }: { suggestions: SuggestionRow[] }
         getItemId={(suggestion) => suggestion.id}
         emptyLabel="suggestions"
         exportFilePrefix="suggestions"
+        paginate={false}
         onVisibleCountChange={setResultCount}
       />
     </div>
