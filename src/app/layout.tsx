@@ -12,7 +12,7 @@ const outfit = Outfit()
 
 const TITLE = "AUI Map"
 const DESCRIPTION =
-  "Every academic, athletic, housing, and administrative building, restaurant, and service on Al Akhawayn University's campus. Complete with images, contacts, and offline mode."
+  "Every academic, administrative, athletic, and housing building, restaurant, shop, parking area, and special place on Al Akhawayn University's campus — complete with photos, videos, contacts, and opening hours."
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://auimap.ma"),

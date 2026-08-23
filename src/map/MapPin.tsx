@@ -1,6 +1,7 @@
 "use client"
 
 import { type MotionValue, motion, useTransform } from "motion/react"
+import { useState } from "react"
 import { Icon } from "@/components/Icon"
 import { ICONS } from "@/icons"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shadcn/ui/tooltip"
@@ -65,6 +66,11 @@ export function MapPin({
   const fill = tagPinFillColor(item.tag.color, tuning)
   const outline = tagPinOutlineColor(item.tag.color)
   const tilt = tiltForPin(item.id)
+  // browser's default focus rectangle looks out of place on a round pin — keyboard nav gets the
+  // same colored glow a selected pin gets instead. :focus-visible's own heuristic already tells
+  // mouse/touch activation apart from keyboard, so this never fires from a click or a tap
+  const [keyboardFocused, setKeyboardFocused] = useState(false)
+  const showGlow = selected || keyboardFocused
   // same left/right split as the personality tilt, just at a magnitude that actually reads as
   // a tilt rather than a nudge — each pin leans the same way whether it's picking its hover
   // nudge or its selected tilt, so the two never fight each other mid-transition
@@ -127,7 +133,13 @@ export function MapPin({
               triggerHaptic()
               onSelect()
             }}
-            className="pin-filter block cursor-pointer touch-none"
+            onFocus={(e) => {
+              if (e.currentTarget.matches(":focus-visible"))
+                setKeyboardFocused(true)
+            }}
+            onBlur={() => setKeyboardFocused(false)}
+            aria-label={item.title}
+            className="pin-filter block cursor-pointer touch-none outline-none"
             animate={{
               scale: (selected ? 1.3 : 1) * sizeScale,
               rotate: restingTilt,
@@ -139,10 +151,10 @@ export function MapPin({
             whileTap={{ scale: 0.9 * sizeScale }}
             style={{ originX: 0.5, originY: PIN_TIP_FRACTION }}
           >
-            {selected && (
+            {showGlow && (
               <>
-                {/* a steady glow so the selection reads even between the ping's pulses, not just
-                    during them */}
+                {/* a steady glow so the selection/focus reads even between the ping's pulses, not
+                    just during them */}
                 <span
                   className="absolute left-1/2 size-5 -translate-1/2 rounded-full opacity-70 blur-[3px]"
                   style={{
@@ -150,13 +162,17 @@ export function MapPin({
                     top: `${PIN_HEAD_FRACTION * 100}%`,
                   }}
                 />
-                <span
-                  className="absolute left-1/2 size-5 -translate-1/2 animate-ping rounded-full opacity-70"
-                  style={{
-                    backgroundColor: fill,
-                    top: `${PIN_HEAD_FRACTION * 100}%`,
-                  }}
-                />
+                {/* the pulse itself stays selection-only — replaying it on every tab stop would be
+                    distracting rather than a helpful indicator */}
+                {selected && (
+                  <span
+                    className="absolute left-1/2 size-5 -translate-1/2 animate-ping rounded-full opacity-70"
+                    style={{
+                      backgroundColor: fill,
+                      top: `${PIN_HEAD_FRACTION * 100}%`,
+                    }}
+                  />
+                )}
               </>
             )}
             <Icon
@@ -167,7 +183,7 @@ export function MapPin({
                 // the stroke follows currentColor, and color-mix() only parses reliably as a css
                 // property — as hugeicons' `color` svg attribute it can silently fall back
                 color: outline,
-                filter: selected ? `drop-shadow(0 0 6px ${fill})` : undefined,
+                filter: showGlow ? `drop-shadow(0 0 6px ${fill})` : undefined,
                 opacity: item.underConstruction
                   ? UNDER_CONSTRUCTION_OPACITY
                   : undefined,
