@@ -6,6 +6,7 @@ import {
   FootballIcon,
   MoreIcon,
   Restaurant02Icon,
+  StarIcon,
   TheaterIcon,
 } from "@hugeicons/core-free-icons"
 import type { HugeIcon } from "@/components/Icon"
@@ -21,6 +22,7 @@ export const ICON_REGISTRY = {
   FootballIcon,
   MoreIcon,
   Restaurant02Icon,
+  StarIcon,
   TheaterIcon,
 } satisfies Record<string, HugeIcon>
 
