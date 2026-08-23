@@ -35,6 +35,22 @@ export function PinTuningPlayground({
       label: "label zoom threshold",
       onChange: (labelShowScale: number) => onTuningChange({ labelShowScale }),
     },
+    pinBaseSizePx: {
+      value: tuning.pinBaseSizePx,
+      min: 8,
+      max: 96,
+      step: 1,
+      label: "pin base size",
+      onChange: (pinBaseSizePx: number) => onTuningChange({ pinBaseSizePx }),
+    },
+    labelGapPx: {
+      value: tuning.labelGapPx,
+      min: -20,
+      max: 60,
+      step: 1,
+      label: "label gap",
+      onChange: (labelGapPx: number) => onTuningChange({ labelGapPx }),
+    },
     labelFontSize: {
       value: tuning.labelFontSize,
       min: 4,

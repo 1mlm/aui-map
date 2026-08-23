@@ -14,6 +14,7 @@ import { latLongToPosition, positionToStyle } from "./geo"
 import {
   type CrayonTuning,
   DEFAULT_CRAYON_TUNING,
+  tagLabelTextColor,
   tagPinFillColor,
   tagPinOutlineColor,
 } from "./tagColor"
@@ -35,7 +36,7 @@ const PIN_TILT_OPTIONS_DEG = [-1, 0, 0.5, 1, 1.5]
 const SELECTED_TILT_DEG = 3
 const UNDER_CONSTRUCTION_OPACITY = 0.6
 // how far the invisible tap target extends past the icon's own edges, in the pin's own unscaled
-// 32px box — sized so even a small-tag pin (0.8x) at the map's most zoomed-out still clears the
+// box — sized so even a small-tag pin (0.8x) at the map's most zoomed-out still clears the
 // 24px minimum touch target after every scale it goes through (tag size, zoom, selection)
 const HIT_SLOP_PX = 8
 
@@ -45,11 +46,18 @@ export type PinSizeTuning = {
   // the map-zoom past which every pin's name label appears — a single cutoff, not a fade: it's
   // either there or it isn't
   labelShowScale: number
+  // the pin icon's own unscaled box, in px, before per-tag sizeScale or selection/hover bumps
+  pinBaseSizePx: number
+  // this is the label's base size at a normal-size (1x) tag — a smaller-tag pin (food, parking...)
+  // scales its own label down by that same tag.sizeScale, so a smaller pin never carries an
+  // oversized name next to it
   labelFontSize: number
   labelFontFamily: "sans" | "mono"
   // the radius of the soft dark halo around the label text (Google Maps' own look) — not a
   // background, just enough of a glow to keep white text legible over busy satellite imagery
   labelStrokeWidth: number
+  // space between the pin's own edge and where its label starts
+  labelGapPx: number
   // pins solid at 100% read as an opaque wall once a cluster gets dense enough to overlap — a
   // little see-through keeps the buildings/paths underneath legible without the pin itself
   // reading as faded or broken
@@ -59,9 +67,11 @@ export type PinSizeTuning = {
 export const DEFAULT_PIN_SIZE_TUNING: PinSizeTuning = {
   growthExponent: DEFAULT_PIN_GROWTH_EXPONENT,
   labelShowScale: 3.5,
+  pinBaseSizePx: 32,
   labelFontSize: 18,
   labelFontFamily: "sans",
   labelStrokeWidth: 8,
+  labelGapPx: 6,
   pinOpacity: 0.95,
 }
 
@@ -260,8 +270,10 @@ export function MapPin({
             opacity: item.underConstruction
               ? UNDER_CONSTRUCTION_OPACITY
               : sizeTuning.pinOpacity,
+            width: sizeTuning.pinBaseSizePx,
+            height: sizeTuning.pinBaseSizePx,
           }}
-          className="pin-filter relative block size-8"
+          className="pin-filter relative block"
         />
       </motion.button>
       {/* zoomed-in-only name label, Google Maps-style — white text with a soft dark halo instead
@@ -271,15 +283,16 @@ export function MapPin({
       {showLabel && (
         <span
           aria-hidden
-          className="pointer-events-none absolute left-full ml-1.5 -translate-y-1/2 whitespace-nowrap font-semibold"
+          className="pointer-events-none absolute left-full -translate-y-1/2 whitespace-nowrap font-semibold"
           style={{
             top: `${PIN_HEAD_FRACTION * 100}%`,
-            fontSize: sizeTuning.labelFontSize,
+            marginLeft: sizeTuning.labelGapPx,
+            fontSize: sizeTuning.labelFontSize * sizeScale,
             fontFamily:
               sizeTuning.labelFontFamily === "mono"
                 ? LABEL_MONO_FONT_STACK
                 : undefined,
-            color: "white",
+            color: tagLabelTextColor(item.tag.color),
             textShadow: labelOutlineShadow(sizeTuning.labelStrokeWidth),
           }}
         >

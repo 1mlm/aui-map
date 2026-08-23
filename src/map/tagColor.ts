@@ -114,6 +114,17 @@ export function tagPinFillColor(
 export const tagPinOutlineColor = (name?: TagColorName) =>
   `color-mix(in oklch, ${getShades(name)[950]} 45%, black)`
 
+// near-white but not literally white — carries just enough of the tag's own hue that a pin's
+// label reads as "this tag's color, whitened" rather than the same plain white for every tag
+const LABEL_TEXT_LIGHTNESS = 96
+const LABEL_TEXT_CHROMA = 0.045
+export function tagLabelTextColor(name?: TagColorName) {
+  const { chroma, hue } = parseOklch(getShades(name)[500])
+  // achromatic families have no real hue to whiten toward, so the label just stays plain white
+  if (chroma < ACHROMATIC_CHROMA_THRESHOLD) return "white"
+  return `oklch(${LABEL_TEXT_LIGHTNESS}% ${LABEL_TEXT_CHROMA} ${hue})`
+}
+
 // tailwind's utility classes can't be built from a runtime variable (the compiler only picks up
 // literal class strings), so tag colors resolve through tailwindcss's own color palette instead
 // and get applied as inline styles
