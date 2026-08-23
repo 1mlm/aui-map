@@ -36,7 +36,7 @@ export function PinTuningPlayground({
     labelFontSize: {
       value: tuning.labelFontSize,
       min: 8,
-      max: 32,
+      max: 60,
       step: 0.5,
       label: "label font size",
       onChange: (labelFontSize: number) =>
