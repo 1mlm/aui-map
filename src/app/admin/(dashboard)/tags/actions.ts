@@ -34,10 +34,13 @@ export async function upsertTag(input: TagInput) {
 export async function deleteTag(id: string) {
   await requireAuth()
   const pinCount = await prisma.pin.count({ where: { tagId: id } })
-  if (pinCount > 0)
-    throw new Error(
-      `${pinCount} pin(s) still use this tag — reassign them first.`,
-    )
+  // a thrown Error's message gets redacted by Next in production (Server Function errors only
+  // survive as an opaque digest client-side), so this has to travel back as a return value
+  if (pinCount > 0) {
+    return {
+      error: `${pinCount} pin(s) still use this tag — reassign them first.`,
+    }
+  }
   await prisma.tag.delete({ where: { id } })
   revalidatePath("/")
   revalidatePath("/admin/tags")

@@ -169,7 +169,7 @@ export function PinDialog({
     }
     startTransition(async () => {
       try {
-        await upsertPin({
+        const result = await upsertPin({
           uuid: pin.uuid,
           id,
           title,
@@ -190,13 +190,13 @@ export function PinDialog({
           tagId,
           underConstruction,
         })
+        if (result?.error) {
+          setError(result.error)
+          return
+        }
         onOpenChange(false)
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Couldn't save — that id might already be in use.",
-        )
+      } catch {
+        setError("Couldn't save. Try again.")
       }
     })
   }

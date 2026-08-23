@@ -49,17 +49,27 @@ async function getAttachments(pinId: string) {
 }
 
 // admin-pasted, so these flow straight into an href/window.open — reject anything that isn't
-// plain https (a javascript: url here would execute in the visitor's session on click)
-function assertValidHttpsUrl(url: string, label: string) {
+// plain https (a javascript: url here would execute in the visitor's session on click).
+// returns an error string instead of throwing — a thrown Error's message gets redacted by
+// Next in production (Server Function errors only survive as an opaque digest client-side),
+// so expected/validation failures have to travel back as a return value instead
+function validateHttpsUrl(url: string, label: string): string | null {
   const isHttps = URL.canParse(url) && new URL(url).protocol === "https:"
-  if (!isHttps) throw new Error(`${label} must be a valid https:// url.`)
+  return isHttps ? null : `${label} must be a valid https:// url.`
 }
 
-export async function upsertPin(input: PinInput) {
+export async function upsertPin(
+  input: PinInput,
+): Promise<{ error: string } | undefined> {
   await requireAuth()
-  if (input.mapsUrl) assertValidHttpsUrl(input.mapsUrl, "Maps link")
-  for (const link of input.links)
-    assertValidHttpsUrl(link.url, `"${link.label}" link`)
+  if (input.mapsUrl) {
+    const urlError = validateHttpsUrl(input.mapsUrl, "Maps link")
+    if (urlError) return { error: urlError }
+  }
+  for (const link of input.links) {
+    const urlError = validateHttpsUrl(link.url, `"${link.label}" link`)
+    if (urlError) return { error: urlError }
+  }
   const shared = {
     id: input.id,
     title: input.title,
@@ -87,7 +97,7 @@ export async function upsertPin(input: PinInput) {
       err instanceof Prisma.PrismaClientKnownRequestError &&
       err.code === "P2002"
     ) {
-      throw new Error("That id is already in use.")
+      return { error: "That id is already in use." }
     }
     throw err
   }
@@ -113,7 +123,7 @@ export async function setThumbnail(pinId: string, attachmentId: string) {
     where: { id: attachmentId },
   })
   if (attachment.mimeType && !attachment.mimeType.startsWith("image/")) {
-    throw new Error("Only images can be set as the thumbnail.")
+    return { error: "Only images can be set as the thumbnail." }
   }
   await prisma.$transaction([
     prisma.attachment.updateMany({

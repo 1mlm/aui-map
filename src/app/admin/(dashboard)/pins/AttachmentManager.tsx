@@ -369,7 +369,12 @@ export function AttachmentManager({
     setActionError(null)
     startTransition(async () => {
       try {
-        onAttachmentsChange(await setThumbnail(pinId, attachmentId))
+        const result = await setThumbnail(pinId, attachmentId)
+        if ("error" in result) {
+          setActionError(result.error)
+          return
+        }
+        onAttachmentsChange(result)
       } catch (err) {
         setActionError(
           extractErrorMessage(err, "Couldn't set that as the thumbnail."),

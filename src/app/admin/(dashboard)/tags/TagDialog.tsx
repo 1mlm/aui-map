@@ -83,12 +83,14 @@ export function TagDialog({
     setError(null)
     startTransition(async () => {
       try {
-        await deleteTag(id)
+        const result = await deleteTag(id)
+        if (result?.error) {
+          setError(result.error)
+          return
+        }
         onOpenChange(false)
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Couldn't delete this tag.",
-        )
+      } catch {
+        setError("Couldn't delete this tag.")
       }
     })
   }
