@@ -19,7 +19,7 @@ import { useUserLocation } from "./useUserLocation"
 // flip true to bring back the leva tag-color/tuning playground
 const LEVA_PLAYGROUND_ENABLED = false
 // flip true to bring back the leva pin-size/label playground
-const PIN_SIZE_PLAYGROUND_ENABLED = true
+const PIN_SIZE_PLAYGROUND_ENABLED = false
 
 // dev-only — code-split so leva (and this whole file) never reaches production visitors
 const TagColorPlayground = dynamic(
