@@ -26,12 +26,11 @@ const OVERZOOM_FLOOR = 0.9
 const MAX_SCALE = 5
 const DOUBLE_TAP_SCALE = 2.5
 // pins used to counter the zoom exactly (1/scale), which pinned them to one on-screen size no
-// matter how far you'd zoomed in — fine at a glance, but there was never any payoff for zooming:
-// everything stayed exactly as big, and a building's name still only showed up one tap at a time.
-// Shrinking them by scale^-0.7 instead means a 10x zoom renders them about 5x smaller, clearing
-// real room around a cluster and letting MapPin's persistent label take over as the icon shrinks
-// past the point of being individually recognizable
-const PIN_GROWTH_EXPONENT = -0.7
+// matter how far you'd zoomed in. Shrinking them slightly instead — scale^-0.3, a 10x zoom
+// renders them only about 2x smaller — clears a little real room around a cluster without the
+// icon itself getting hard to see; the actual room to read names comes from the map spreading
+// pins further apart on screen as you zoom, not from the icon shrinking further than this
+const PIN_GROWTH_EXPONENT = -0.3
 const DOUBLE_TAP_MAX_DELAY_MS = 300
 const DOUBLE_TAP_MAX_DISTANCE_PX = 24
 const WHEEL_SETTLE_DELAY_MS = 220

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useLayoutEffect, useState } from "react"
 
 // Each rule owns the one piece of chrome it decides, measured against what actually stops fitting
 // rather than device breakpoints — so a narrow window on a desktop behaves like a phone.
@@ -15,11 +15,21 @@ const MIN_WIDTH = {
 const MIN_HEIGHT_FOR_FULL_CREDIT = 560
 
 export function useAvailableSpace(ref: React.RefObject<HTMLElement | null>) {
+  // starts at 0 on both server and client so the first client render matches the server's HTML
+  // exactly — reading window.innerWidth here instead would get the layout right one render
+  // sooner, but at the cost of a genuine hydration mismatch, since this value drives real DOM
+  // output. The layout effect below corrects it before the browser ever paints, so there's no
+  // visible flash either way — this just gets there via an extra internal render instead
   const [size, setSize] = useState({ width: 0, height: 0 })
 
-  useEffect(() => {
+  // a layout effect, not a plain effect — it reads and corrects the real size synchronously
+  // before the browser paints, so the very first frame the user sees is already right. A plain
+  // effect (or the "assume roomy" fallback this replaced) let the wrong layout paint for one
+  // real frame first: full desktop chrome flashing on a narrow phone screen before collapsing
+  useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
+    setSize(el.getBoundingClientRect())
     const observer = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect
       setSize({ width, height })
@@ -28,14 +38,11 @@ export function useAvailableSpace(ref: React.RefObject<HTMLElement | null>) {
     return () => observer.disconnect()
   }, [ref])
 
-  // 0 only happens on the very first paint, before the observer has measured — assume roomy so
-  // the full layout doesn't flash its collapsed form
-  const width = size.width || Number.POSITIVE_INFINITY
-  const height = size.height || Number.POSITIVE_INFINITY
-
   return {
-    showsProjectName: width >= MIN_WIDTH.projectName,
-    showsFullCredit: width >= MIN_WIDTH.fullCredit && height >= MIN_HEIGHT_FOR_FULL_CREDIT,
-    docksPanel: width < MIN_WIDTH.sidePanel,
+    showsProjectName: size.width >= MIN_WIDTH.projectName,
+    showsFullCredit:
+      size.width >= MIN_WIDTH.fullCredit &&
+      size.height >= MIN_HEIGHT_FOR_FULL_CREDIT,
+    docksPanel: size.width < MIN_WIDTH.sidePanel,
   }
 }

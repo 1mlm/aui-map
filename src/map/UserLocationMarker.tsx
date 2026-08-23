@@ -42,19 +42,19 @@ export function UserLocationMarker({
     <>
       <span className="absolute inset-0 animate-ping rounded-full bg-blue-500 opacity-75" />
       {heading !== null && (
+        // inset-0 matches the dot's own box exactly, so the default center transform-origin is
+        // the dot's real center — rotating this wrapper sweeps the tip around that point at a
+        // fixed short reach instead of swinging out from some offset pivot
         <span
-          className="absolute inset-x-0 bottom-1/2 flex justify-center"
-          style={{
-            // the icon points down by default, so a flat rotate(heading) would have it facing the
-            // wrong way at heading 0 (north/up) — the extra 180 flips its rest pose to point up
-            transform: `rotate(${heading + 180}deg)`,
-            transformOrigin: "50% 100%",
-          }}
+          className="absolute inset-0 flex items-start justify-center"
+          style={{ transform: `rotate(${heading}deg)` }}
         >
           <Icon
             icon={ICONS.heading}
-            strokeWidth={2.5}
-            className="mb-0.5 size-3.5 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"
+            strokeWidth={3}
+            // the icon points down by default — rotate-180 is a fixed correction so it points
+            // outward (up) at heading 0, independent of the heading rotation on the wrapper above
+            className="-mt-1 size-2 rotate-180 text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.6)]"
           />
         </span>
       )}
