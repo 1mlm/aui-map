@@ -12,7 +12,11 @@ export function PinTuningPlayground({
   onTuningChange,
 }: {
   tuning: PinSizeTuning
-  onTuningChange: (tuning: PinSizeTuning) => void
+  // a patch, not the whole object — leva only rebinds these onChange closures when the
+  // schema's own keys change, not on every parent re-render, so a closure that spread the
+  // full `tuning` here would spread a stale snapshot and stomp every other field back to
+  // whatever tuning was at that snapshot the moment any one slider moved
+  onTuningChange: (patch: Partial<PinSizeTuning>) => void
 }) {
   useControls("Pin size & labels", {
     growthExponent: {
@@ -21,8 +25,7 @@ export function PinTuningPlayground({
       max: 3,
       step: 0.05,
       label: "shrink amount",
-      onChange: (growthExponent: number) =>
-        onTuningChange({ ...tuning, growthExponent }),
+      onChange: (growthExponent: number) => onTuningChange({ growthExponent }),
     },
     labelShowScale: {
       value: tuning.labelShowScale,
@@ -30,8 +33,7 @@ export function PinTuningPlayground({
       max: 15,
       step: 0.05,
       label: "label zoom threshold",
-      onChange: (labelShowScale: number) =>
-        onTuningChange({ ...tuning, labelShowScale }),
+      onChange: (labelShowScale: number) => onTuningChange({ labelShowScale }),
     },
     labelFontSize: {
       value: tuning.labelFontSize,
@@ -39,8 +41,7 @@ export function PinTuningPlayground({
       max: 120,
       step: 0.5,
       label: "label font size",
-      onChange: (labelFontSize: number) =>
-        onTuningChange({ ...tuning, labelFontSize }),
+      onChange: (labelFontSize: number) => onTuningChange({ labelFontSize }),
     },
     labelStrokeWidth: {
       value: tuning.labelStrokeWidth,
@@ -49,7 +50,7 @@ export function PinTuningPlayground({
       step: 0.25,
       label: "label outline width",
       onChange: (labelStrokeWidth: number) =>
-        onTuningChange({ ...tuning, labelStrokeWidth }),
+        onTuningChange({ labelStrokeWidth }),
     },
     pinOpacity: {
       value: tuning.pinOpacity,
@@ -57,8 +58,7 @@ export function PinTuningPlayground({
       max: 1,
       step: 0.01,
       label: "pin opacity",
-      onChange: (pinOpacity: number) =>
-        onTuningChange({ ...tuning, pinOpacity }),
+      onChange: (pinOpacity: number) => onTuningChange({ pinOpacity }),
     },
   })
 

@@ -166,7 +166,9 @@ export function MapExperience({
         process.env.NODE_ENV === "development" && (
           <PinTuningPlayground
             tuning={sizeTuning}
-            onTuningChange={setSizeTuning}
+            onTuningChange={(patch) =>
+              setSizeTuning((current) => ({ ...current, ...patch }))
+            }
           />
         )}
     </div>
