@@ -15,6 +15,7 @@ import {
 } from "@/shadcn/ui/dropdown-menu"
 import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover"
 import { cn } from "@/shadcn/utils"
+import { copyToClipboard } from "@/utils/clipboard"
 import { triggerHaptic } from "@/utils/haptics"
 import { isImageMimeType } from "@/utils/mimeType"
 import { AttachmentCarousel, AttachmentStrip } from "./AttachmentCarousel"
@@ -400,11 +401,12 @@ function MapsMenuButton({ item }: { item: MapItem }) {
     window.open(url, "_blank", "noopener,noreferrer")
   }
 
-  function copyCoordinates() {
+  async function copyCoordinates() {
     triggerHaptic()
-    navigator.clipboard.writeText(
+    const succeeded = await copyToClipboard(
       `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}`,
     )
+    if (!succeeded) return
     setCopied(true)
     setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS)
   }
@@ -455,8 +457,9 @@ function CoordinatesLine({
   const coordinates = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
   const [copied, setCopied] = useState(false)
 
-  const copyCoordinates = () => {
-    navigator.clipboard.writeText(coordinates)
+  const copyCoordinates = async () => {
+    const succeeded = await copyToClipboard(coordinates)
+    if (!succeeded) return
     setCopied(true)
     setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS)
   }

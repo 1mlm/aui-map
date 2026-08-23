@@ -13,6 +13,7 @@ import {
   ContextMenuTrigger,
 } from "@/shadcn/ui/context-menu"
 import { cn } from "@/shadcn/utils"
+import { copyToClipboard } from "@/utils/clipboard"
 import { triggerHaptic } from "@/utils/haptics"
 import {
   formatCoordinates,
@@ -56,7 +57,7 @@ function DroppedPinMarker({ position }: { position: NormalizedPosition }) {
         {...{ fill }}
         strokeWidth={1.8}
         style={{ color: outline, filter: `drop-shadow(0 0 6px ${glow})` }}
-        className="relative block size-7"
+        className="relative block size-8"
       />
     </div>
   )
@@ -76,9 +77,12 @@ function DroppedPinMenuContent({ position }: { position: NormalizedPosition }) {
     window.open(url, "_blank", "noopener,noreferrer")
   }
 
-  function copyCoordinates() {
+  async function copyCoordinates() {
     triggerHaptic()
-    navigator.clipboard.writeText(formatCoordinates({ latitude, longitude }))
+    const succeeded = await copyToClipboard(
+      formatCoordinates({ latitude, longitude }),
+    )
+    if (!succeeded) return
     setCopied(true)
     setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS)
   }
@@ -151,7 +155,7 @@ export function MapCanvas({
 
   // ctrl/cmd + click reads the coordinate under the cursor and copies it in data.ts's format, so
   // new map items can be surveyed straight off the satellite image
-  function copyCoordinateUnderCursor(event: React.MouseEvent) {
+  async function copyCoordinateUnderCursor(event: React.MouseEvent) {
     const imageBox = imageBoxRef.current?.getBoundingClientRect()
     if (!event.ctrlKey && !event.metaKey) return
     if (!imageBox) return
@@ -162,7 +166,11 @@ export function MapCanvas({
     )
     const coord = formatCoordinates(positionToLatLong(clicked))
 
-    navigator.clipboard.writeText(coord)
+    const succeeded = await copyToClipboard(coord)
+    if (!succeeded) {
+      triggerHaptic("error")
+      return
+    }
     triggerHaptic("success")
     setSurveyedCoord(coord)
 
