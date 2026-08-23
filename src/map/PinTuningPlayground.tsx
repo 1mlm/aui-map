@@ -36,7 +36,7 @@ export function PinTuningPlayground({
     labelFontSize: {
       value: tuning.labelFontSize,
       min: 8,
-      max: 20,
+      max: 32,
       step: 0.5,
       label: "label font size",
       onChange: (labelFontSize: number) =>
@@ -45,7 +45,7 @@ export function PinTuningPlayground({
     labelStrokeWidth: {
       value: tuning.labelStrokeWidth,
       min: 0,
-      max: 6,
+      max: 10,
       step: 0.25,
       label: "label outline width",
       onChange: (labelStrokeWidth: number) =>

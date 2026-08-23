@@ -58,8 +58,8 @@ export type PinSizeTuning = {
 export const DEFAULT_PIN_SIZE_TUNING: PinSizeTuning = {
   growthExponent: DEFAULT_PIN_GROWTH_EXPONENT,
   labelShowScale: 4,
-  labelFontSize: 13,
-  labelStrokeWidth: 3,
+  labelFontSize: 22,
+  labelStrokeWidth: 8,
   pinOpacity: 0.95,
 }
 
