@@ -48,7 +48,10 @@ function CreditTag({
   rotation: (typeof TAG_ROTATIONS)[number]
 }) {
   const className = cn(
-    "relative -my-0.5 inline-flex w-fit shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full corner-squircle bg-white/5 py-0.5 pr-3 pl-2 font-semibold text-foreground outline-none transition-all duration-200 hover:-translate-y-2 hover:scale-105 hover:bg-white/10 focus-visible:-translate-y-2 focus-visible:scale-105 focus-visible:bg-white/10 active:-translate-y-2 active:scale-105 active:bg-white/10",
+    // the "About the project" paragraph sets text-indent for its own first-line indent — that
+    // inherits into this flex container and, since the label is a bare text node, gets applied
+    // to it as if it were its own indented line, shoving it away from the icon. Reset it here
+    "relative -my-0.5 inline-flex w-fit shrink-0 items-center gap-1.5 indent-0 whitespace-nowrap rounded-full corner-squircle bg-white/5 py-0.5 pr-3 pl-2 font-semibold text-foreground outline-none transition-all duration-200 hover:-translate-y-2 hover:scale-105 hover:bg-white/10 focus-visible:-translate-y-2 focus-visible:scale-105 focus-visible:bg-white/10 active:-translate-y-2 active:scale-105 active:bg-white/10",
     rotation,
   )
 

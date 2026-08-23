@@ -15,6 +15,9 @@ import { useAvailableSpace } from "./useAvailableSpace"
 import { useCompassHeading } from "./useCompassHeading"
 import { useUserLocation } from "./useUserLocation"
 
+// flip true to bring back the leva tag-color/tuning playground
+const LEVA_PLAYGROUND_ENABLED = false
+
 // dev-only — code-split so leva (and this whole file) never reaches production visitors
 const TagColorPlayground = dynamic(
   () => import("./TagColorPlayground").then((m) => m.TagColorPlayground),
@@ -125,7 +128,7 @@ export function MapExperience({
         <NoticeDialog open={noticeOpen} onOpenChange={setNoticeOpen} />
       </div>
 
-      {process.env.NODE_ENV === "development" && (
+      {LEVA_PLAYGROUND_ENABLED && process.env.NODE_ENV === "development" && (
         <TagColorPlayground
           tags={tags}
           onColorChange={(tagId, color) =>
