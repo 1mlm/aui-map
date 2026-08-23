@@ -70,9 +70,9 @@ export const DEFAULT_PIN_SIZE_TUNING: PinSizeTuning = {
   pinBaseSizePx: 32,
   labelFontSize: 18,
   labelFontFamily: "sans",
-  labelStrokeWidth: 8,
-  labelGapPx: 6,
-  pinOpacity: 0.95,
+  labelStrokeWidth: 3.2,
+  labelGapPx: 4,
+  pinOpacity: 0.9,
 }
 
 const LABEL_MONO_FONT_STACK =

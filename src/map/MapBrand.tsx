@@ -7,10 +7,17 @@ export function MapBrand() {
   return (
     <SquircleFuserContainer
       align="top-left"
-      superClassName="pointer-events-auto absolute top-0 left-0"
+      superClassName="map-brand pointer-events-auto absolute top-0 left-0"
       className="gap-3 pr-10 pl-4"
     >
-      <Image src="/icon.webp" alt="" width={36} height={36} unoptimized className="size-9" />
+      <Image
+        src="/icon.webp"
+        alt=""
+        width={36}
+        height={36}
+        unoptimized
+        className="size-9"
+      />
       {/* the badge hangs off the wordmark's top-right corner, so it needs the text as its anchor */}
       <span className="relative pr-3 text-2xl font-bold whitespace-nowrap">
         AUI Map

@@ -18,14 +18,12 @@ const LOCATE_TOOLTIP_TEXT: Record<LocationStatus, string> = {
 }
 
 export function MapControls({
-  compact,
   onOpenNotice,
   locationStatus,
   onLocate,
   ...props
 }: SearchProps &
   FilterProps & {
-    compact: boolean
     onOpenNotice: () => void
     locationStatus: LocationStatus
     onLocate: () => void
@@ -121,8 +119,20 @@ export function MapControls({
           {LOCATE_TOOLTIP_TEXT[locationStatus]}
         </TooltipContent>
       </Tooltip>
+    </>
+  )
 
-      {compact && (
+  // compact (mobile-width) screens have no viewport-corner "frame" for the pill to fuse into, and
+  // have no separate MapCredit line to reach the notice dialog from — so this variant goes
+  // standalone and centered instead of docking to the corner, and carries its own about button.
+  // Both this and the corner-fused variant below render unconditionally; which one is actually
+  // visible is decided by a CSS container query (globals.css's .map-controls-compact /
+  // .map-controls-full rules) rather than a JS-measured boolean, so the right one is already
+  // showing on the very first frame instead of flashing the wrong one while JS boots up
+  return (
+    <>
+      <div className="map-controls-compact pointer-events-auto absolute top-4 left-1/2 flex -translate-x-1/2 items-center justify-center gap-2.5 rounded-full corner-squircle bg-background px-4 py-2.5 drop-shadow-lg drop-shadow-black/40">
+        {buttons}
         <Tooltip>
           <TooltipTrigger asChild>
             <IconButton
@@ -135,28 +145,15 @@ export function MapControls({
             About this project
           </TooltipContent>
         </Tooltip>
-      )}
-    </>
-  )
-
-  // compact (mobile-width) screens have no viewport-corner "frame" for the pill to fuse into —
-  // it just reads as an oddly notched shape floating in space — so it goes standalone and
-  // centered there instead of docking to the corner the way it does with room to spare
-  if (compact) {
-    return (
-      <div className="pointer-events-auto absolute top-4 left-1/2 flex -translate-x-1/2 items-center justify-center gap-2.5 rounded-full corner-squircle bg-background px-4 py-2.5 drop-shadow-lg drop-shadow-black/40">
-        {buttons}
       </div>
-    )
-  }
 
-  return (
-    <SquircleFuserContainer
-      align="top-right"
-      superClassName="pointer-events-auto absolute top-0 right-0"
-      className="gap-2"
-    >
-      {buttons}
-    </SquircleFuserContainer>
+      <SquircleFuserContainer
+        align="top-right"
+        superClassName="map-controls-full pointer-events-auto absolute top-0 right-0"
+        className="gap-2"
+      >
+        {buttons}
+      </SquircleFuserContainer>
+    </>
   )
 }

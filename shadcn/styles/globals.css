@@ -119,3 +119,37 @@
 [data-moving] .pin-filter {
   filter: none !important;
 }
+
+/* the brand pill, corner-fused controls, and credit line used to switch between their mobile and
+   desktop layouts via a boolean measured in JS (useAvailableSpace) — correct on every resize, but
+   the very first paint always started from a default before that measurement could land, which
+   flashed the wrong chrome for a frame while JS booted and hydrated. Container queries pick the
+   right one before any JS runs at all, straight from the stylesheet on the very first frame.
+   Queries the shell itself, not the viewport, so a narrow window on a wide desktop still gets the
+   compact chrome — same intent the JS hook had */
+.map-shell {
+  container-type: size;
+  container-name: shell;
+}
+
+.map-brand,
+.map-controls-full,
+.map-credit {
+  display: none !important;
+}
+
+@container shell (min-width: 620px) {
+  .map-brand {
+    display: block !important;
+  }
+}
+
+@container shell (min-width: 480px) and (min-height: 560px) {
+  .map-controls-compact {
+    display: none !important;
+  }
+  .map-controls-full,
+  .map-credit {
+    display: block !important;
+  }
+}

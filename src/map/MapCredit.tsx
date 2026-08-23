@@ -167,7 +167,7 @@ export function MapCredit({ onOpen }: { onOpen: () => void }) {
   return (
     <SquircleFuserContainer
       align="bottom-center"
-      superClassName="absolute bottom-0 left-1/2 -translate-x-1/2"
+      superClassName="map-credit absolute bottom-0 left-1/2 -translate-x-1/2"
     >
       <button
         type="button"

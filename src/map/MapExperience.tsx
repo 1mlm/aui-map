@@ -19,7 +19,7 @@ import { useUserLocation } from "./useUserLocation"
 // flip true to bring back the leva tag-color/tuning playground
 const LEVA_PLAYGROUND_ENABLED = false
 // flip true to bring back the leva pin-size/label playground
-const PIN_SIZE_PLAYGROUND_ENABLED = true
+const PIN_SIZE_PLAYGROUND_ENABLED = false
 
 // dev-only — code-split so leva (and this whole file) never reaches production visitors
 const TagColorPlayground = dynamic(
@@ -109,7 +109,7 @@ export function MapExperience({
     <div className="h-dvh w-dvw bg-background sm:p-3">
       <div
         ref={shellRef}
-        className="relative h-full w-full overflow-hidden bg-background sm:rounded-[3rem] sm:corner-squircle sm:shadow-2xl"
+        className="map-shell relative h-full w-full overflow-hidden bg-background sm:rounded-[3rem] sm:corner-squircle sm:shadow-2xl"
       >
         <MapCanvas
           ref={mapCanvasRef}
@@ -122,14 +122,13 @@ export function MapExperience({
           {...{ selectedId, hoveredTagId, tuning, sizeTuning }}
         />
 
-        {space.showsProjectName && <MapBrand />}
+        <MapBrand />
 
         <MapControls
           tags={effectiveTags}
           onToggle={toggleTag}
           onSearchChange={setSearch}
           onHoverTag={setHoveredTagId}
-          compact={!space.showsFullCredit}
           onOpenNotice={() => setNoticeOpen(true)}
           locationStatus={location.status}
           onLocate={handleLocate}
@@ -146,9 +145,7 @@ export function MapExperience({
           )}
         </AnimatePresence>
 
-        {space.showsFullCredit && (
-          <MapCredit onOpen={() => setNoticeOpen(true)} />
-        )}
+        <MapCredit onOpen={() => setNoticeOpen(true)} />
         <NoticeDialog open={noticeOpen} onOpenChange={setNoticeOpen} />
       </div>
 
