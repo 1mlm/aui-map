@@ -9,7 +9,7 @@ import { MapCanvas } from "./MapCanvas"
 import { MapControls } from "./MapControls"
 import { MapCredit, NoticeDialog } from "./MapCredit"
 import { MapDetailPanel } from "./MapDetailPanel"
-import type { TagColorName } from "./tagColor"
+import { DEFAULT_CRAYON_TUNING, type TagColorName } from "./tagColor"
 import type { MapItem, MapItemTag } from "./types"
 import { useAvailableSpace } from "./useAvailableSpace"
 import { useCompassHeading } from "./useCompassHeading"
@@ -54,6 +54,9 @@ export function MapExperience({
   const [colorOverrides, setColorOverrides] = useState<
     Record<string, TagColorName>
   >({})
+  // dev-only live crayon-treatment tuning from TagColorPlayground — never populated in
+  // production, so pins always fall back to tagColor.ts's DEFAULT_CRAYON_TUNING there
+  const [tuning, setTuning] = useState(DEFAULT_CRAYON_TUNING)
   const effectiveTags = tags.map((tag) =>
     colorOverrides[tag.id] ? { ...tag, color: colorOverrides[tag.id] } : tag,
   )
@@ -91,7 +94,7 @@ export function MapExperience({
           compassHeading={compass.heading}
           compassPermission={compass.permission}
           onRequestCompass={compass.requestPermission}
-          {...{ selectedId, hoveredTagId }}
+          {...{ selectedId, hoveredTagId, tuning }}
         />
 
         {space.showsProjectName && <MapBrand />}
@@ -128,6 +131,8 @@ export function MapExperience({
           onColorChange={(tagId, color) =>
             setColorOverrides((current) => ({ ...current, [tagId]: color }))
           }
+          {...{ tuning }}
+          onTuningChange={setTuning}
         />
       )}
     </div>

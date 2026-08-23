@@ -6,7 +6,12 @@ import { ICONS } from "@/icons"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shadcn/ui/tooltip"
 import { triggerHaptic } from "@/utils/haptics"
 import { latLongToPosition, positionToStyle } from "./geo"
-import { tagPinFillColor, tagPinOutlineColor } from "./tagColor"
+import {
+  type CrayonTuning,
+  DEFAULT_CRAYON_TUNING,
+  tagPinFillColor,
+  tagPinOutlineColor,
+} from "./tagColor"
 import type { MapItem } from "./types"
 import { pinCounterScale } from "./useMapPanZoom"
 
@@ -42,6 +47,7 @@ export function MapPin({
   onSelect,
   previewing,
   matchesPreview,
+  tuning = DEFAULT_CRAYON_TUNING,
 }: {
   item: MapItem
   selected: boolean
@@ -51,10 +57,12 @@ export function MapPin({
   // wiggle a little so the preview doesn't just look like a fade someone forgot to finish
   previewing: boolean
   matchesPreview: boolean
+  // only ever overridden by the dev-only TagColorPlayground — real visitors always get the default
+  tuning?: CrayonTuning
 }) {
   const position = latLongToPosition(item.latitude, item.longitude)
   const counterScale = useTransform(viewportScale, pinCounterScale)
-  const fill = tagPinFillColor(item.tag.color)
+  const fill = tagPinFillColor(item.tag.color, tuning)
   const outline = tagPinOutlineColor(item.tag.color)
   const tilt = tiltForPin(item.id)
   // same left/right split as the personality tilt, just at a magnitude that actually reads as

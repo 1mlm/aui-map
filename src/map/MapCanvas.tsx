@@ -23,6 +23,7 @@ import {
   screenPointToPosition,
 } from "./geo"
 import { MapPin, PIN_TIP_FRACTION } from "./MapPin"
+import type { CrayonTuning } from "./tagColor"
 import type { MapItem } from "./types"
 import { type UserLocation, UserLocationMarker } from "./UserLocationMarker"
 import type { CompassPermission } from "./useCompassHeading"
@@ -118,6 +119,7 @@ export function MapCanvas({
   compassPermission,
   onRequestCompass,
   hoveredTagId,
+  tuning,
 }: {
   items: MapItem[]
   selectedId: string | null
@@ -127,6 +129,8 @@ export function MapCanvas({
   compassPermission: CompassPermission
   onRequestCompass: () => void
   hoveredTagId: string | null
+  // only ever overridden by the dev-only TagColorPlayground — real visitors always get the default
+  tuning?: CrayonTuning
 }) {
   const panZoom = useMapPanZoom()
   const imageBoxRef = useRef<HTMLDivElement>(null)
@@ -250,7 +254,7 @@ export function MapCanvas({
                   }
                   previewing={hoveredTagId !== null}
                   matchesPreview={item.tag.id === hoveredTagId}
-                  {...{ item }}
+                  {...{ item, tuning }}
                 />
               ))}
               {contextMenuPosition && (
