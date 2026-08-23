@@ -17,8 +17,8 @@ export function PinTuningPlayground({
   useControls("Pin size & labels", {
     growthExponent: {
       value: tuning.growthExponent,
-      min: -1,
-      max: 0.7,
+      min: -3,
+      max: 3,
       step: 0.05,
       label: "shrink amount",
       onChange: (growthExponent: number) =>
@@ -26,8 +26,8 @@ export function PinTuningPlayground({
     },
     labelShowScale: {
       value: tuning.labelShowScale,
-      min: 1.45,
-      max: 5,
+      min: 0.5,
+      max: 15,
       step: 0.05,
       label: "label zoom threshold",
       onChange: (labelShowScale: number) =>
@@ -35,8 +35,8 @@ export function PinTuningPlayground({
     },
     labelFontSize: {
       value: tuning.labelFontSize,
-      min: 8,
-      max: 60,
+      min: 4,
+      max: 120,
       step: 0.5,
       label: "label font size",
       onChange: (labelFontSize: number) =>
@@ -45,7 +45,7 @@ export function PinTuningPlayground({
     labelStrokeWidth: {
       value: tuning.labelStrokeWidth,
       min: 0,
-      max: 10,
+      max: 25,
       step: 0.25,
       label: "label outline width",
       onChange: (labelStrokeWidth: number) =>
@@ -53,7 +53,7 @@ export function PinTuningPlayground({
     },
     pinOpacity: {
       value: tuning.pinOpacity,
-      min: 0.3,
+      min: 0,
       max: 1,
       step: 0.01,
       label: "pin opacity",
