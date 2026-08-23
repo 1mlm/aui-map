@@ -1,7 +1,10 @@
+import type { Metadata } from "next"
 import type { IconName } from "@/map/iconRegistry"
 import { prisma } from "@/utils/prisma"
 import type { TagRow } from "./TagsTable"
 import { TagsTable } from "./TagsTable"
+
+export const metadata: Metadata = { title: "Tags" }
 
 export default async function AdminTagsPage() {
   const tagRows = await prisma.tag.findMany({

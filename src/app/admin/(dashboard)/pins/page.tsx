@@ -1,8 +1,11 @@
+import type { Metadata } from "next"
 import { tagRowToMapItemTag } from "@/map/mapItemFromDb"
 import { type MapItemTag, parsePinLinks } from "@/map/types"
 import { prisma } from "@/utils/prisma"
 import type { AdminPin } from "./PinDialog"
 import { PinsTable } from "./PinsTable"
+
+export const metadata: Metadata = { title: "Pins" }
 
 export default async function AdminPinsPage() {
   const [pinRows, tagRows] = await Promise.all([

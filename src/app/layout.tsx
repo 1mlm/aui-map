@@ -16,7 +16,7 @@ const DESCRIPTION =
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://auimap.ma"),
-  title: TITLE,
+  title: { default: TITLE, template: `%s · ${TITLE}` },
   description: DESCRIPTION,
   keywords: [
     "AUI Map",
