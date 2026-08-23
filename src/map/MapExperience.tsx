@@ -1,6 +1,7 @@
 "use client"
 
 import { AnimatePresence } from "motion/react"
+import dynamic from "next/dynamic"
 import { useQueryState } from "nuqs"
 import { useRef, useState } from "react"
 import { MapBrand } from "./MapBrand"
@@ -8,10 +9,17 @@ import { MapCanvas } from "./MapCanvas"
 import { MapControls } from "./MapControls"
 import { MapCredit, NoticeDialog } from "./MapCredit"
 import { MapDetailPanel } from "./MapDetailPanel"
+import type { TagColorName } from "./tagColor"
 import type { MapItem, MapItemTag } from "./types"
 import { useAvailableSpace } from "./useAvailableSpace"
 import { useCompassHeading } from "./useCompassHeading"
 import { useUserLocation } from "./useUserLocation"
+
+// dev-only — code-split so leva (and this whole file) never reaches production visitors
+const TagColorPlayground = dynamic(
+  () => import("./TagColorPlayground").then((m) => m.TagColorPlayground),
+  { ssr: false },
+)
 
 function matchesSearch(item: MapItem, query: string) {
   if (!query) return true
@@ -40,8 +48,23 @@ export function MapExperience({
   // in the url so a place can be linked to directly: /?focus=m6l
   const [selectedId, setSelectedId] = useQueryState("focus")
 
-  const selected = items.find((item) => item.id === selectedId) ?? null
-  const visibleItems = items.filter(
+  // dev-only live color overrides from TagColorPlayground — never populated in production, so
+  // this is a no-op merge there. Keyed by tag id, applied to both the tags list (for the filter
+  // pills) and each item's embedded tag (for the pins themselves)
+  const [colorOverrides, setColorOverrides] = useState<
+    Record<string, TagColorName>
+  >({})
+  const effectiveTags = tags.map((tag) =>
+    colorOverrides[tag.id] ? { ...tag, color: colorOverrides[tag.id] } : tag,
+  )
+  const effectiveTagById = new Map(effectiveTags.map((tag) => [tag.id, tag]))
+  const effectiveItems = items.map((item) => ({
+    ...item,
+    tag: effectiveTagById.get(item.tag.id) ?? item.tag,
+  }))
+
+  const selected = effectiveItems.find((item) => item.id === selectedId) ?? null
+  const visibleItems = effectiveItems.filter(
     (item) =>
       matchesSearch(item, search) &&
       (activeTagIds.size === 0 || activeTagIds.has(item.tag.id)),
@@ -74,7 +97,7 @@ export function MapExperience({
         {space.showsProjectName && <MapBrand />}
 
         <MapControls
-          {...{ tags }}
+          tags={effectiveTags}
           onToggle={toggleTag}
           onSearchChange={setSearch}
           onHoverTag={setHoveredTagId}
@@ -98,6 +121,15 @@ export function MapExperience({
         )}
         <NoticeDialog open={noticeOpen} onOpenChange={setNoticeOpen} />
       </div>
+
+      {process.env.NODE_ENV === "development" && (
+        <TagColorPlayground
+          tags={tags}
+          onColorChange={(tagId, color) =>
+            setColorOverrides((current) => ({ ...current, [tagId]: color }))
+          }
+        />
+      )}
     </div>
   )
 }

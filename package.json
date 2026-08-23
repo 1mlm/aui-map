@@ -1,6 +1,6 @@
 {
   "name": "aui-map",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "packageManager": "pnpm@11.6.0",
   "scripts": {
@@ -26,6 +26,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "exceljs": "^4.4.0",
+    "leva": "^0.10.1",
     "motion": "^12.42.2",
     "next": "16.2.6",
     "nuqs": "^2.9.2",
