@@ -38,6 +38,10 @@ const PIN_OPACITY = 0.9
 // 32px box — sized so even a small-tag pin (0.8x) at the map's most zoomed-out still clears the
 // 24px minimum touch target after every scale it goes through (tag size, zoom, selection)
 const HIT_SLOP_PX = 8
+// the map-zoom range (not the pin's own shrinking size) over which the name label fades in — pins
+// are still recognizable by shape/color below this, so a label everywhere would just be clutter
+const LABEL_FADE_START_SCALE = 2.2
+const LABEL_FADE_END_SCALE = 3.2
 
 // stays the same for a given pin every time, so the tilt reads as each pin's own personality
 // rather than jittering on every re-render — a real Math.random() would do the latter
@@ -71,6 +75,15 @@ export function MapPin({
 }) {
   const position = latLongToPosition(item.latitude, item.longitude)
   const counterScale = useTransform(viewportScale, pinCounterScale)
+  // the icon shrinks on purpose as you zoom in (see PIN_GROWTH_EXPONENT) — this cancels that
+  // shrink back out just for the label, so the name stays a constant, legible size instead of
+  // vanishing right along with the icon
+  const labelScale = useTransform(counterScale, (scale) => 1 / scale)
+  const labelOpacity = useTransform(
+    viewportScale,
+    [LABEL_FADE_START_SCALE, LABEL_FADE_END_SCALE],
+    [0, 1],
+  )
   const fill = tagPinFillColor(item.tag.color, tuning)
   const outline = tagPinOutlineColor(item.tag.color)
   const tilt = tiltForPin(item.id)
@@ -207,6 +220,23 @@ export function MapPin({
               className="pin-filter relative block size-8"
             />
           </motion.button>
+          {/* zoomed-in-only name label, so a building is identifiable without a tap — a sibling of
+              the button rather than a child, so it doesn't inherit the button's own hover/tap/
+              selection scale on top of its own inverse-scale compensation */}
+          <motion.span
+            aria-hidden
+            className="pointer-events-none absolute left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-foreground/90 px-1.5 py-0.5 text-[10px] font-medium text-background shadow-sm"
+            style={{
+              top: `${PIN_TIP_FRACTION * 100}%`,
+              y: 4,
+              scale: labelScale,
+              opacity: labelOpacity,
+              originX: 0.5,
+              originY: 0,
+            }}
+          >
+            {item.shortestName}
+          </motion.span>
         </motion.div>
       </TooltipTrigger>
       <TooltipContent side="top" sideOffset={6} className="font-semibold">

@@ -13,7 +13,7 @@ import { SuggestionForm } from "./SuggestionForm"
 const LOCATE_TOOLTIP_TEXT: Record<LocationStatus, string> = {
   idle: "Use my location",
   requesting: "Finding you…",
-  granted: "Locate me",
+  granted: "Center me",
   denied: "Location unavailable",
 }
 
@@ -21,14 +21,14 @@ export function MapControls({
   compact,
   onOpenNotice,
   locationStatus,
-  onRequestLocation,
+  onLocate,
   ...props
 }: SearchProps &
   FilterProps & {
     compact: boolean
     onOpenNotice: () => void
     locationStatus: LocationStatus
-    onRequestLocation: () => void
+    onLocate: () => void
   }) {
   const { search, activeTagIds } = props
 
@@ -112,7 +112,7 @@ export function MapControls({
             iconClassName={
               locationStatus === "requesting" ? "animate-spin" : undefined
             }
-            onClick={onRequestLocation}
+            onClick={onLocate}
             tone={locationStatus === "granted" ? "primary" : "subtle"}
             aria-label={LOCATE_TOOLTIP_TEXT[locationStatus]}
           />

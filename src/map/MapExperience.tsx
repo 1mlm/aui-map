@@ -5,7 +5,7 @@ import dynamic from "next/dynamic"
 import { useQueryState } from "nuqs"
 import { useRef, useState } from "react"
 import { MapBrand } from "./MapBrand"
-import { MapCanvas } from "./MapCanvas"
+import { MapCanvas, type MapCanvasHandle } from "./MapCanvas"
 import { MapControls } from "./MapControls"
 import { MapCredit, NoticeDialog } from "./MapCredit"
 import { MapDetailPanel } from "./MapDetailPanel"
@@ -40,9 +40,18 @@ export function MapExperience({
   tags: MapItemTag[]
 }) {
   const shellRef = useRef<HTMLDivElement>(null)
+  const mapCanvasRef = useRef<MapCanvasHandle>(null)
   const space = useAvailableSpace(shellRef)
   const location = useUserLocation()
   const compass = useCompassHeading()
+
+  // requests location if it isn't already, and — unlike the passive first-fix auto-center —
+  // always jumps the view back regardless of whether the user's already panned elsewhere,
+  // since clicking the button is unambiguous intent to recenter
+  function handleLocate() {
+    location.requestLocation()
+    if (location.position) mapCanvasRef.current?.centerOn(location.position)
+  }
 
   const [search, setSearch] = useState("")
   const [activeTagIds, setActiveTagIds] = useState<Set<string>>(new Set())
@@ -91,6 +100,7 @@ export function MapExperience({
         className="relative h-full w-full overflow-hidden bg-background sm:rounded-[3rem] sm:corner-squircle sm:shadow-2xl"
       >
         <MapCanvas
+          ref={mapCanvasRef}
           items={visibleItems}
           onSelect={setSelectedId}
           userPosition={location.position}
@@ -110,7 +120,7 @@ export function MapExperience({
           compact={!space.showsFullCredit}
           onOpenNotice={() => setNoticeOpen(true)}
           locationStatus={location.status}
-          onRequestLocation={location.requestLocation}
+          onLocate={handleLocate}
           {...{ search, activeTagIds, hoveredTagId }}
         />
 

@@ -2,7 +2,7 @@
 
 import { motion, useMotionValueEvent } from "motion/react"
 import Image from "next/image"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useImperativeHandle, useRef, useState } from "react"
 import { Icon } from "@/components/Icon"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
 import { ICONS } from "@/icons"
@@ -110,6 +110,13 @@ function DroppedPinMenuContent({ position }: { position: NormalizedPosition }) {
   )
 }
 
+export type MapCanvasHandle = {
+  // an explicit recenter — unlike the one-time auto-center on first fix, this ignores whether
+  // the user has already panned around, since clicking a "center me" button is unambiguous
+  // intent to jump back to their position
+  centerOn: (position: [number, number]) => void
+}
+
 export function MapCanvas({
   items,
   selectedId,
@@ -120,6 +127,7 @@ export function MapCanvas({
   onRequestCompass,
   hoveredTagId,
   tuning,
+  ref,
 }: {
   items: MapItem[]
   selectedId: string | null
@@ -131,6 +139,7 @@ export function MapCanvas({
   hoveredTagId: string | null
   // only ever overridden by the dev-only TagColorPlayground — real visitors always get the default
   tuning?: CrayonTuning
+  ref?: React.Ref<MapCanvasHandle>
 }) {
   const panZoom = useMapPanZoom()
   const imageBoxRef = useRef<HTMLDivElement>(null)
@@ -138,6 +147,10 @@ export function MapCanvas({
   const surveyedCoordTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const [contextMenuPosition, setContextMenuPosition] =
     useState<NormalizedPosition | null>(null)
+
+  useImperativeHandle(ref, () => ({ centerOn: panZoom.centerOn }), [
+    panZoom.centerOn,
+  ])
 
   useEffect(() => () => clearTimeout(surveyedCoordTimer.current), [])
 
