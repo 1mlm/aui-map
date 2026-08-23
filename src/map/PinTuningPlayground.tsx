@@ -1,6 +1,6 @@
 "use client"
 
-import { useControls } from "leva"
+import { Leva, useControls } from "leva"
 import type { PinSizeTuning } from "./MapPin"
 
 // dev-only tool (see the dynamic-import gate in MapExperience.tsx) — lets you retune how pins
@@ -43,6 +43,13 @@ export function PinTuningPlayground({
       label: "label font size",
       onChange: (labelFontSize: number) => onTuningChange({ labelFontSize }),
     },
+    labelFontFamily: {
+      value: tuning.labelFontFamily,
+      options: { Normal: "sans", Monospace: "mono" },
+      label: "label font",
+      onChange: (labelFontFamily: "sans" | "mono") =>
+        onTuningChange({ labelFontFamily }),
+    },
     labelStrokeWidth: {
       value: tuning.labelStrokeWidth,
       min: 0,
@@ -62,5 +69,16 @@ export function PinTuningPlayground({
     },
   })
 
-  return null
+  // the implicit auto-mounted panel leva spawns from useControls alone uses its default theme
+  // (small text, narrow column) — rendering our own <Leva> takes over that panel and lets it be
+  // sized for an actual dev tuning by hand, not a corner-of-screen debug readout
+  return (
+    <Leva
+      oneLineLabels
+      theme={{
+        fontSizes: { root: "16px" },
+        sizes: { rootWidth: "340px", controlWidth: "160px" },
+      }}
+    />
+  )
 }

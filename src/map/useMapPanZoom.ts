@@ -26,11 +26,11 @@ const OVERZOOM_FLOOR = 0.9
 const MAX_SCALE = 5
 const DOUBLE_TAP_SCALE = 2.5
 // pins used to counter the zoom exactly (1/scale), which pinned them to one on-screen size no
-// matter how far you'd zoomed in. Shrinking them slightly instead — scale^-0.3, a 10x zoom
-// renders them only about 2x smaller — clears a little real room around a cluster without the
-// icon itself getting hard to see; the actual room to read names comes from the map spreading
-// pins further apart on screen as you zoom, not from the icon shrinking further than this
-export const DEFAULT_PIN_GROWTH_EXPONENT = -0.3
+// matter how far you'd zoomed in. Shrinking them slightly instead clears a little real room
+// around a cluster without the icon itself getting hard to see; the actual room to read names
+// comes from the map spreading pins further apart on screen as you zoom, not from the icon
+// shrinking further than this. Tuned live via PinTuningPlayground's "shrink amount" slider
+export const DEFAULT_PIN_GROWTH_EXPONENT = 0.25
 const DOUBLE_TAP_MAX_DELAY_MS = 300
 const DOUBLE_TAP_MAX_DISTANCE_PX = 24
 const WHEEL_SETTLE_DELAY_MS = 220

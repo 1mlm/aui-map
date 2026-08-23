@@ -46,8 +46,9 @@ export type PinSizeTuning = {
   // either there or it isn't
   labelShowScale: number
   labelFontSize: number
-  // the dark outline around the label text (Google Maps' own look) — not a background, just
-  // enough of a stroke to keep white text legible over busy satellite imagery
+  labelFontFamily: "sans" | "mono"
+  // the radius of the soft dark halo around the label text (Google Maps' own look) — not a
+  // background, just enough of a glow to keep white text legible over busy satellite imagery
   labelStrokeWidth: number
   // pins solid at 100% read as an opaque wall once a cluster gets dense enough to overlap — a
   // little see-through keeps the buildings/paths underneath legible without the pin itself
@@ -57,10 +58,29 @@ export type PinSizeTuning = {
 
 export const DEFAULT_PIN_SIZE_TUNING: PinSizeTuning = {
   growthExponent: DEFAULT_PIN_GROWTH_EXPONENT,
-  labelShowScale: 4,
-  labelFontSize: 33,
+  labelShowScale: 3.5,
+  labelFontSize: 18,
+  labelFontFamily: "sans",
   labelStrokeWidth: 8,
   pinOpacity: 0.95,
+}
+
+const LABEL_MONO_FONT_STACK =
+  "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+// a hard geometric stroke (-webkit-text-stroke) reads harsh at any real thickness — its miter
+// joins turn sharp letter corners into a blocky mess. Stacking many small blurred shadows in a
+// ring instead reads as a soft, even halo — always all the way around the glyph, never just a
+// drop shadow at the bottom
+const LABEL_OUTLINE_DIRECTIONS = 16
+function labelOutlineShadow(radius: number) {
+  if (radius <= 0) return undefined
+  const blur = radius * 0.5
+  return Array.from({ length: LABEL_OUTLINE_DIRECTIONS }, (_, i) => {
+    const angle = (i / LABEL_OUTLINE_DIRECTIONS) * Math.PI * 2
+    const x = (Math.cos(angle) * radius).toFixed(2)
+    const y = (Math.sin(angle) * radius).toFixed(2)
+    return `${x}px ${y}px ${blur.toFixed(2)}px black`
+  }).join(", ")
 }
 
 // stays the same for a given pin every time, so the tilt reads as each pin's own personality
@@ -244,7 +264,7 @@ export function MapPin({
           className="pin-filter relative block size-8"
         />
       </motion.button>
-      {/* zoomed-in-only name label, Google Maps-style — white text with a dark outline instead
+      {/* zoomed-in-only name label, Google Maps-style — white text with a soft dark halo instead
           of a background pill, so it reads against the satellite image without competing with
           the pin itself. A sibling of the button (not a child) so it only rides the zoom
           counter-scale, not the button's own hover/tap/selection bump */}
@@ -255,9 +275,12 @@ export function MapPin({
           style={{
             top: `${PIN_HEAD_FRACTION * 100}%`,
             fontSize: sizeTuning.labelFontSize,
+            fontFamily:
+              sizeTuning.labelFontFamily === "mono"
+                ? LABEL_MONO_FONT_STACK
+                : undefined,
             color: "white",
-            WebkitTextStroke: `${sizeTuning.labelStrokeWidth}px black`,
-            paintOrder: "stroke fill",
+            textShadow: labelOutlineShadow(sizeTuning.labelStrokeWidth),
           }}
         >
           {item.shortestName}
