@@ -22,7 +22,7 @@ import {
   positionToStyle,
   screenPointToPosition,
 } from "./geo"
-import { MapPin, PIN_TIP_FRACTION } from "./MapPin"
+import { MapPin, type PinSizeTuning, PIN_TIP_FRACTION } from "./MapPin"
 import type { CrayonTuning } from "./tagColor"
 import type { MapItem } from "./types"
 import { type UserLocation, UserLocationMarker } from "./UserLocationMarker"
@@ -127,6 +127,7 @@ export function MapCanvas({
   onRequestCompass,
   hoveredTagId,
   tuning,
+  sizeTuning,
   ref,
 }: {
   items: MapItem[]
@@ -139,6 +140,8 @@ export function MapCanvas({
   hoveredTagId: string | null
   // only ever overridden by the dev-only TagColorPlayground — real visitors always get the default
   tuning?: CrayonTuning
+  // only ever overridden by the dev-only PinTuningPlayground — real visitors always get the default
+  sizeTuning?: PinSizeTuning
   ref?: React.Ref<MapCanvasHandle>
 }) {
   const panZoom = useMapPanZoom()
@@ -267,7 +270,7 @@ export function MapCanvas({
                   }
                   previewing={hoveredTagId !== null}
                   matchesPreview={item.tag.id === hoveredTagId}
-                  {...{ item, tuning }}
+                  {...{ item, tuning, sizeTuning }}
                 />
               ))}
               {contextMenuPosition && (

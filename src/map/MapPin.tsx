@@ -14,7 +14,7 @@ import {
   tagPinOutlineColor,
 } from "./tagColor"
 import type { MapItem } from "./types"
-import { pinCounterScale } from "./useMapPanZoom"
+import { DEFAULT_PIN_GROWTH_EXPONENT, pinCounterScale } from "./useMapPanZoom"
 
 // Location02Icon's teardrop bottoms out at y=22 of its 24-unit viewBox, not at the very bottom of
 // the box — so the pin is pulled up by that fraction rather than a flat -100%, and every scale on
@@ -30,18 +30,30 @@ const PREVIEW_DIM_OPACITY = 0.2
 const PIN_TILT_OPTIONS_DEG = [-1, 0, 0.5, 1, 1.5]
 const SELECTED_TILT_DEG = 3
 const UNDER_CONSTRUCTION_OPACITY = 0.6
-// pins solid at 100% read as an opaque wall once a cluster gets dense enough to overlap — a
-// little see-through keeps the buildings/paths underneath legible without the pin itself
-// reading as faded or broken
-const PIN_OPACITY = 0.95
 // how far the invisible tap target extends past the icon's own edges, in the pin's own unscaled
 // 32px box — sized so even a small-tag pin (0.8x) at the map's most zoomed-out still clears the
 // 24px minimum touch target after every scale it goes through (tag size, zoom, selection)
 const HIT_SLOP_PX = 8
-// the map-zoom (not the pin's own barely-shrinking size) past which the name label appears — a
-// single cutoff, not a fade: it's either there or it isn't. What actually clears room for it is
-// the map spreading pins further apart on screen as you zoom, not the icon shrinking
-const LABEL_SHOW_SCALE = 4
+
+export type PinSizeTuning = {
+  // how much a pin shrinks as you zoom in — see useMapPanZoom's pinCounterScale
+  growthExponent: number
+  // the map-zoom (not the pin's own barely-shrinking size) past which the name label appears —
+  // a single cutoff, not a fade: it's either there or it isn't
+  labelShowScale: number
+  labelFontSize: number
+  // pins solid at 100% read as an opaque wall once a cluster gets dense enough to overlap — a
+  // little see-through keeps the buildings/paths underneath legible without the pin itself
+  // reading as faded or broken
+  pinOpacity: number
+}
+
+export const DEFAULT_PIN_SIZE_TUNING: PinSizeTuning = {
+  growthExponent: DEFAULT_PIN_GROWTH_EXPONENT,
+  labelShowScale: 4,
+  labelFontSize: 11,
+  pinOpacity: 0.95,
+}
 
 // stays the same for a given pin every time, so the tilt reads as each pin's own personality
 // rather than jittering on every re-render — a real Math.random() would do the latter
@@ -61,6 +73,7 @@ export function MapPin({
   previewing,
   matchesPreview,
   tuning = DEFAULT_CRAYON_TUNING,
+  sizeTuning = DEFAULT_PIN_SIZE_TUNING,
 }: {
   item: MapItem
   selected: boolean
@@ -72,11 +85,15 @@ export function MapPin({
   matchesPreview: boolean
   // only ever overridden by the dev-only TagColorPlayground — real visitors always get the default
   tuning?: CrayonTuning
+  // only ever overridden by the dev-only PinTuningPlayground — real visitors always get the default
+  sizeTuning?: PinSizeTuning
 }) {
   const position = latLongToPosition(item.latitude, item.longitude)
-  const counterScale = useTransform(viewportScale, pinCounterScale)
+  const counterScale = useTransform(viewportScale, (scale) =>
+    pinCounterScale(scale, sizeTuning.growthExponent),
+  )
   const showLabel = useTransform(viewportScale, (scale) =>
-    scale > LABEL_SHOW_SCALE ? 1 : 0,
+    scale > sizeTuning.labelShowScale ? 1 : 0,
   )
   const fill = tagPinFillColor(item.tag.color, tuning)
   const outline = tagPinOutlineColor(item.tag.color)
@@ -205,8 +222,12 @@ export function MapPin({
                 reading as one attached flag rather than a floating label */}
             <motion.span
               aria-hidden
-              className="pointer-events-none absolute left-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-foreground/90 py-1 pr-2.5 pl-4 text-[11px] font-medium text-background"
-              style={{ top: `${PIN_HEAD_FRACTION * 100}%`, opacity: showLabel }}
+              className="pointer-events-none absolute left-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-foreground/90 py-1 pr-2.5 pl-4 font-medium text-background"
+              style={{
+                top: `${PIN_HEAD_FRACTION * 100}%`,
+                opacity: showLabel,
+                fontSize: sizeTuning.labelFontSize,
+              }}
             >
               {item.shortestName}
             </motion.span>
@@ -221,7 +242,7 @@ export function MapPin({
                 filter: showGlow ? `drop-shadow(0 0 6px ${fill})` : undefined,
                 opacity: item.underConstruction
                   ? UNDER_CONSTRUCTION_OPACITY
-                  : PIN_OPACITY,
+                  : sizeTuning.pinOpacity,
               }}
               className="pin-filter relative block size-8"
             />

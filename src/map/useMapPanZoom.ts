@@ -30,7 +30,7 @@ const DOUBLE_TAP_SCALE = 2.5
 // renders them only about 2x smaller — clears a little real room around a cluster without the
 // icon itself getting hard to see; the actual room to read names comes from the map spreading
 // pins further apart on screen as you zoom, not from the icon shrinking further than this
-const PIN_GROWTH_EXPONENT = -0.3
+export const DEFAULT_PIN_GROWTH_EXPONENT = -0.3
 const DOUBLE_TAP_MAX_DELAY_MS = 300
 const DOUBLE_TAP_MAX_DISTANCE_PX = 24
 const WHEEL_SETTLE_DELAY_MS = 220
@@ -53,9 +53,12 @@ function restingScaleFor(rect: DOMRect) {
 }
 
 // the scale a pin has to apply to itself, from inside the zoomed map, to end up at that curve —
-// normalised so a pin is exactly its designed size at the default zoom
-export const pinCounterScale = (mapScale: number) =>
-  (mapScale / DEFAULT_SCALE) ** PIN_GROWTH_EXPONENT / mapScale
+// normalised so a pin is exactly its designed size at the default zoom. growthExponent is only
+// ever overridden by the dev-only PinTuningPlayground — real visitors always get the default
+export const pinCounterScale = (
+  mapScale: number,
+  growthExponent: number = DEFAULT_PIN_GROWTH_EXPONENT,
+) => (mapScale / DEFAULT_SCALE) ** growthExponent / mapScale
 
 // pans/zooms the campus image inside a fixed-size viewport: wheel + trackpad pinch on desktop,
 // one-finger drag + two-finger pinch on touch, double-click/double-tap to toggle zoom. All state

@@ -9,6 +9,7 @@ import { MapCanvas, type MapCanvasHandle } from "./MapCanvas"
 import { MapControls } from "./MapControls"
 import { MapCredit, NoticeDialog } from "./MapCredit"
 import { MapDetailPanel } from "./MapDetailPanel"
+import { DEFAULT_PIN_SIZE_TUNING, type PinSizeTuning } from "./MapPin"
 import { DEFAULT_CRAYON_TUNING, type TagColorName } from "./tagColor"
 import type { MapItem, MapItemTag } from "./types"
 import { useAvailableSpace } from "./useAvailableSpace"
@@ -17,10 +18,16 @@ import { useUserLocation } from "./useUserLocation"
 
 // flip true to bring back the leva tag-color/tuning playground
 const LEVA_PLAYGROUND_ENABLED = false
+// flip true to bring back the leva pin-size/label playground
+const PIN_SIZE_PLAYGROUND_ENABLED = true
 
 // dev-only — code-split so leva (and this whole file) never reaches production visitors
 const TagColorPlayground = dynamic(
   () => import("./TagColorPlayground").then((m) => m.TagColorPlayground),
+  { ssr: false },
+)
+const PinTuningPlayground = dynamic(
+  () => import("./PinTuningPlayground").then((m) => m.PinTuningPlayground),
   { ssr: false },
 )
 
@@ -69,6 +76,11 @@ export function MapExperience({
   // dev-only live crayon-treatment tuning from TagColorPlayground — never populated in
   // production, so pins always fall back to tagColor.ts's DEFAULT_CRAYON_TUNING there
   const [tuning, setTuning] = useState(DEFAULT_CRAYON_TUNING)
+  // dev-only live pin size/label tuning from PinTuningPlayground — never populated in
+  // production, so pins always fall back to MapPin's own DEFAULT_PIN_SIZE_TUNING there
+  const [sizeTuning, setSizeTuning] = useState<PinSizeTuning>(
+    DEFAULT_PIN_SIZE_TUNING,
+  )
   const effectiveTags = tags.map((tag) =>
     colorOverrides[tag.id] ? { ...tag, color: colorOverrides[tag.id] } : tag,
   )
@@ -107,7 +119,7 @@ export function MapExperience({
           compassHeading={compass.heading}
           compassPermission={compass.permission}
           onRequestCompass={compass.requestPermission}
-          {...{ selectedId, hoveredTagId, tuning }}
+          {...{ selectedId, hoveredTagId, tuning, sizeTuning }}
         />
 
         {space.showsProjectName && <MapBrand />}
@@ -150,6 +162,13 @@ export function MapExperience({
           onTuningChange={setTuning}
         />
       )}
+      {PIN_SIZE_PLAYGROUND_ENABLED &&
+        process.env.NODE_ENV === "development" && (
+          <PinTuningPlayground
+            tuning={sizeTuning}
+            onTuningChange={setSizeTuning}
+          />
+        )}
     </div>
   )
 }
