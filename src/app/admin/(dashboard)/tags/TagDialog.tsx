@@ -5,8 +5,9 @@ import { DelayedButton } from "@/components/DelayedButton"
 import { FieldLabel } from "@/components/FieldLabel"
 import { FormDialog } from "@/components/FormDialog"
 import { Icon } from "@/components/Icon"
+import { IconPicker } from "@/components/IconPicker"
 import { ICONS } from "@/icons"
-import { ICON_REGISTRY, type IconName, resolveIcon } from "@/map/iconRegistry"
+import { type IconName, resolveIcon } from "@/map/iconRegistry"
 import { CURATED_TAG_COLORS, tagSolidColor } from "@/map/tagColor"
 import { Input } from "@/shadcn/ui/input"
 import {
@@ -164,22 +165,7 @@ export function TagDialog({
           <FieldLabel icon={resolveIcon(icon)} htmlFor="tag-icon">
             Icon
           </FieldLabel>
-          <Select
-            value={icon}
-            onValueChange={(value) => setIcon(value as IconName)}
-          >
-            <SelectTrigger id="tag-icon" className={INPUT_CLASS}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.keys(ICON_REGISTRY).map((name) => (
-                <SelectItem key={name} value={name}>
-                  <Icon icon={resolveIcon(name)} />
-                  {name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <IconPicker id="tag-icon" value={icon} onChange={setIcon} />
           <p className="text-muted-foreground text-xs">
             Need a different icon? Add it to the app's icon registry first.
           </p>
