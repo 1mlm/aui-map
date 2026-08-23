@@ -57,7 +57,7 @@ function DroppedPinMarker({ position }: { position: NormalizedPosition }) {
         {...{ fill }}
         strokeWidth={1.8}
         style={{ color: outline, filter: `drop-shadow(0 0 6px ${glow})` }}
-        className="relative block size-8"
+        className="relative block size-7"
       />
     </div>
   )
