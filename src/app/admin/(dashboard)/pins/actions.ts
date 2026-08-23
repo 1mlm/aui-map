@@ -1,12 +1,16 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { Prisma } from "@/generated/prisma/client"
 import type { PinLink } from "@/map/types"
 import { deleteFile, uploadFile } from "@/utils/blob"
 import { prisma } from "@/utils/prisma"
 import { requireAuth } from "@/utils/requireAuth"
 
 export type PinInput = {
+  // null for a pin that doesn't exist yet — upsertPin creates one and lets the db generate its
+  // uuid. Once a pin exists, its uuid is its real identity: id is just the editable public slug
+  uuid: string | null
   id: string
   title: string
   aliases: string[]
@@ -57,6 +61,7 @@ export async function upsertPin(input: PinInput) {
   for (const link of input.links)
     assertValidHttpsUrl(link.url, `"${link.label}" link`)
   const shared = {
+    id: input.id,
     title: input.title,
     aliases: input.aliases,
     description: input.description,
@@ -71,22 +76,32 @@ export async function upsertPin(input: PinInput) {
     tagId: input.tagId,
     underConstruction: input.underConstruction,
   }
-  await prisma.pin.upsert({
-    where: { id: input.id },
-    create: { id: input.id, ...shared },
-    update: shared,
-  })
+  try {
+    if (input.uuid) {
+      await prisma.pin.update({ where: { uuid: input.uuid }, data: shared })
+    } else {
+      await prisma.pin.create({ data: shared })
+    }
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2002"
+    ) {
+      throw new Error("That id is already in use.")
+    }
+    throw err
+  }
   revalidatePath("/")
   revalidatePath("/admin/pins")
 }
 
-export async function deletePin(id: string) {
+export async function deletePin(uuid: string) {
   await requireAuth()
   const attachments = await prisma.attachment.findMany({
-    where: { pinId: id },
+    where: { pinId: uuid },
     select: { url: true },
   })
-  await prisma.pin.delete({ where: { id } })
+  await prisma.pin.delete({ where: { uuid } })
   await Promise.all(attachments.map((attachment) => deleteFile(attachment.url)))
   revalidatePath("/")
   revalidatePath("/admin/pins")

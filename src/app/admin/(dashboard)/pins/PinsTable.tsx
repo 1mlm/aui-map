@@ -22,6 +22,7 @@ const toTagEnumValue = (tag: MapItemTag): CustomTableEnumValue => ({
 })
 
 const emptyPin = (tags: MapItemTag[]): AdminPin => ({
+  uuid: null,
   id: "",
   title: "",
   aliases: [],
@@ -158,9 +159,10 @@ function PinsTableInner({
       <CustomTable
         {...{ columns }}
         items={pins}
-        getItemId={(pin) => pin.id}
+        getItemId={(pin) => pin.uuid ?? pin.id}
         emptyLabel="pins"
         exportFilePrefix="pins"
+        paginate={false}
         onVisibleCountChange={setResultCount}
       />
 
@@ -182,9 +184,9 @@ function PinsTableInner({
           {...{ tags }}
         />
       )}
-      {viewingPhotosOf && (
+      {viewingPhotosOf?.uuid && (
         <PinPhotosDialog
-          pinId={viewingPhotosOf.id}
+          pinId={viewingPhotosOf.uuid}
           pinTitle={viewingPhotosOf.title}
           attachments={viewingPhotosOf.attachments}
           open={Boolean(viewingPhotosOf)}

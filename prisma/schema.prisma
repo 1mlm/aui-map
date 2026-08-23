@@ -21,9 +21,12 @@ model Tag {
 }
 
 model Pin {
-  id           String       @id
-  // kept as the existing short slugs (m6l, b4, ...) rather than a generated id,
-  // so ?focus= deep links into the map keep working unchanged
+  // the real, stable identity — never shown, never edited. Attachment/Submission point at this
+  // instead of id, so renaming a pin's public slug can't orphan its photos or break a relation
+  uuid         String       @id @default(uuid())
+  // the short public slug (m6l, b4, ...) used in ?focus= links and shown/settable in the admin —
+  // just @unique now instead of the primary key, so it's free to rename
+  id           String       @unique
   title        String
   aliases      String[]
   description  String?
@@ -67,7 +70,7 @@ model Attachment {
   order       Int      @default(0)
   postedAt    DateTime @default(now())
   pinId       String
-  pin         Pin      @relation(fields: [pinId], references: [id], onDelete: Cascade)
+  pin         Pin      @relation(fields: [pinId], references: [uuid], onDelete: Cascade)
 }
 
 enum SubmissionStatus {
@@ -82,7 +85,7 @@ enum SubmissionStatus {
 model Submission {
   id          String           @id @default(cuid())
   pinId       String
-  pin         Pin              @relation(fields: [pinId], references: [id], onDelete: Cascade)
+  pin         Pin              @relation(fields: [pinId], references: [uuid], onDelete: Cascade)
   fileUrl     String
   fileName    String
   mimeType    String

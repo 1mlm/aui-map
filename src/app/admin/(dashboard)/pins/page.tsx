@@ -18,6 +18,7 @@ export default async function AdminPinsPage() {
   const tags: MapItemTag[] = tagRows.map(tagRowToMapItemTag)
 
   const pins: AdminPin[] = pinRows.map((pin) => ({
+    uuid: pin.uuid,
     id: pin.id,
     title: pin.title,
     aliases: pin.aliases,

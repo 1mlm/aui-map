@@ -35,6 +35,8 @@ const slugify = (text: string) =>
     .replace(/^-|-$/g, "")
 
 export type AdminPin = {
+  // null for a pin that hasn't been created yet
+  uuid: string | null
   id: string
   title: string
   aliases: string[]
@@ -167,6 +169,7 @@ export function PinDialog({
     startTransition(async () => {
       try {
         await upsertPin({
+          uuid: pin.uuid,
           id,
           title,
           aliases: aliasesText
@@ -228,7 +231,8 @@ export function PinDialog({
             {...{ pending }}
             onClick={() =>
               startTransition(async () => {
-                await deletePin(id)
+                if (!pin.uuid) return
+                await deletePin(pin.uuid)
                 onOpenChange(false)
               })
             }
@@ -261,13 +265,18 @@ export function PinDialog({
               id="pin-id"
               placeholder="e.g. m6l"
               value={id}
-              disabled={!isNew}
               onChange={(e) => {
                 setIdTouched(true)
                 setId(slugify(e.target.value))
               }}
               className={INPUT_CLASS}
             />
+            {!isNew && (
+              <p className="text-muted-foreground text-xs">
+                Renaming this breaks any ?focus= link already pointing at the
+                old id.
+              </p>
+            )}
           </div>
           <div className="flex flex-col gap-1.5">
             <FieldLabel icon={ICONS.aliases} htmlFor="pin-aliases">
@@ -396,11 +405,11 @@ export function PinDialog({
             <LinksEditor {...{ links }} onChange={setLinks} />
           </div>
 
-          {!isNew && (
+          {!isNew && pin.uuid && (
             <div className="flex flex-col gap-1.5">
               <FieldLabel icon={ICONS.photos}>Photos</FieldLabel>
               <AttachmentManager
-                pinId={id}
+                pinId={pin.uuid}
                 {...{ attachments }}
                 onAttachmentsChange={setAttachments}
               />
