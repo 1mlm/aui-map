@@ -46,8 +46,16 @@ export function MapDetailPanel({
   const hero = item.attachments.find((attachment) =>
     isImageMimeType(attachment.mimeType),
   )
-  const enterFrom = docked ? { y: "100%" } : { x: 24, opacity: 0 }
-  const restingAt = docked ? { y: 0 } : { x: 0, opacity: 1 }
+  // both fully specify x/y/opacity, even though only one axis actually differs between docked
+  // and undocked — deep-linking straight to a pin mounts this before useAvailableSpace's real
+  // measurement lands, so `docked` (and this shape) can flip between mount and the next render.
+  // motion only ever applies `initial` once and, for any key `animate` doesn't mention, leaves it
+  // exactly where it was — a partial restingAt left `y` stuck at its docked-mount value forever
+  // once `docked` flipped to false, opacity animating in fine while the panel sat 100% off-screen
+  const enterFrom = docked
+    ? { x: 0, y: "100%", opacity: 1 }
+    : { x: 24, y: 0, opacity: 0 }
+  const restingAt = { x: 0, y: 0, opacity: 1 }
   const [openAttachmentIndex, setOpenAttachmentIndex] = useState<number | null>(
     null,
   )
