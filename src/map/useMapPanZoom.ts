@@ -21,6 +21,11 @@ const MIN_SCALE = 1
 const OVERZOOM_FLOOR = 0.9
 const MAX_SCALE = 5
 const DOUBLE_TAP_SCALE = 2.5
+// the scale pins render at their designed, undiminished size — set above MIN_SCALE on purpose,
+// so pins start out a bit smaller than that at the fully-zoomed-out resting view than they'd
+// otherwise be. Dense clusters (the dorms especially) don't have room for full-size pins at the
+// scale everyone now opens the map at
+const PIN_REFERENCE_SCALE = 4
 // pins used to counter the zoom exactly (1/scale), which pinned them to one on-screen size no
 // matter how far you'd zoomed in. Shrinking them slightly instead clears a little real room
 // around a cluster without the icon itself getting hard to see; the actual room to read names
@@ -43,13 +48,13 @@ const LOCATE_TRANSITION = {
 } as const
 
 // the scale a pin has to apply to itself, from inside the zoomed map, to end up at that curve —
-// normalised so a pin is exactly its designed size at the resting (fully zoomed out) scale.
-// growthExponent is only ever overridden by the dev-only PinTuningPlayground — real visitors
-// always get the default
+// normalised against PIN_REFERENCE_SCALE rather than the resting scale itself, so a pin is
+// already partway down the shrink curve (not full pinBaseSizePx) at rest. growthExponent is
+// only ever overridden by the dev-only PinTuningPlayground — real visitors always get the default
 export const pinCounterScale = (
   mapScale: number,
   growthExponent: number = DEFAULT_PIN_GROWTH_EXPONENT,
-) => (mapScale / MIN_SCALE) ** growthExponent / mapScale
+) => (mapScale / PIN_REFERENCE_SCALE) ** growthExponent / mapScale
 
 // pans/zooms the campus image inside a fixed-size viewport: wheel + trackpad pinch on desktop,
 // one-finger drag + two-finger pinch on touch, double-click/double-tap to toggle zoom. All state
