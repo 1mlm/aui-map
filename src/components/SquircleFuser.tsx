@@ -21,42 +21,42 @@ const layoutByAlign = {
     ],
   },
   "top-left": {
-    pill: "flex-row pt-2 pr-8 pb-3 pl-4 rounded-full rounded-t-none rounded-bl-none!",
+    pill: "flex-row pt-2 pr-8 pb-3 pl-4 rounded-br-full!",
     fusers: [
       { corner: "top-left", at: "left-full top-0" },
       { corner: "top-left", at: "top-full left-0" },
     ],
   },
   "top-right": {
-    pill: "flex-row pt-2 pr-4 pb-3 pl-6 rounded-full rounded-t-none rounded-br-none!",
+    pill: "flex-row pt-2 pr-4 pb-3 pl-6 rounded-bl-full!",
     fusers: [
       { corner: "top-right", at: "right-full top-0" },
       { corner: "top-right", at: "top-full right-0" },
     ],
   },
   right: {
-    pill: "flex-col px-3 pt-6 pb-8 rounded-full rounded-r-none",
+    pill: "flex-col px-3 pt-6 pb-8 rounded-l-full!",
     fusers: [
       { corner: "bottom-right", at: "right-0 bottom-full" },
       { corner: "top-right", at: "right-0 top-full" },
     ],
   },
   "bottom-center": {
-    pill: "flex-row px-5 pt-3 pb-2 rounded-full rounded-b-none",
+    pill: "flex-row px-5 pt-3 pb-2 rounded-t-full!",
     fusers: [
       { corner: "bottom-right", at: "right-full bottom-0" },
       { corner: "bottom-left", at: "left-full bottom-0" },
     ],
   },
   "bottom-right": {
-    pill: "flex-row px-5 pt-3 pb-2 rounded-full rounded-b-none rounded-tr-none!",
+    pill: "flex-row px-5 pt-3 pb-2 rounded-tl-full!",
     fusers: [
       { corner: "bottom-right", at: "right-full bottom-0" },
       { corner: "bottom-right", at: "right-0 bottom-full" },
     ],
   },
   "bottom-left": {
-    pill: "flex-row pl-4 pr-5 pt-3 pb-2 rounded-full rounded-b-none rounded-tl-none!",
+    pill: "flex-row pl-4 pr-5 pt-3 pb-2 rounded-tr-full!",
     fusers: [
       { corner: "bottom-left", at: "bottom-0 left-full" },
       { corner: "bottom-left", at: "bottom-full left-0" },
