@@ -15,6 +15,7 @@ import {
 import { cn } from "@/shadcn/utils"
 import { copyToClipboard } from "@/utils/clipboard"
 import { triggerHaptic } from "@/utils/haptics"
+import { isImageMimeType } from "@/utils/mimeType"
 import {
   formatCoordinates,
   type NormalizedPosition,
@@ -156,6 +157,19 @@ export function MapCanvas({
   ])
 
   useEffect(() => () => clearTimeout(surveyedCoordTimer.current), [])
+
+  // requests every pin's photos once, up front, so the service worker's image cache has them
+  // before anyone goes offline — not just the ones they happened to open first. Plain <img>-style
+  // requests are enough; the cache is populated by the fetch itself, this component never reads
+  // the result
+  useEffect(() => {
+    for (const item of items) {
+      for (const attachment of item.attachments) {
+        if (!isImageMimeType(attachment.mimeType)) continue
+        new window.Image().src = attachment.url
+      }
+    }
+  }, [items])
 
   // toggled imperatively instead of through React state, so dropping the selected pin's glow
   // filter mid-gesture doesn't itself cost a render — see useMapPanZoom's isMoving for why

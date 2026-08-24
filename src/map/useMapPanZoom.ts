@@ -249,16 +249,20 @@ export function useMapPanZoom() {
     // button) still needs to open the context menu at the right coordinate
     lastPointerClientPosition.current = { x: e.clientX, y: e.clientY }
 
-    // let pins/buttons handle their own taps instead of the viewport capturing the pointer
-    // and swallowing their click
-    if ((e.target as HTMLElement).closest("button")) return
     // right/middle mouse buttons are for the context menu, not panning
     if (e.pointerType === "mouse" && e.button !== 0) return
 
-    e.currentTarget.setPointerCapture(e.pointerId)
+    const startedOnButton = (e.target as HTMLElement).closest("button")
+    // capturing a pointer that started on a pin would retarget its pointerup away from the
+    // button and swallow the click, so it's left uncaptured — the button still gets the tap.
+    // The position is tracked below regardless, so a second finger landing on a pin still
+    // counts toward a pinch instead of being dropped
+    if (!startedOnButton) e.currentTarget.setPointerCapture(e.pointerId)
     activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
 
     if (activePointers.current.size === 1) {
+      // a lone touch on a pin should resolve as its own tap, not start a pan
+      if (startedOnButton) return
       panOrigin.current = {
         pointer: { x: e.clientX, y: e.clientY },
         pan: getPan(),

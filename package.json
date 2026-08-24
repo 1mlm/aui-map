@@ -1,6 +1,6 @@
 {
   "name": "aui-map",
-  "version": "0.1.30",
+  "version": "0.1.31",
   "private": true,
   "packageManager": "pnpm@11.6.0",
   "scripts": {
@@ -10,8 +10,7 @@
     "start": "next start",
     "check": "tsc --noEmit",
     "biome": "biome lint .",
-    "biome:fix": "biome check . --write",
-    "db:seed": "dotenv -e .env.local -- npx tsx prisma/seed.ts"
+    "biome:fix": "biome check . --write"
   },
   "dependencies": {
     "@hugeicons/core-free-icons": "^4.2.0",

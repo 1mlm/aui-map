@@ -143,10 +143,8 @@ export const ICONS = {
   navSubmissions: FileAttachmentIcon,
   logout: LogoutIcon,
 
-  // least-obvious picks for concepts not wired to anything yet — "Special" currently covers admin
-  // offices, the clinic, the mosque, laundry, and the ATM (see prisma/seed-data.ts). splitting
-  // those into their own tags later means picking icons anyway, so these are pre-picked starting
-  // points, not currently referenced by any component.
+  // least-obvious picks for concepts not wired to anything yet — pre-picked starting points for
+  // tags that might get split out of "Special" later, not currently referenced by any component.
   auditorium: TheaterIcon,
   service: IdCardLanyardIcon,
   business: Briefcase01Icon,
