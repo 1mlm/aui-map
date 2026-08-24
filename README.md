@@ -7,7 +7,9 @@ Live at [auimap.ma](https://auimap.ma).
 |                                  Desktop                                  |                                 Mobile                                  |
 | :------------------------------------------------------------------------: | :------------------------------------------------------------------------: |
 | ![Desktop map view](docs/screenshots/desktop-overview.jpg) | ![Mobile map view](docs/screenshots/mobile-overview.jpg) |
-| ![Desktop pin detail panel](docs/screenshots/desktop-detail.jpg) | ![Mobile pin detail sheet](docs/screenshots/mobile-detail.jpg) |
+| ![Desktop pin detail panel, the library](docs/screenshots/desktop-detail.jpg) | ![Mobile pin detail sheet, the library](docs/screenshots/mobile-detail.jpg) |
+| ![Pin labels appearing on zoom](docs/screenshots/zoomed-labels.jpg) | ![Filtering pins by tag](docs/screenshots/filtering.jpg) |
+| ![Searching for a pin](docs/screenshots/searching.jpg) | ![Live location on the map](docs/screenshots/location.jpg) |
 
 ## Features
 
@@ -25,13 +27,3 @@ Live at [auimap.ma](https://auimap.ma).
 - [`Tailwind CSS`](https://tailwindcss.com/) 4 · [`shadcn`](https://ui.shadcn.com/) (Nova style, Neutral theme, Medium radius, [`Outfit`](https://fonts.google.com/specimen/Outfit) font) · [`Hugeicons`](https://hugeicons.com/)
 - [`motion`](https://motion.dev/) for pin/panel animation, [`serwist`](https://serwist.pages.dev/) for the offline-capable PWA service worker
 - [`Biome`](https://biomejs.dev/) · [`pnpm`](https://pnpm.io/)
-
-## Philosophy
-
-Any config, generated code (shadcn, etc.) stays outside `src/`. `src/` is for application code only.
-
-Biome > ESLint + Prettier. One tool, one config, handles linting and formatting with autofix for both.
-
-pnpm is faster and doesn't copy packages into `node_modules`, just symlinks them.
-
-`.vscode/settings.json` hides ugly files (`node_modules`, `.next`, `shadcn/ui`, lockfiles...) from the file explorer.
