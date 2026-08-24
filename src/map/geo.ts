@@ -1,17 +1,22 @@
-// Everything that converts between real-world coordinates and where things sit on auimap.webp.
+// Everything that converts between real-world coordinates and where things sit on the map image.
 // Nothing else in the app should do lat/long arithmetic.
 
 import type { Point } from "./panZoomMath"
 
-// auimap.webp is stitched from satellite tiles to exactly this box (see the note in the README),
-// so the box is the source of truth and the imagery follows it, rather than the other way round.
-// North-up, no rotation. Web Mercator vs a flat lat/long lerp differ by 0.16px over the whole
-// 3542px image at this latitude, which is why the simple version below is fine.
+// the map image is stitched from satellite tiles to exactly this box, so the box is the source
+// of truth and the imagery follows it, rather than the other way round. North-up, no rotation.
+// Web Mercator vs a flat lat/long lerp differ by 0.16px over the whole image at this latitude,
+// which is why the simple version below is fine.
+//
+// cropped from the original stitch to the campus + a real margin (a couple hundred meters on
+// every side) rather than the forest surrounding it — every pin's coordinates were checked
+// against this box before cropping, see public/archived/auimap-3542-original.webp for the
+// uncropped source if the crop ever needs revisiting
 export const MAP_BOUNDING_BOX = {
-  topLat: 33.548014,
-  bottomLat: 33.532107,
-  leftLong: -5.115768,
-  rightLong: -5.096759,
+  topLat: 33.544681703557316,
+  bottomLat: 33.53289291897234,
+  leftLong: -5.11292362676454,
+  rightLong: -5.098835929136081,
 }
 
 export type NormalizedPosition = [x: number, y: number]

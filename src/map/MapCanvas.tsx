@@ -33,6 +33,12 @@ import { useMapPanZoom } from "./useMapPanZoom"
 const SURVEYED_COORD_TOAST_MS = 3000
 const COPIED_FEEDBACK_MS = 1500
 
+// a tiny, heavily blurred copy of the map, inlined so it paints instantly with zero network
+// cost — shown until the real (still much lighter, post-crop) image finishes loading, so first
+// paint isn't blocked on it
+const MAP_IMAGE_PLACEHOLDER =
+  "data:image/webp;base64,UklGRuwAAABXRUJQVlA4IOAAAACQBgCdASocABwAPuleqE2pJSQiN/VYASAdCWMArDNDDj01wIQbHO7NrlrkXHtPrgvbXVQYAa9AYGdu74jgAP7uhUz/AWWkUW9SqKuJeTe9iHWwNySMJG8PfzG/dMaRQ+Fs9LT8ubyqdt1yTwRfFBWuj8qvT7S6GdN0WzQsDNA6TZ1LhmwMACA3b64ZCtoftWMMw++qu1UlV7hUg0HmWNZ+75Jkd44lJfjKaJX4iWIyo9pomiWf8bQLM8oFhAwABh8Ev2yQoP5GV1CkmKxfOerPN0Kk8avrYCzuNnqLODQAAA=="
+
 // a marker for wherever the map's context menu was opened — never a real place, just a way to
 // see exactly which point the menu's coordinates/directions refer to
 function DroppedPinMarker({ position }: { position: NormalizedPosition }) {
@@ -151,6 +157,7 @@ export function MapCanvas({
   const surveyedCoordTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const [contextMenuPosition, setContextMenuPosition] =
     useState<NormalizedPosition | null>(null)
+  const [mapImageLoaded, setMapImageLoaded] = useState(false)
 
   useImperativeHandle(ref, () => ({ centerOn: panZoom.centerOn }), [
     panZoom.centerOn,
@@ -257,15 +264,26 @@ export function MapCanvas({
               ref={imageBoxRef}
               className="relative size-[100cqmax] shrink-0"
             >
+              {/* shown until the real image below finishes loading, so first paint never waits
+              on it */}
+              <div
+                aria-hidden
+                className={cn(
+                  "pointer-events-none absolute inset-0 bg-cover bg-center transition-opacity duration-500",
+                  mapImageLoaded ? "opacity-0" : "opacity-100",
+                )}
+                style={{ backgroundImage: `url(${MAP_IMAGE_PLACEHOLDER})` }}
+              />
               {/* unoptimized on purpose: the optimizer would hand back a copy sized to the viewport,
               which is exactly the detail zooming needs. This file is already a tuned webp */}
               <Image
-                src="/auimap.webp"
+                src="/auimap-1312.webp"
                 alt="Campus map"
                 fill
                 priority
                 unoptimized
                 draggable={false}
+                onLoad={() => setMapImageLoaded(true)}
                 className="pointer-events-none"
               />
               <UserLocationMarker

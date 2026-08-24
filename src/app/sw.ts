@@ -16,11 +16,11 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope
 
-// the 2.4mb campus map background — cached the first time it's actually requested, not at
-// install time. Precaching it would fetch it a second time on a visitor's very first load, on
-// top of the page's own <img> request for the same file
+// the campus map background — cached the first time it's actually requested, not at install
+// time. Precaching it would fetch it a second time on a visitor's very first load, on top of
+// the page's own <img> request for the same file
 const mapImageCaching: RuntimeCaching = {
-  matcher: /\/auimap\.webp$/,
+  matcher: /\/auimap-1312\.webp$/,
   handler: new CacheFirst({ cacheName: "campus-map-image" }),
 }
 

@@ -19,10 +19,10 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // the 2.4mb campus map background never changes at this path — a new image gets a new
+        // the campus map background never changes at this path — a new image gets a new
         // filename instead — so it's safe to tell browsers to keep it indefinitely rather than
         // revalidating on every visit
-        source: "/auimap.webp",
+        source: "/auimap-1312.webp",
         headers: [
           {
             key: "Cache-Control",

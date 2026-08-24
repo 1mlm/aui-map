@@ -14,13 +14,9 @@ import {
 } from "./panZoomMath"
 
 // the image sits in a square box already sized to cover the viewport, so 1 is the smallest
-// scale that still fills it — going below would let the page background show through
-const DEFAULT_SCALE = 1.45
+// scale that still fills it — going below would let the page background show through. The map
+// always opens at this scale, fully zoomed out, no matter the viewport's aspect ratio
 const MIN_SCALE = 1
-// how much of the campus's width a wide screen frames at rest, which is what DEFAULT_SCALE works
-// out to there. Phones in portrait get a square box as tall as the screen, so the same scale would
-// frame half as much; they open at whatever shows the most map without uncovering the background
-const RESTING_WIDTH_FRACTION = 1 / DEFAULT_SCALE
 // pinching past MIN_SCALE stretches this far before springing back, android-overscroll style
 const OVERZOOM_FLOOR = 0.9
 const MAX_SCALE = 5
@@ -46,26 +42,21 @@ const LOCATE_TRANSITION = {
   ease: "easeOut",
 } as const
 
-// the scale the map opens at, and returns to when a double-tap zooms back out
-function restingScaleFor(rect: DOMRect) {
-  const boxSide = Math.max(rect.width, rect.height)
-  return Math.max(MIN_SCALE, rect.width / boxSide / RESTING_WIDTH_FRACTION)
-}
-
 // the scale a pin has to apply to itself, from inside the zoomed map, to end up at that curve —
-// normalised so a pin is exactly its designed size at the default zoom. growthExponent is only
-// ever overridden by the dev-only PinTuningPlayground — real visitors always get the default
+// normalised so a pin is exactly its designed size at the resting (fully zoomed out) scale.
+// growthExponent is only ever overridden by the dev-only PinTuningPlayground — real visitors
+// always get the default
 export const pinCounterScale = (
   mapScale: number,
   growthExponent: number = DEFAULT_PIN_GROWTH_EXPONENT,
-) => (mapScale / DEFAULT_SCALE) ** growthExponent / mapScale
+) => (mapScale / MIN_SCALE) ** growthExponent / mapScale
 
 // pans/zooms the campus image inside a fixed-size viewport: wheel + trackpad pinch on desktop,
 // one-finger drag + two-finger pinch on touch, double-click/double-tap to toggle zoom. All state
 // lives in motion values so gestures update transforms without re-rendering React.
 export function useMapPanZoom() {
   const containerRef = useRef<HTMLDivElement>(null)
-  const scale = useMotionValue(DEFAULT_SCALE)
+  const scale = useMotionValue(MIN_SCALE)
   const x = useMotionValue(0)
   const y = useMotionValue(0)
   // pins carry two stacked shadow filters each; re-rasterizing all of them on every frame the
@@ -74,7 +65,6 @@ export function useMapPanZoom() {
   // mid-motion, not at rest
   const isMoving = useMotionValue(0)
   const [hitLimit, setHitLimit] = useState(false)
-  const restingScale = useRef(DEFAULT_SCALE)
   // true the moment the user first touches the map themselves — drag, pinch, wheel, or a tap that
   // lands on a pin. Read once, on the geolocation fix, to decide whether auto-centering on them
   // would still be welcome or would now just be yanking the view out from under them
@@ -198,24 +188,23 @@ export function useMapPanZoom() {
   }
 
   function toggleZoom(origin: Point) {
-    const isZoomedIn = scale.get() > restingScale.current + 0.1
-    zoomTo(isZoomedIn ? restingScale.current : DOUBLE_TAP_SCALE, origin, {
+    const isZoomedIn = scale.get() > MIN_SCALE + 0.1
+    zoomTo(isZoomedIn ? MIN_SCALE : DOUBLE_TAP_SCALE, origin, {
       animated: true,
     })
   }
 
-  // the resting scale depends on the viewport's shape, which isn't known until the container is
-  // laid out — so the map opens at the constant and corrects itself on the first frame. Also
-  // keeps `rect` current for every gesture, so those handlers never have to measure it themselves
+  // `rect` isn't known until the container is laid out, so it's measured on mount and kept
+  // current on every resize — every gesture handler reads it from here rather than measuring
+  // itself
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
     const measure = () => {
       rect.current = el.getBoundingClientRect()
-      restingScale.current = restingScaleFor(rect.current)
     }
     measure()
-    scale.set(restingScale.current)
+    scale.set(MIN_SCALE)
     const observer = new ResizeObserver(measure)
     observer.observe(el)
     return () => observer.disconnect()

@@ -463,7 +463,7 @@ export const MAP_ITEMS: MapItem[] = rawMapItems.map(
     updatedAt: new Date(),
     attachments: Array.from({ length: attachmentCount ?? 0 }, (_, i) => ({
       id: `${id}-${i}`,
-      url: "/auimap.webp",
+      url: "/auimap-1312.webp",
       caption: null,
       mimeType: null,
       fileName: null,

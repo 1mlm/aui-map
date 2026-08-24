@@ -116,7 +116,7 @@ export default function PinDebugPage() {
           ref={boxRef}
         >
           <Image
-            src="/auimap.webp"
+            src="/auimap-1312.webp"
             alt=""
             fill
             unoptimized
