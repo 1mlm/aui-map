@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { IconButton } from "@/components/IconButton"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
 import { ICONS } from "@/icons"
@@ -29,6 +30,12 @@ export function MapControls({
     onLocate: () => void
   }) {
   const { search, activeTagIds } = props
+  // one state per rendered variant (compact and full both mount unconditionally, see below) —
+  // sharing a single controlled Popover's open state across two separate mounted instances made
+  // each one's outside-click dismissal see the other's portaled content as "outside" and close
+  // itself immediately, so opening either one visually did nothing
+  const [compactSuggestionsOpen, setCompactSuggestionsOpen] = useState(false)
+  const [fullSuggestionsOpen, setFullSuggestionsOpen] = useState(false)
 
   const popoverButtons = [
     {
@@ -49,78 +56,93 @@ export function MapControls({
       contentClassName: "flex flex-wrap gap-1.5",
       content: <TagPills {...props} />,
     },
-    {
-      id: "suggestions",
-      icon: ICONS.suggestions,
-      label: "Map Feedback",
-      active: false,
-      badgeCount: 0,
-      contentClassName: "",
-      content: <SuggestionForm />,
-    },
   ]
 
-  const buttons = (
-    <>
-      {popoverButtons.map(
-        ({
-          id,
-          icon,
-          label,
-          active,
-          badgeCount,
-          contentClassName,
-          content,
-        }) => (
-          <span key={id} className="relative">
-            <Popover>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <PopoverTrigger asChild>
-                    <IconButton
-                      aria-label={label}
-                      tone={active ? "primary" : "subtle"}
-                      {...{ icon }}
-                    />
-                  </PopoverTrigger>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" sideOffset={6}>
-                  {label}
-                </TooltipContent>
-              </Tooltip>
-              <PopoverContent className={contentClassName}>
-                {content}
-              </PopoverContent>
-            </Popover>
-            {badgeCount > 0 && (
-              <span className="pointer-events-none absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground ring-2 ring-background">
-                {badgeCount}
-              </span>
-            )}
-          </span>
-        ),
-      )}
+  function renderButtons(
+    suggestionsOpen: boolean,
+    setSuggestionsOpen: (open: boolean) => void,
+  ) {
+    return (
+      <>
+        {popoverButtons.map(
+          ({
+            id,
+            icon,
+            label,
+            active,
+            badgeCount,
+            contentClassName,
+            content,
+          }) => (
+            <span key={id} className="relative">
+              <Popover>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <PopoverTrigger asChild>
+                      <IconButton
+                        aria-label={label}
+                        tone={active ? "primary" : "subtle"}
+                        {...{ icon }}
+                      />
+                    </PopoverTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" sideOffset={6}>
+                    {label}
+                  </TooltipContent>
+                </Tooltip>
+                <PopoverContent className={contentClassName}>
+                  {content}
+                </PopoverContent>
+              </Popover>
+              {badgeCount > 0 && (
+                <span className="pointer-events-none absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground ring-2 ring-background">
+                  {badgeCount}
+                </span>
+              )}
+            </span>
+          ),
+        )}
 
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <IconButton
-            icon={
-              locationStatus === "requesting" ? ICONS.loading : ICONS.locate
-            }
-            iconClassName={
-              locationStatus === "requesting" ? "animate-spin" : undefined
-            }
-            onClick={onLocate}
-            tone={locationStatus === "granted" ? "primary" : "subtle"}
-            aria-label={LOCATE_TOOLTIP_TEXT[locationStatus]}
-          />
-        </TooltipTrigger>
-        <TooltipContent side="bottom" sideOffset={6}>
-          {LOCATE_TOOLTIP_TEXT[locationStatus]}
-        </TooltipContent>
-      </Tooltip>
-    </>
-  )
+        <Popover open={suggestionsOpen} onOpenChange={setSuggestionsOpen}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <PopoverTrigger asChild>
+                <IconButton
+                  aria-label="Map Feedback"
+                  icon={ICONS.suggestions}
+                />
+              </PopoverTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={6}>
+              Map Feedback
+            </TooltipContent>
+          </Tooltip>
+          <PopoverContent>
+            <SuggestionForm onSent={() => setSuggestionsOpen(false)} />
+          </PopoverContent>
+        </Popover>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <IconButton
+              icon={
+                locationStatus === "requesting" ? ICONS.loading : ICONS.locate
+              }
+              iconClassName={
+                locationStatus === "requesting" ? "animate-spin" : undefined
+              }
+              onClick={onLocate}
+              tone={locationStatus === "granted" ? "primary" : "subtle"}
+              aria-label={LOCATE_TOOLTIP_TEXT[locationStatus]}
+            />
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={6}>
+            {LOCATE_TOOLTIP_TEXT[locationStatus]}
+          </TooltipContent>
+        </Tooltip>
+      </>
+    )
+  }
 
   // compact (mobile-width) screens have no viewport-corner "frame" for the pill to fuse into, and
   // have no separate MapCredit line to reach the notice dialog from — so this variant goes
@@ -132,7 +154,7 @@ export function MapControls({
   return (
     <>
       <div className="map-controls-compact pointer-events-auto absolute top-4 left-1/2 flex -translate-x-1/2 items-center justify-center gap-2.5 rounded-full corner-squircle bg-background px-4 py-2.5 drop-shadow-lg drop-shadow-black/40">
-        {buttons}
+        {renderButtons(compactSuggestionsOpen, setCompactSuggestionsOpen)}
         <Tooltip>
           <TooltipTrigger asChild>
             <IconButton
@@ -152,7 +174,7 @@ export function MapControls({
         superClassName="map-controls-full pointer-events-auto absolute top-0 right-0"
         className="gap-2"
       >
-        {buttons}
+        {renderButtons(fullSuggestionsOpen, setFullSuggestionsOpen)}
       </SquircleFuserContainer>
     </>
   )

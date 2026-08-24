@@ -53,7 +53,29 @@ export function MapDetailPanel({
   )
   const [contributeOpen, setContributeOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const [shared, setShared] = useState(false)
   useDismissKey(onClose)
+
+  // native share sheet where it exists (mobile mostly); everywhere else this just copies the
+  // same deep link (?focus=id) the app already supports, matching the "copy coordinates" pattern
+  // used elsewhere in this panel
+  async function handleShare() {
+    const url = new URL(window.location.href)
+    url.searchParams.set("focus", item.id)
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: item.title, url: url.toString() })
+      } catch {
+        // user dismissed the share sheet, not a failure worth surfacing
+      }
+      return
+    }
+    const succeeded = await copyToClipboard(url.toString())
+    if (!succeeded) return
+    triggerHaptic("success")
+    setShared(true)
+    setTimeout(() => setShared(false), COPIED_FEEDBACK_MS)
+  }
 
   // dragging the handle up/down resizes the sheet; dragging it well past collapsed dismisses,
   // matching the swipe-to-dismiss threshold pattern AttachmentCarousel uses for its own drag gesture
@@ -107,15 +129,22 @@ export function MapDetailPanel({
         </>
       )}
 
-      <IconButton
-        icon={ICONS.close}
-        // the button sits over the hero photo as often as over the panel itself, so it carries its
-        // own dark backdrop rather than tinting with whatever is behind it
-        tone="floating"
-        onClick={onClose}
-        aria-label="Close"
-        className="absolute top-4 right-4 z-10"
-      />
+      <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+        <IconButton
+          icon={shared ? ICONS.copied : ICONS.share}
+          // same reasoning as the close button below: sits over the hero photo as often as over
+          // the panel itself, so it carries its own dark backdrop
+          tone="floating"
+          onClick={handleShare}
+          aria-label={shared ? "Link copied!" : "Share"}
+        />
+        <IconButton
+          icon={ICONS.close}
+          tone="floating"
+          onClick={onClose}
+          aria-label="Close"
+        />
+      </div>
 
       <motion.div
         animate={{

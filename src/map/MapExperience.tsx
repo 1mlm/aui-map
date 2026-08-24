@@ -1,9 +1,10 @@
 "use client"
 
+import { track } from "@vercel/analytics"
 import { AnimatePresence } from "motion/react"
 import dynamic from "next/dynamic"
 import { useQueryState } from "nuqs"
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { MapBrand } from "./MapBrand"
 import { MapCanvas, type MapCanvasHandle } from "./MapCanvas"
 import { MapControls } from "./MapControls"
@@ -38,6 +39,9 @@ function matchesSearch(item: MapItem, query: string) {
     name.toLowerCase().includes(q),
   )
 }
+
+// long enough that it only fires once someone's actually done typing, not on every keystroke
+const ZERO_RESULT_SEARCH_TRACK_DELAY_MS = 800
 
 export function MapExperience({
   items,
@@ -104,6 +108,23 @@ export function MapExperience({
       else next.add(tagId)
       return next
     })
+
+  // finds missing pins/aliases from real usage: a search term matching nothing anywhere on the
+  // map (checked against the whole map, not visibleItems, so an active tag filter can't produce
+  // a false "no results" for a term that's really just filtered out). Debounced so this only
+  // fires once someone's paused typing, not once per keystroke
+  useEffect(() => {
+    const query = search.trim()
+    if (!query) return
+    const timer = setTimeout(() => {
+      const matchesSomething = effectiveItems.some((item) =>
+        matchesSearch(item, query),
+      )
+      if (!matchesSomething)
+        track("search_no_results", { query: query.toLowerCase() })
+    }, ZERO_RESULT_SEARCH_TRACK_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [search, effectiveItems])
 
   return (
     <div className="h-dvh w-dvw bg-background sm:p-3">

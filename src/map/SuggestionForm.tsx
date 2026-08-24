@@ -11,6 +11,7 @@ import {
   InputGroupButton,
   InputGroupTextarea,
 } from "@/shadcn/ui/input-group"
+import { triggerConfetti } from "@/utils/confetti"
 import { iconForMimeType } from "@/utils/mimeType"
 import { submitSuggestion } from "./suggestionActions"
 
@@ -20,7 +21,7 @@ function extractErrorMessage(err: unknown, fallback: string) {
   return err instanceof Error ? err.message : fallback
 }
 
-export function SuggestionForm() {
+export function SuggestionForm({ onSent }: { onSent?: () => void }) {
   const [message, setMessage] = useState("")
   const [file, setFile] = useState<File | null>(null)
   const [pending, startTransition] = useTransition()
@@ -64,7 +65,11 @@ export function SuggestionForm() {
         setMessage("")
         setFile(null)
         setSent(true)
-        setTimeout(() => setSent(false), SENT_FEEDBACK_MS)
+        triggerConfetti()
+        setTimeout(() => {
+          setSent(false)
+          onSent?.()
+        }, SENT_FEEDBACK_MS)
       } catch (err) {
         setError(extractErrorMessage(err, "Couldn't send that — try again."))
       }
