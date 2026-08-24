@@ -153,3 +153,28 @@
     display: block !important;
   }
 }
+
+/* a quick "no, that's wrong" shake for the locate button when a fix lands outside the campus's
+   own bounds -- plays once as isOffCampus's class turns on, not on a loop, since a corner button
+   shaking forever would just read as broken rather than as a one-time heads up */
+@keyframes wiggle {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  20% {
+    transform: rotate(-10deg);
+  }
+  40% {
+    transform: rotate(8deg);
+  }
+  60% {
+    transform: rotate(-6deg);
+  }
+  80% {
+    transform: rotate(4deg);
+  }
+}
+.animate-wiggle {
+  animation: wiggle 0.5s ease-in-out;
+}

@@ -152,6 +152,7 @@ export function MapExperience({
           onHoverTag={setHoveredTagId}
           onOpenNotice={() => setNoticeOpen(true)}
           locationStatus={location.status}
+          isOffCampus={location.isOffCampus}
           onLocate={handleLocate}
           {...{ search, activeTagIds, hoveredTagId }}
         />

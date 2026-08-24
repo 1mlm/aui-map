@@ -5,25 +5,25 @@ import { isWithinCampusBounds, latLongToPosition } from "./geo"
 
 export type LocationStatus = "idle" | "requesting" | "granted" | "denied"
 
-// mirrors useAvailableSpace's own compact thresholds, but read synchronously at mount instead of
-// through a ResizeObserver — whether to silently fire a permission prompt has to be right from
-// the very first render, not "eventually correct once the observer catches up". This still runs
-// during SSR (client components render server-side too), where there's no real viewport at all —
-// defaulting to compact there is the conservative choice: it just means auto-start waits one
-// extra render for the client to correct it, never the reverse (firing the prompt too early)
-function isCompactViewport() {
-  if (typeof window === "undefined") return true
-  return window.innerWidth < 480 || window.innerHeight < 560
+// once the browser's actually granted this before, it won't re-prompt anyway -- so a later visit
+// can go straight to watching position instead of waiting for another tap
+const LOCATION_GRANTED_STORAGE_KEY = "aui-map:location-granted"
+
+function hasGrantedLocationBefore() {
+  if (typeof window === "undefined") return false
+  return localStorage.getItem(LOCATION_GRANTED_STORAGE_KEY) === "true"
 }
 
-// on a roomy screen the permission prompt is a small, unintrusive browser popover, so this starts
-// watching immediately, silently — no button, no toast, no error UI. On a narrow/mobile screen
-// that same prompt is a full-width sheet that feels like a surprise on page load, so there it
-// waits for requestLocation() to be called from an explicit tap instead
+// never fires the permission prompt on its own, on any device -- only an explicit tap
+// (requestLocation) starts watching, unless this browser's granted it before, in which case
+// there's nothing left to ask permission for, so this just goes ahead and shows where they are
 export function useUserLocation() {
   const [position, setPosition] = useState<[number, number] | null>(null)
   const [status, setStatus] = useState<LocationStatus>("idle")
-  const [requested, setRequested] = useState(() => !isCompactViewport())
+  // true once a fix has landed outside the map's own bounds -- distinct from position being
+  // null, which also just means "no fix yet"
+  const [isOffCampus, setIsOffCampus] = useState(false)
+  const [requested, setRequested] = useState(hasGrantedLocationBefore)
 
   useEffect(() => {
     if (!requested) return
@@ -35,8 +35,17 @@ export function useUserLocation() {
     const watchId = navigator.geolocation.watchPosition(
       ({ coords }) => {
         setStatus("granted")
-        if (!isWithinCampusBounds(coords.latitude, coords.longitude)) return
-        setPosition(latLongToPosition(coords.latitude, coords.longitude))
+        localStorage.setItem(LOCATION_GRANTED_STORAGE_KEY, "true")
+        const withinCampus = isWithinCampusBounds(
+          coords.latitude,
+          coords.longitude,
+        )
+        setIsOffCampus(!withinCampus)
+        setPosition(
+          withinCampus
+            ? latLongToPosition(coords.latitude, coords.longitude)
+            : null,
+        )
       },
       () => setStatus("denied"),
       { enableHighAccuracy: true, timeout: 10_000 },
@@ -44,5 +53,10 @@ export function useUserLocation() {
     return () => navigator.geolocation.clearWatch(watchId)
   }, [requested])
 
-  return { position, status, requestLocation: () => setRequested(true) }
+  return {
+    position,
+    status,
+    isOffCampus,
+    requestLocation: () => setRequested(true),
+  }
 }

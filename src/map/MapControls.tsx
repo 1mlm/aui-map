@@ -17,16 +17,19 @@ const LOCATE_TOOLTIP_TEXT: Record<LocationStatus, string> = {
   granted: "Center me",
   denied: "Location unavailable",
 }
+const OFF_CAMPUS_TEXT = "You're not on campus 💀??"
 
 export function MapControls({
   onOpenNotice,
   locationStatus,
+  isOffCampus,
   onLocate,
   ...props
 }: SearchProps &
   FilterProps & {
     onOpenNotice: () => void
     locationStatus: LocationStatus
+    isOffCampus: boolean
     onLocate: () => void
   }) {
   const { search, activeTagIds } = props
@@ -107,14 +110,11 @@ export function MapControls({
           <Tooltip>
             <TooltipTrigger asChild>
               <PopoverTrigger asChild>
-                <IconButton
-                  aria-label="Map Feedback"
-                  icon={ICONS.suggestions}
-                />
+                <IconButton aria-label="Feedback" icon={ICONS.suggestions} />
               </PopoverTrigger>
             </TooltipTrigger>
             <TooltipContent side="bottom" sideOffset={6}>
-              Map Feedback
+              Feedback
             </TooltipContent>
           </Tooltip>
           <PopoverContent>
@@ -133,11 +133,18 @@ export function MapControls({
               }
               onClick={onLocate}
               tone={locationStatus === "granted" ? "primary" : "subtle"}
-              aria-label={LOCATE_TOOLTIP_TEXT[locationStatus]}
+              aria-label={
+                isOffCampus
+                  ? OFF_CAMPUS_TEXT
+                  : LOCATE_TOOLTIP_TEXT[locationStatus]
+              }
+              className={isOffCampus ? "animate-wiggle" : undefined}
             />
           </TooltipTrigger>
           <TooltipContent side="bottom" sideOffset={6}>
-            {LOCATE_TOOLTIP_TEXT[locationStatus]}
+            {isOffCampus
+              ? OFF_CAMPUS_TEXT
+              : LOCATE_TOOLTIP_TEXT[locationStatus]}
           </TooltipContent>
         </Tooltip>
       </>
