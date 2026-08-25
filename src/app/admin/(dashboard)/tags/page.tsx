@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import type { IconName } from "@/map/iconRegistry"
 import { prisma } from "@/utils/prisma"
-import type { TagRow } from "./TagsTable"
+import type { AdminTag } from "./TagDialog"
 import { TagsTable } from "./TagsTable"
 
 export const metadata: Metadata = { title: "Tags" }
@@ -12,7 +12,7 @@ export default async function AdminTagsPage() {
     orderBy: { label: "asc" },
   })
 
-  const tags: TagRow[] = tagRows.map((tag) => ({
+  const tags: AdminTag[] = tagRows.map((tag) => ({
     id: tag.id,
     label: tag.label,
     icon: tag.icon as IconName,

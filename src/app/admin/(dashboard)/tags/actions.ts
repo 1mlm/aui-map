@@ -2,16 +2,11 @@
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
+import type { Tag } from "@/generated/prisma/client"
 import { prisma } from "@/utils/prisma"
 import { requireAuth } from "@/utils/requireAuth"
 
-export type TagInput = {
-  id: string
-  label: string
-  icon: string
-  color: string | null
-  sizeScale: number
-}
+export type TagInput = Tag
 
 export async function upsertTag(input: TagInput) {
   await requireAuth()

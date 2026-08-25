@@ -260,7 +260,7 @@ export function MapPin({
         )}
         <Icon
           icon={ICONS.pin}
-          fill={fill}
+          {...{ fill }}
           strokeWidth={1.8}
           style={{
             // the stroke follows currentColor, and color-mix() only parses reliably as a css

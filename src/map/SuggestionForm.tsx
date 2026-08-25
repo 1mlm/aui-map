@@ -12,14 +12,11 @@ import {
   InputGroupTextarea,
 } from "@/shadcn/ui/input-group"
 import { triggerConfetti } from "@/utils/confetti"
+import { extractErrorMessage } from "@/utils/error"
 import { iconForMimeType } from "@/utils/mimeType"
 import { submitSuggestion } from "./suggestionActions"
 
 const SENT_FEEDBACK_MS = 2000
-
-function extractErrorMessage(err: unknown, fallback: string) {
-  return err instanceof Error ? err.message : fallback
-}
 
 export function SuggestionForm({ onSent }: { onSent?: () => void }) {
   const [message, setMessage] = useState("")

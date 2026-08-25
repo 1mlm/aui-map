@@ -16,6 +16,7 @@ import { cn } from "@/shadcn/utils"
 import { copyToClipboard } from "@/utils/clipboard"
 import { triggerHaptic } from "@/utils/haptics"
 import { isImageMimeType } from "@/utils/mimeType"
+import { useCopyFeedback } from "@/utils/useCopyFeedback"
 import {
   formatCoordinates,
   type NormalizedPosition,
@@ -74,7 +75,7 @@ function DroppedPinMarker({ position }: { position: NormalizedPosition }) {
 function DroppedPinMenuContent({ position }: { position: NormalizedPosition }) {
   const { latitude, longitude } = positionToLatLong(position)
   const coordinates = `${latitude},${longitude}`
-  const [copied, setCopied] = useState(false)
+  const { copied, copy } = useCopyFeedback(COPIED_FEEDBACK_MS)
 
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${coordinates}`
   const appleMapsUrl = `https://maps.apple.com/?ll=${coordinates}`
@@ -85,14 +86,9 @@ function DroppedPinMenuContent({ position }: { position: NormalizedPosition }) {
     window.open(url, "_blank", "noopener,noreferrer")
   }
 
-  async function copyCoordinates() {
+  function copyCoordinates() {
     triggerHaptic()
-    const succeeded = await copyToClipboard(
-      formatCoordinates({ latitude, longitude }),
-    )
-    if (!succeeded) return
-    setCopied(true)
-    setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS)
+    copy(formatCoordinates({ latitude, longitude }))
   }
 
   return (

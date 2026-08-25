@@ -104,9 +104,10 @@ export function tagPinFillColor(
   name?: TagColorName,
   tuning: CrayonTuning = DEFAULT_CRAYON_TUNING,
 ) {
-  const { chroma, hue } = parseOklch(getShades(name)[500])
+  const shades = getShades(name)
+  const { chroma, hue } = parseOklch(shades[500])
   // achromatic families are meant to stay neutral, so they skip the crayon treatment
-  if (chroma < ACHROMATIC_CHROMA_THRESHOLD) return getShades(name)[600]
+  if (chroma < ACHROMATIC_CHROMA_THRESHOLD) return shades[600]
   return `oklch(${tuning.lightness}% ${tuning.chroma} ${hue})`
 }
 // 950 is as dark as tailwind goes and still reads washed out against the satellite image, so the

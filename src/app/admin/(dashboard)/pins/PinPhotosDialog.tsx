@@ -35,7 +35,7 @@ export function PinPhotosDialog({
             Drag to reorder, right-click a photo to set it as the thumbnail.
           </DialogDescription>
         </DialogHeader>
-        <AttachmentManager pinId={pinId} attachments={rows} onAttachmentsChange={setRows} />
+        <AttachmentManager {...{ pinId }} attachments={rows} onAttachmentsChange={setRows} />
       </DialogContent>
     </Dialog>
   )

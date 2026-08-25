@@ -2,6 +2,7 @@ import { type HandleUploadBody, handleUpload } from "@vercel/blob/client"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { AUTH_COOKIE_NAME, isAuthCookieValid } from "@/utils/auth"
+import { extractErrorMessage } from "@/utils/error"
 
 // mints a client-upload token so the browser can send pin photos straight to Blob storage,
 // bypassing the 4.5mb request body cap Vercel puts on every serverless function. can't reuse
@@ -26,7 +27,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json(jsonResponse)
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Upload failed." },
+      { error: extractErrorMessage(error, "Upload failed.") },
       { status: 400 },
     )
   }

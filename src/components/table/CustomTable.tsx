@@ -2,7 +2,7 @@
 
 import { BrushCleaningIcon, InboxIcon } from "@hugeicons/core-free-icons"
 import { parseAsInteger, parseAsString, useQueryState, useQueryStates } from "nuqs"
-import { type ReactNode, useEffect, useMemo, useState } from "react"
+import { type ReactNode, useEffect, useState } from "react"
 import { type HugeIcon, Icon } from "@/components/Icon"
 import { Button } from "@/shadcn/ui/button"
 import { Checkbox } from "@/shadcn/ui/checkbox"
@@ -144,16 +144,12 @@ export function CustomTable<T>({
   const [sortRaw, setSortRaw] = useQueryState("sort", { defaultValue: "" })
   const [page, setPage] = useQueryState("page", parseAsInteger.withDefault(1))
 
-  const filterParsers = useMemo(
-    () =>
-      Object.fromEntries(
-        filterable
-          ? columns.flatMap((column) =>
-              getColumnFilterFields(column).map((field) => [getFilterKey(column.id, field), parseAsString.withDefault("")]),
-            )
-          : [],
-      ),
-    [columns, filterable],
+  const filterParsers = Object.fromEntries(
+    filterable
+      ? columns.flatMap((column) =>
+          getColumnFilterFields(column).map((field) => [getFilterKey(column.id, field), parseAsString.withDefault("")]),
+        )
+      : [],
   )
   const [filterValues, setFilterValues] = useQueryStates(filterParsers)
 
@@ -171,19 +167,17 @@ export function CustomTable<T>({
     setSortRaw("")
   }
 
-  const visibleItems = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    const filtered = items.filter((item) => {
-      if (query && !getSearchableStrings(columns, item).some((s) => s.toLowerCase().includes(query))) return false
-      if (!filterable) return true
-      return columns.every((column) => columnMatchesFilter(column, item, (field) => filterValues[getFilterKey(column.id, field)] ?? ""))
-    })
-    if (!sort) return filtered
-    const sortColumn = columns.find((column) => column.id === sort.columnId)
-    if (!sortColumn) return filtered
-    const sorted = [...filtered].sort((a, b) => compareColumnValues(sortColumn, a, b))
-    return sort.dir === "desc" ? sorted.reverse() : sorted
-  }, [items, columns, search, sort, filterValues, filterable])
+  const query = search.trim().toLowerCase()
+  const filteredItems = items.filter((item) => {
+    if (query && !getSearchableStrings(columns, item).some((s) => s.toLowerCase().includes(query))) return false
+    if (!filterable) return true
+    return columns.every((column) => columnMatchesFilter(column, item, (field) => filterValues[getFilterKey(column.id, field)] ?? ""))
+  })
+  const sortColumn = sort ? columns.find((column) => column.id === sort.columnId) : undefined
+  const visibleItems =
+    sort && sortColumn
+      ? [...filteredItems].sort((a, b) => compareColumnValues(sortColumn, a, b) * (sort.dir === "desc" ? -1 : 1))
+      : filteredItems
 
   useEffect(() => {
     onVisibleCountChange?.(visibleItems.length)

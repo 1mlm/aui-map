@@ -16,11 +16,12 @@ import {
 } from "@/shadcn/ui/dropdown-menu"
 import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover"
 import { cn } from "@/shadcn/utils"
-import { copyToClipboard } from "@/utils/clipboard"
 import { triggerHaptic } from "@/utils/haptics"
 import { isImageMimeType } from "@/utils/mimeType"
+import { useCopyFeedback } from "@/utils/useCopyFeedback"
 import { AttachmentCarousel, AttachmentStrip } from "./AttachmentCarousel"
 import { ContributeDialog } from "./ContributeDialog"
+import { formatCoordinates } from "./geo"
 import { TagChipIcon, tagChipClassName } from "./MapTagFilter"
 import { tagColorStyle } from "./tagColor"
 import type { MapItem, MapItemAttachment, MapItemTag, PinLink } from "./types"
@@ -61,7 +62,7 @@ export function MapDetailPanel({
   )
   const [contributeOpen, setContributeOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)
-  const [shared, setShared] = useState(false)
+  const { copied: shared, copy: copyShareLink } = useCopyFeedback(COPIED_FEEDBACK_MS)
   useDismissKey(onClose)
 
   // native share sheet where it exists (mobile mostly); everywhere else this just copies the
@@ -78,11 +79,8 @@ export function MapDetailPanel({
       }
       return
     }
-    const succeeded = await copyToClipboard(url.toString())
-    if (!succeeded) return
-    triggerHaptic("success")
-    setShared(true)
-    setTimeout(() => setShared(false), COPIED_FEEDBACK_MS)
+    const succeeded = await copyShareLink(url.toString())
+    if (succeeded) triggerHaptic("success")
   }
 
   // dragging the handle up/down resizes the sheet; dragging it well past collapsed dismisses,
@@ -193,7 +191,7 @@ export function MapDetailPanel({
             title={item.title}
             aliases={item.aliases}
             attachment={hero}
-            docked={docked}
+            {...{ docked }}
             onOpen={() => setOpenAttachmentIndex(0)}
           />
         ) : (
@@ -425,7 +423,7 @@ function ContactInfo({ item }: { item: MapItem }) {
 // navigator.userAgent can guess Apple vs Google but can't know someone prefers Waze. so this
 // is a menu, decided at click time (client-only, no hydration risk) rather than one guessed link
 function MapsMenuButton({ item }: { item: MapItem }) {
-  const [copied, setCopied] = useState(false)
+  const { copied, copy } = useCopyFeedback(COPIED_FEEDBACK_MS)
   const coordinates = `${item.latitude},${item.longitude}`
 
   // an admin-curated place link, when set, replaces the generic coordinate search so the
@@ -443,14 +441,9 @@ function MapsMenuButton({ item }: { item: MapItem }) {
     window.open(url, "_blank", "noopener,noreferrer")
   }
 
-  async function copyCoordinates() {
+  function copyCoordinates() {
     triggerHaptic()
-    const succeeded = await copyToClipboard(
-      `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}`,
-    )
-    if (!succeeded) return
-    setCopied(true)
-    setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS)
+    copy(formatCoordinates(item))
   }
 
   return (
@@ -496,15 +489,8 @@ function CoordinatesLine({
   latitude: number
   longitude: number
 }) {
-  const coordinates = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
-  const [copied, setCopied] = useState(false)
-
-  const copyCoordinates = async () => {
-    const succeeded = await copyToClipboard(coordinates)
-    if (!succeeded) return
-    setCopied(true)
-    setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS)
-  }
+  const coordinates = formatCoordinates({ latitude, longitude })
+  const { copied, copy } = useCopyFeedback(COPIED_FEEDBACK_MS)
 
   return (
     <span className="group flex items-center gap-2 text-sm opacity-70">
@@ -512,7 +498,7 @@ function CoordinatesLine({
       {coordinates}
       <button
         type="button"
-        onClick={copyCoordinates}
+        onClick={() => copy(coordinates)}
         aria-label="Copy coordinates"
         className="rounded-full corner-squircle p-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-foreground/10 focus-visible:opacity-100"
       >

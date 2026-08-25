@@ -6,6 +6,7 @@ import Image from "next/image"
 import { type ChangeEvent, useRef, useState, useTransition } from "react"
 import { FormError } from "@/components/FormError"
 import { Icon } from "@/components/Icon"
+import type { Attachment } from "@/generated/prisma/client"
 import { ICONS } from "@/icons"
 import { Button } from "@/shadcn/ui/button"
 import {
@@ -24,6 +25,7 @@ import {
 } from "@/shadcn/ui/dialog"
 import { Input } from "@/shadcn/ui/input"
 import { formatRelativeDate } from "@/utils/date"
+import { extractErrorMessage } from "@/utils/error"
 import {
   iconForMimeType,
   isImageMimeType,
@@ -37,14 +39,7 @@ import {
   setThumbnail,
 } from "./actions"
 
-export type AttachmentRow = {
-  id: string
-  url: string
-  caption: string | null
-  mimeType: string | null
-  fileName: string | null
-  isThumbnail: boolean
-  order: number
+export type AttachmentRow = Omit<Attachment, "pinId" | "postedAt"> & {
   postedAt: string
 }
 
@@ -54,10 +49,6 @@ type PendingUpload = {
   status: "uploading" | "error"
   progress: number
   message?: string
-}
-
-function extractErrorMessage(err: unknown, fallback: string) {
-  return err instanceof Error ? err.message : fallback
 }
 
 function AttachmentThumbnail({ attachment }: { attachment: AttachmentRow }) {
@@ -403,13 +394,15 @@ export function AttachmentManager({
     })
   }
 
+  const attachmentIds = attachments.map((attachment) => attachment.id)
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-3 overflow-x-auto py-1">
         <Reorder.Group
           as="div"
           axis="x"
-          values={attachments.map((attachment) => attachment.id)}
+          values={attachmentIds}
           onReorder={handleReorder}
           className="flex gap-3"
         >

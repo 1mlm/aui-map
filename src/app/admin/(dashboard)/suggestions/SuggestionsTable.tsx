@@ -8,19 +8,14 @@ import {
   CustomTable,
   type CustomTableColumn,
 } from "@/components/table/CustomTable"
+import type { Suggestion } from "@/generated/prisma/client"
 import { ICONS } from "@/icons"
 import { Button } from "@/shadcn/ui/button"
 import { iconForMimeType } from "@/utils/mimeType"
 import { deleteSuggestion, setSuggestionResolved } from "./actions"
 
-export type SuggestionRow = {
-  id: string
-  message: string
-  fileUrl: string | null
-  fileName: string | null
-  mimeType: string | null
+export type SuggestionRow = Omit<Suggestion, "submittedAt"> & {
   submittedAt: string
-  resolved: boolean
 }
 
 function SuggestionRowActions({ suggestion }: { suggestion: SuggestionRow }) {

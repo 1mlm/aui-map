@@ -27,6 +27,11 @@ export type PinInput = {
   underConstruction: boolean
 }
 
+function revalidatePinPaths() {
+  revalidatePath("/")
+  revalidatePath("/admin/pins")
+}
+
 async function getAttachments(pinId: string) {
   const attachments = await prisma.attachment.findMany({
     where: { pinId },
@@ -101,8 +106,7 @@ export async function upsertPin(
     }
     throw err
   }
-  revalidatePath("/")
-  revalidatePath("/admin/pins")
+  revalidatePinPaths()
 }
 
 export async function deletePin(uuid: string) {
@@ -113,8 +117,7 @@ export async function deletePin(uuid: string) {
   })
   await prisma.pin.delete({ where: { uuid } })
   await Promise.all(attachments.map((attachment) => deleteFile(attachment.url)))
-  revalidatePath("/")
-  revalidatePath("/admin/pins")
+  revalidatePinPaths()
 }
 
 export async function setThumbnail(pinId: string, attachmentId: string) {
@@ -135,8 +138,7 @@ export async function setThumbnail(pinId: string, attachmentId: string) {
       data: { isThumbnail: true },
     }),
   ])
-  revalidatePath("/")
-  revalidatePath("/admin/pins")
+  revalidatePinPaths()
   return getAttachments(pinId)
 }
 
@@ -150,8 +152,7 @@ export async function setAttachmentCaption(
     where: { id: attachmentId },
     data: { caption: caption || null },
   })
-  revalidatePath("/")
-  revalidatePath("/admin/pins")
+  revalidatePinPaths()
   return getAttachments(pinId)
 }
 
@@ -163,8 +164,7 @@ export async function reorderAttachments(pinId: string, orderedIds: string[]) {
       prisma.attachment.update({ where: { id }, data: { order } }),
     ),
   )
-  revalidatePath("/")
-  revalidatePath("/admin/pins")
+  revalidatePinPaths()
   return getAttachments(pinId)
 }
 
@@ -174,8 +174,7 @@ export async function deleteAttachment(pinId: string, attachmentId: string) {
     where: { id: attachmentId },
   })
   await deleteFile(attachment.url)
-  revalidatePath("/")
-  revalidatePath("/admin/pins")
+  revalidatePinPaths()
   return getAttachments(pinId)
 }
 
@@ -198,7 +197,6 @@ export async function createAttachment(
     },
   })
 
-  revalidatePath("/")
-  revalidatePath("/admin/pins")
+  revalidatePinPaths()
   return getAttachments(pinId)
 }

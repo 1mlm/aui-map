@@ -173,11 +173,10 @@ export function MapExperience({
 
       {LEVA_PLAYGROUND_ENABLED && process.env.NODE_ENV === "development" && (
         <TagColorPlayground
-          tags={tags}
           onColorChange={(tagId, color) =>
             setColorOverrides((current) => ({ ...current, [tagId]: color }))
           }
-          {...{ tuning }}
+          {...{ tags, tuning }}
           onTuningChange={setTuning}
         />
       )}

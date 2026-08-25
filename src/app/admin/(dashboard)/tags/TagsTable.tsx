@@ -13,8 +13,6 @@ import { CURATED_TAG_COLORS } from "@/map/tagColor"
 import { Button } from "@/shadcn/ui/button"
 import { type AdminTag, TagDialog } from "./TagDialog"
 
-export type TagRow = AdminTag
-
 const colorOptions: Record<string, CustomTableEnumValue> = Object.fromEntries(
   CURATED_TAG_COLORS.map((name) => [
     name,
@@ -31,12 +29,12 @@ const emptyTag: AdminTag = {
   pinCount: 0,
 }
 
-function TagsTableInner({ tags }: { tags: TagRow[] }) {
+function TagsTableInner({ tags }: { tags: AdminTag[] }) {
   const [resultCount, setResultCount] = useState(tags.length)
-  const [editingTag, setEditingTag] = useState<TagRow | null>(null)
+  const [editingTag, setEditingTag] = useState<AdminTag | null>(null)
   const [creating, setCreating] = useState(false)
 
-  const columns: CustomTableColumn<TagRow>[] = [
+  const columns: CustomTableColumn<AdminTag>[] = [
     {
       id: "label",
       label: "Label",
@@ -135,7 +133,7 @@ function TagsTableInner({ tags }: { tags: TagRow[] }) {
   )
 }
 
-export function TagsTable(props: { tags: TagRow[] }) {
+export function TagsTable(props: { tags: AdminTag[] }) {
   return (
     <Suspense>
       <TagsTableInner {...props} />

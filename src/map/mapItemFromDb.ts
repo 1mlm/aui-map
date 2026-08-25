@@ -1,38 +1,9 @@
+import type { Prisma, Tag } from "@/generated/prisma/client"
 import { resolveIcon } from "./iconRegistry"
 import type { TagColorName } from "./tagColor"
 import { type MapItem, type MapItemTag, parsePinLinks } from "./types"
 
-type TagRow = {
-  id: string
-  label: string
-  icon: string
-  color: string | null
-  sizeScale: number
-}
-type PinRow = {
-  id: string
-  title: string
-  aliases: string[]
-  description: string | null
-  latitude: number
-  longitude: number
-  mapsUrl: string | null
-  hours: string | null
-  ramadanHours: string | null
-  phone: string | null
-  email: string | null
-  links: unknown
-  underConstruction: boolean
-  updatedAt: Date
-  attachments: {
-    id: string
-    url: string
-    caption: string | null
-    mimeType: string | null
-    fileName: string | null
-    postedAt: Date
-  }[]
-}
+type PinWithAttachments = Prisma.PinGetPayload<{ include: { attachments: true } }>
 
 // the one place a db row turns into the shapes the map/admin ui actually render —
 // server-only, since it resolves icon strings via the registry
@@ -41,7 +12,7 @@ export const getShortestName = (names: string[]) =>
     name.length < shortest.length ? name : shortest,
   )
 
-export function tagRowToMapItemTag(tag: TagRow): MapItemTag {
+export function tagRowToMapItemTag(tag: Tag): MapItemTag {
   return {
     id: tag.id,
     label: tag.label,
@@ -51,7 +22,7 @@ export function tagRowToMapItemTag(tag: TagRow): MapItemTag {
   }
 }
 
-export function pinRowToMapItem(pin: PinRow, tag: MapItemTag): MapItem {
+export function pinRowToMapItem(pin: PinWithAttachments, tag: MapItemTag): MapItem {
   return {
     id: pin.id,
     title: pin.title,

@@ -9,7 +9,6 @@ import {
   Forward02Icon,
   FullScreenIcon,
 } from "@hugeicons/core-free-icons"
-import { useState } from "react"
 import { Icon } from "@/components/Icon"
 import { Badge } from "@/shadcn/ui/badge"
 import { Button } from "@/shadcn/ui/button"
@@ -19,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/shadcn/ui/tooltip"
 import { cn } from "@/shadcn/utils"
 import { getColorStyle } from "@/utils/color"
 import { formatDetailedDuration, formatExactDate, formatRelativeDate } from "@/utils/date"
+import { useCopyFeedback } from "@/utils/useCopyFeedback"
 import type { CustomTableColumn, CustomTableEnumValue } from "./CustomTable"
 import { CustomTableEmptyValue } from "./CustomTableEmptyValue"
 
@@ -41,16 +41,10 @@ export function EnumBadge({ value }: { value: CustomTableEnumValue }) {
 }
 
 function CopyButton({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false)
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(value)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1000)
-  }
+  const { copied, copy } = useCopyFeedback(1000)
 
   return (
-    <Button variant="ghost" size="icon" className="size-6" onClick={handleCopy}>
+    <Button variant="ghost" size="icon" className="size-6" onClick={() => copy(value)}>
       <Icon icon={copied ? CheckIcon : Copy01Icon} />
     </Button>
   )

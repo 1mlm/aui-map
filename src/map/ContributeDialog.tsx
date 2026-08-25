@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from "@/shadcn/ui/dialog"
 import { Textarea } from "@/shadcn/ui/textarea"
+import { extractErrorMessage } from "@/utils/error"
 import { triggerHaptic } from "@/utils/haptics"
 import {
   iconForMimeType,
@@ -43,8 +44,8 @@ function FilePreview({ file }: { file: File }) {
   if (!previewUrl) return null
 
   if (isImageMimeType(file.type)) {
-    // biome-ignore lint/performance/noImgElement: local blob: preview, next/image can't load blob urls
     return (
+      // biome-ignore lint/performance/noImgElement: local blob: preview, next/image can't load blob urls
       <img
         src={previewUrl}
         alt=""
@@ -128,11 +129,7 @@ export function ContributeDialog({
           setCaption("")
         }, SUCCESS_CLOSE_DELAY_MS)
       } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Couldn't send that — try again.",
-        )
+        setError(extractErrorMessage(err, "Couldn't send that — try again."))
       }
     })
   }
