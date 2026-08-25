@@ -31,7 +31,7 @@ const PIN_REFERENCE_SCALE = 4
 // around a cluster without the icon itself getting hard to see; the actual room to read names
 // comes from the map spreading pins further apart on screen as you zoom, not from the icon
 // shrinking further than this. Tuned live via PinTuningPlayground's "shrink amount" slider
-export const DEFAULT_PIN_GROWTH_EXPONENT = 0.3
+export const DEFAULT_PIN_GROWTH_EXPONENT = 0.1
 const DOUBLE_TAP_MAX_DELAY_MS = 300
 const DOUBLE_TAP_MAX_DISTANCE_PX = 24
 const WHEEL_SETTLE_DELAY_MS = 220
