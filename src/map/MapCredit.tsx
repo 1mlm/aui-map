@@ -1,17 +1,21 @@
 "use client"
 
 import Image from "next/image"
+import { useState } from "react"
 import { Icon, type HugeIcon } from "@/components/Icon"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
 import { ICONS } from "@/icons"
+import { Button } from "@/shadcn/ui/button"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/shadcn/ui/dialog"
 import { cn } from "@/shadcn/utils"
+import { SuggestionForm } from "./SuggestionForm"
 
 const AUTHOR = {
   name: "Malik Lahlou",
@@ -51,7 +55,11 @@ function CreditTag({
     // the "About the project" paragraph sets text-indent for its own first-line indent — that
     // inherits into this flex container and, since the label is a bare text node, gets applied
     // to it as if it were its own indented line, shoving it away from the icon. Reset it here
-    "relative -my-0.5 inline-flex w-fit shrink-0 items-center gap-1.5 indent-0 whitespace-nowrap rounded-full corner-squircle bg-white/5 py-0.5 pr-3 pl-2 font-semibold text-foreground outline-none transition-all duration-200 hover:-translate-y-2 hover:scale-105 hover:bg-white/10 focus-visible:-translate-y-2 focus-visible:scale-105 focus-visible:bg-white/10 active:-translate-y-2 active:scale-105 active:bg-white/10",
+    "relative -my-0.5 inline-flex w-fit shrink-0 items-center gap-1.5 indent-0 whitespace-nowrap rounded-full corner-squircle bg-white/5 py-0.5 pr-3 pl-2 font-semibold text-foreground outline-none",
+    // only a linked tag (opens something on click) gets the hover/press affordance — the
+    // MapCredit bottom line's plain author tag isn't clickable, so it shouldn't look like it is
+    href &&
+      "transition-all duration-200 hover:-translate-y-2 hover:scale-105 hover:bg-white/10 focus-visible:-translate-y-2 focus-visible:scale-105 focus-visible:bg-white/10 active:-translate-y-2 active:scale-105 active:bg-white/10",
     rotation,
   )
 
@@ -99,6 +107,8 @@ export function NoticeDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+
   return (
     <Dialog {...{ open, onOpenChange }}>
       <DialogContent className="corner-squircle rotate-[0.25deg] gap-5 overflow-visible p-6 sm:max-w-md">
@@ -142,6 +152,28 @@ export function NoticeDialog({
             </div>
           </DialogDescription>
         </DialogHeader>
+
+        <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
+          <DialogTrigger asChild>
+            <Button
+              size="sm"
+              className="w-fit self-center rounded-full corner-squircle"
+            >
+              <Icon icon={ICONS.suggestions} />
+              Provide feedback
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="corner-squircle sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Send feedback</DialogTitle>
+              <DialogDescription>
+                Report a bug or suggest something.
+              </DialogDescription>
+            </DialogHeader>
+            <SuggestionForm onSent={() => setFeedbackOpen(false)} />
+          </DialogContent>
+        </Dialog>
+
         <div className="flex flex-wrap items-center justify-center gap-1.5 text-sm text-muted-foreground">
           Made with ❤️ by
           <CreditTag
@@ -163,24 +195,22 @@ export function NoticeDialog({
   )
 }
 
-export function MapCredit({ onOpen }: { onOpen: () => void }) {
+// purely decorative (see CreditTag's href-less branch above) — the "About this project" button
+// in the map controls opens NoticeDialog, which is where "Provide feedback" actually lives now
+export function MapCredit() {
   return (
     <SquircleFuserContainer
       align="bottom-center"
       superClassName="map-credit absolute bottom-0 left-1/2 -translate-x-1/2"
     >
-      <button
-        type="button"
-        onClick={onOpen}
-        className="flex items-center gap-1.5 text-sm text-muted-foreground"
-      >
+      <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
         Made with ❤️ by
         <CreditTag
           label={AUTHOR.name}
           avatarUrl={AUTHOR.avatarUrl}
           rotation={TAG_ROTATIONS[1]}
         />
-      </button>
+      </span>
     </SquircleFuserContainer>
   )
 }

@@ -5,6 +5,7 @@ import { Prisma } from "@/generated/prisma/client"
 import type { PinLink } from "@/map/types"
 import { deleteFile } from "@/utils/blob"
 import { prisma } from "@/utils/prisma"
+import { RESERVED_PIN_IDS } from "@/utils/reservedPinIds"
 import { requireAuth } from "@/utils/requireAuth"
 
 export type PinInput = {
@@ -67,6 +68,9 @@ export async function upsertPin(
   input: PinInput,
 ): Promise<{ error: string } | undefined> {
   await requireAuth()
+  if (RESERVED_PIN_IDS.has(input.id)) {
+    return { error: `"${input.id}" is reserved and can't be used as an id.` }
+  }
   if (input.mapsUrl) {
     const urlError = validateHttpsUrl(input.mapsUrl, "Maps link")
     if (urlError) return { error: urlError }

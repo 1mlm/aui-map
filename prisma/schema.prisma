@@ -24,7 +24,7 @@ model Pin {
   // the real, stable identity — never shown, never edited. Attachment/Submission point at this
   // instead of id, so renaming a pin's public slug can't orphan its photos or break a relation
   uuid         String       @id @default(uuid())
-  // the short public slug (m6l, b4, ...) used in ?focus= links and shown/settable in the admin —
+  // the short public slug (m6l, b4, ...) used in #id links and shown/settable in the admin —
   // just @unique now instead of the primary key, so it's free to rename
   id           String       @unique
   title        String
@@ -51,6 +51,7 @@ model Pin {
   tag          Tag          @relation(fields: [tagId], references: [id])
   attachments  Attachment[]
   submissions  Submission[]
+  qrCodes      QrCode[]
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 }
@@ -93,6 +94,44 @@ model Submission {
   status      SubmissionStatus @default(PENDING)
   submittedAt DateTime         @default(now())
   reviewedAt  DateTime?
+}
+
+// a trackable QR/short-link instance for a pin — separate from Pin.id (which also works as a
+// plain short link) so a scan can be attributed to a specific printed poster/flyer rather than
+// just "someone visited this pin's page". pinId points at uuid, not the renameable public slug,
+// same reasoning as Attachment/Submission above
+model QrCode {
+  // the code embedded in the QR / printed on the link — generated once and permanent, since a
+  // printed poster can't be updated after the fact
+  id        String        @id
+  // set by an admin to tell instances of the same pin's QR apart ("front door poster", ...);
+  // null for the default one auto-created the first time someone opens a pin's QR code
+  label     String?
+  pinId     String
+  pin       Pin           @relation(fields: [pinId], references: [uuid], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+  events    QrCodeEvent[]
+}
+
+enum QrCodeEventType {
+  CREATED
+  RENAMED
+  SCANNED
+}
+
+// chronological audit log for a QrCode — mirrors riad-stone's HistoryEvent shape (enum type +
+// freeform data blob) rather than separate tables per event kind, since the event set is small
+// and admin history views just want one ordered timeline
+model QrCodeEvent {
+  id        String          @id @default(cuid())
+  qrCodeId  String
+  qrCode    QrCode          @relation(fields: [qrCodeId], references: [id], onDelete: Cascade)
+  type      QrCodeEventType
+  // RENAMED stores { before, after }; CREATED/SCANNED carry no extra data
+  data      Json            @default("{}")
+  createdAt DateTime        @default(now())
+
+  @@index([createdAt])
 }
 
 // general feedback/bug reports from the bulb icon on the public map — not tied to a pin

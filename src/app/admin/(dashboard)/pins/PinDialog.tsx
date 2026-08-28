@@ -259,7 +259,7 @@ export function PinDialog({
         </div>
         <div className="flex flex-col gap-1.5">
           <FieldLabel icon={ICONS.id} htmlFor="pin-id">
-            Id (used in ?focus= links)
+            Id (used in #id links)
           </FieldLabel>
           <Input
             id="pin-id"
@@ -273,8 +273,7 @@ export function PinDialog({
           />
           {!isNew && (
             <p className="text-muted-foreground text-xs">
-              Renaming this breaks any ?focus= link already pointing at the old
-              id.
+              Renaming this breaks any #id link already pointing at the old id.
             </p>
           )}
         </div>

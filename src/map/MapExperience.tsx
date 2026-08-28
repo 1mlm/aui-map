@@ -3,7 +3,6 @@
 import { track } from "@vercel/analytics"
 import { AnimatePresence } from "motion/react"
 import dynamic from "next/dynamic"
-import { useQueryState } from "nuqs"
 import { useEffect, useRef, useState } from "react"
 import { MapBrand } from "./MapBrand"
 import { MapCanvas, type MapCanvasHandle } from "./MapCanvas"
@@ -15,7 +14,9 @@ import { DEFAULT_CRAYON_TUNING, type TagColorName } from "./tagColor"
 import type { MapItem, MapItemTag } from "./types"
 import { useAvailableSpace } from "./useAvailableSpace"
 import { useCompassHeading } from "./useCompassHeading"
+import { useHashState } from "./useHashState"
 import { useUserLocation } from "./useUserLocation"
+import { useWakeLock } from "./useWakeLock"
 
 // flip true to bring back the leva tag-color/tuning playground
 const LEVA_PLAYGROUND_ENABLED = false
@@ -55,6 +56,7 @@ export function MapExperience({
   const space = useAvailableSpace(shellRef)
   const location = useUserLocation()
   const compass = useCompassHeading()
+  useWakeLock()
 
   // requests location if it isn't already, and — unlike the passive first-fix auto-center —
   // always jumps the view back regardless of whether the user's already panned elsewhere,
@@ -68,8 +70,8 @@ export function MapExperience({
   const [activeTagIds, setActiveTagIds] = useState<Set<string>>(new Set())
   const [hoveredTagId, setHoveredTagId] = useState<string | null>(null)
   const [noticeOpen, setNoticeOpen] = useState(false)
-  // in the url so a place can be linked to directly: /?focus=m6l
-  const [selectedId, setSelectedId] = useQueryState("focus")
+  // in the url hash so a place can be linked to directly: /#m6l
+  const [selectedId, setSelectedId] = useHashState()
 
   // dev-only live color overrides from TagColorPlayground — never populated in production, so
   // this is a no-op merge there. Keyed by tag id, applied to both the tags list (for the filter
@@ -167,7 +169,7 @@ export function MapExperience({
           )}
         </AnimatePresence>
 
-        <MapCredit onOpen={() => setNoticeOpen(true)} />
+        <MapCredit />
         <NoticeDialog open={noticeOpen} onOpenChange={setNoticeOpen} />
       </div>
 

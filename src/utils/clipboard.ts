@@ -9,3 +9,14 @@ export async function copyToClipboard(text: string) {
     return false
   }
 }
+
+// same as above but for an image blob (e.g. a generated QR code) — the Clipboard API only
+// accepts a handful of image mime types, png is the one every OS paste target understands
+export async function copyImageToClipboard(blob: Blob) {
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
+    return true
+  } catch {
+    return false
+  }
+}

@@ -23,6 +23,7 @@ import { AttachmentCarousel, AttachmentStrip } from "./AttachmentCarousel"
 import { ContributeDialog } from "./ContributeDialog"
 import { formatCoordinates } from "./geo"
 import { TagChipIcon, tagChipClassName } from "./MapTagFilter"
+import { ShareMenu } from "./ShareMenu"
 import { tagColorStyle } from "./tagColor"
 import type { MapItem, MapItemAttachment, MapItemTag, PinLink } from "./types"
 import { useDismissKey } from "./useDismissKey"
@@ -62,26 +63,7 @@ export function MapDetailPanel({
   )
   const [contributeOpen, setContributeOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)
-  const { copied: shared, copy: copyShareLink } = useCopyFeedback(COPIED_FEEDBACK_MS)
   useDismissKey(onClose)
-
-  // native share sheet where it exists (mobile mostly); everywhere else this just copies the
-  // same deep link (?focus=id) the app already supports, matching the "copy coordinates" pattern
-  // used elsewhere in this panel
-  async function handleShare() {
-    const url = new URL(window.location.href)
-    url.searchParams.set("focus", item.id)
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: item.title, url: url.toString() })
-      } catch {
-        // user dismissed the share sheet, not a failure worth surfacing
-      }
-      return
-    }
-    const succeeded = await copyShareLink(url.toString())
-    if (succeeded) triggerHaptic("success")
-  }
 
   // dragging the handle up/down resizes the sheet; dragging it well past collapsed dismisses,
   // matching the swipe-to-dismiss threshold pattern AttachmentCarousel uses for its own drag gesture
@@ -136,14 +118,7 @@ export function MapDetailPanel({
       )}
 
       <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-        <IconButton
-          icon={shared ? ICONS.copied : ICONS.share}
-          // same reasoning as the close button below: sits over the hero photo as often as over
-          // the panel itself, so it carries its own dark backdrop
-          tone="floating"
-          onClick={handleShare}
-          aria-label={shared ? "Link copied!" : "Share"}
-        />
+        <ShareMenu pinId={item.id} pinTitle={item.title} />
         <IconButton
           icon={ICONS.close}
           tone="floating"

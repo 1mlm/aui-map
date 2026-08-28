@@ -20,15 +20,24 @@ function MobileLogoutButton() {
       onClick={() => startTransition(() => logout())}
       className="w-full rounded-full corner-squircle text-destructive hover:bg-destructive/10 hover:text-destructive"
     >
-      <Icon icon={pending ? ICONS.loading : ICONS.logout} className={pending ? "animate-spin" : undefined} />
+      <Icon
+        icon={pending ? ICONS.loading : ICONS.logout}
+        className={pending ? "animate-spin" : undefined}
+      />
       Log out
     </Button>
   )
 }
 
-export type NavCounts = Record<"pins" | "tags" | "submissions" | "suggestions", number>
+export type NavCounts = Record<
+  "pins" | "tags" | "submissions" | "suggestions",
+  number
+>
 
-export function AppShell({ counts, children }: PropsWithChildren<{ counts: NavCounts }>) {
+export function AppShell({
+  counts,
+  children,
+}: PropsWithChildren<{ counts: NavCounts }>) {
   return (
     <AppNav
       brand={APP_HEADER}

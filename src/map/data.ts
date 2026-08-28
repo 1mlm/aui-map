@@ -67,7 +67,7 @@ export const MAP_TAGS = {
 type TagId = keyof typeof MAP_TAGS
 
 const rawMapItems: {
-  // short readable handle, and the value of the ?focus= query param that opens this item
+  // short readable handle, and the url hash (#id) that opens this item directly
   id: string
   title: string
   aliases?: string[]

@@ -3,10 +3,14 @@ import { cn } from "@/shadcn/utils"
 
 // corner = which corner of the square the visible fillet sliver occupies
 const fuserMaskByCorner = {
-  "top-left": "[mask:radial-gradient(circle_at_bottom_right,transparent_1em,#000_0)]",
-  "top-right": "[mask:radial-gradient(circle_at_bottom_left,transparent_1em,#000_0)]",
-  "bottom-left": "[mask:radial-gradient(circle_at_top_right,transparent_1em,#000_0)]",
-  "bottom-right": "[mask:radial-gradient(circle_at_top_left,transparent_1em,#000_0)]",
+  "top-left":
+    "[mask:radial-gradient(circle_at_bottom_right,transparent_1em,#000_0)]",
+  "top-right":
+    "[mask:radial-gradient(circle_at_bottom_left,transparent_1em,#000_0)]",
+  "bottom-left":
+    "[mask:radial-gradient(circle_at_top_right,transparent_1em,#000_0)]",
+  "bottom-right":
+    "[mask:radial-gradient(circle_at_top_left,transparent_1em,#000_0)]",
 } as const
 type SquircleFuserCorner = keyof typeof fuserMaskByCorner
 
@@ -62,7 +66,10 @@ const layoutByAlign = {
       { corner: "bottom-left", at: "bottom-full left-0" },
     ],
   },
-} satisfies Record<string, { pill: string; fusers: { corner: SquircleFuserCorner; at: string }[] }>
+} satisfies Record<
+  string,
+  { pill: string; fusers: { corner: SquircleFuserCorner; at: string }[] }
+>
 
 type Align = keyof typeof layoutByAlign
 

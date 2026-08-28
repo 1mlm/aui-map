@@ -2,6 +2,12 @@
 
 import { Icon } from "@/components/Icon"
 import { ICONS } from "@/icons"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/shadcn/ui/input-group"
 
 export type SearchProps = {
   search: string
@@ -10,21 +16,29 @@ export type SearchProps = {
 
 export function SearchField({ search, onSearchChange }: SearchProps) {
   return (
-    <>
-      <Icon icon={ICONS.search} className="shrink-0 text-muted-foreground" />
-      <input
-        // biome-ignore lint/a11y/noAutofocus: the field only exists once the user opened it
+    <InputGroup className="rounded-[calc(var(--radius-3xl)-0.75rem)] corner-squircle">
+      <InputGroupAddon>
+        <Icon icon={ICONS.search} />
+      </InputGroupAddon>
+      <InputGroupInput
         autoFocus
         value={search}
         onChange={(e) => onSearchChange(e.target.value)}
         placeholder="Search places..."
-        className="h-7 w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
       />
       {search && (
-        <button type="button" onClick={() => onSearchChange("")} aria-label="Clear search">
-          <Icon icon={ICONS.clear} className="size-4 shrink-0 text-muted-foreground" />
-        </button>
+        <InputGroupAddon align="inline-end">
+          <InputGroupButton
+            size="icon-xs"
+            variant="ghost"
+            className="rounded-full corner-squircle"
+            onClick={() => onSearchChange("")}
+            aria-label="Clear search"
+          >
+            <Icon icon={ICONS.clear} />
+          </InputGroupButton>
+        </InputGroupAddon>
       )}
-    </>
+    </InputGroup>
   )
 }

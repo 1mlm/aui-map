@@ -14,8 +14,8 @@
     --card-foreground: light-dark(oklch(0.145 0 0), oklch(0.985 0 0));
     --popover: light-dark(oklch(1 0 0), oklch(0.205 0 0));
     --popover-foreground: light-dark(oklch(0.145 0 0), oklch(0.985 0 0));
-    --primary: light-dark(oklch(0.205 0 0), oklch(0.922 0 0));
-    --primary-foreground: light-dark(oklch(0.985 0 0), oklch(0.205 0 0));
+    --primary: light-dark(oklch(0.42 0.1 152), oklch(0.62 0.13 152));
+    --primary-foreground: light-dark(oklch(0.98 0 0), oklch(0.15 0.02 152));
     --secondary: light-dark(oklch(0.97 0 0), oklch(0.269 0 0));
     --secondary-foreground: light-dark(oklch(0.205 0 0), oklch(0.985 0 0));
     --muted: light-dark(oklch(0.97 0 0), oklch(0.269 0 0));

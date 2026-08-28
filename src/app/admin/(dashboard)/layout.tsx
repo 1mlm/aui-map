@@ -13,5 +13,9 @@ export default async function AdminLayout({ children }: PropsWithChildren) {
     prisma.suggestion.count({ where: { resolved: false } }),
   ])
 
-  return <AppShell counts={{ pins, tags, submissions, suggestions }}>{children}</AppShell>
+  return (
+    <AppShell counts={{ pins, tags, submissions, suggestions }}>
+      {children}
+    </AppShell>
+  )
 }
