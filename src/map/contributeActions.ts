@@ -1,5 +1,6 @@
 "use server"
 
+import { escapeHtml, notifyAdmin } from "@/utils/notifyAdmin"
 import { prisma } from "@/utils/prisma"
 
 // public — anyone on the map can suggest a file for a pin, no auth required. Lands as a
@@ -15,7 +16,7 @@ export async function submitContribution(
   // real (and immutable) uuid, so the slug has to be resolved before the row can be written
   const pin = await prisma.pin.findUniqueOrThrow({
     where: { id: pinSlug },
-    select: { uuid: true },
+    select: { uuid: true, title: true },
   })
 
   await prisma.submission.create({
@@ -27,4 +28,9 @@ export async function submitContribution(
       caption,
     },
   })
+
+  await notifyAdmin(
+    `New media contribution for ${pin.title}`,
+    `<p>File: <a href="${blob.url}">${escapeHtml(blob.fileName)}</a></p>${caption ? `<p>${escapeHtml(caption)}</p>` : ""}`,
+  )
 }

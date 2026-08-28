@@ -1,6 +1,6 @@
 {
   "name": "aui-map",
-  "version": "0.1.37",
+  "version": "0.1.38",
   "private": true,
   "packageManager": "pnpm@11.6.0",
   "scripts": {
@@ -36,6 +36,7 @@
     "react": "19.2.4",
     "react-day-picker": "^10.0.1",
     "react-dom": "19.2.4",
+    "resend": "^6.24.0",
     "serwist": "^9.5.12",
     "shadcn": "^4.15.0",
     "tailwind-merge": "^3.6.0",

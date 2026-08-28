@@ -1,5 +1,6 @@
 "use server"
 
+import { escapeHtml, notifyAdmin } from "@/utils/notifyAdmin"
 import { prisma } from "@/utils/prisma"
 
 // public — the bulb icon on the map posts here, no auth required. Returns an error string
@@ -22,4 +23,9 @@ export async function submitSuggestion(
       mimeType: blob?.mimeType,
     },
   })
+
+  await notifyAdmin(
+    "New feedback on AUI Map",
+    `<p>${escapeHtml(trimmed)}</p>${blob ? `<p>Attachment: <a href="${blob.url}">${escapeHtml(blob.fileName)}</a></p>` : ""}`,
+  )
 }
