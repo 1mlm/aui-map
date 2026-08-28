@@ -195,7 +195,7 @@ export function MapPin({
           left: "50%",
           top: `${PIN_TIP_FRACTION * 100}%`,
           transform: `translate(-50%, -50%) scale(${sizeScale})`,
-          background: `radial-gradient(closest-side, rgba(0,0,0,${selected ? 0.65 : 0.55}), rgba(0,0,0,0) 75%)`,
+          background: `radial-gradient(closest-side, rgba(0,0,0,${selected ? 0.85 : 0.78}), rgba(0,0,0,0) 75%)`,
         }}
       />
       <motion.button
@@ -249,7 +249,7 @@ export function MapPin({
                 distracting rather than a helpful indicator */}
             {selected && (
               <span
-                className="absolute left-1/2 size-5 -translate-1/2 animate-ping rounded-full opacity-70"
+                className="absolute left-1/2 size-5 -translate-1/2 rounded-full opacity-70 motion-safe:animate-ping"
                 style={{
                   backgroundColor: fill,
                   top: `${PIN_HEAD_FRACTION * 100}%`,

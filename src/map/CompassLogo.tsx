@@ -1,6 +1,6 @@
 "use client"
 
-import { motion } from "motion/react"
+import { motion, useReducedMotion } from "motion/react"
 
 // dial center — used as the needle's rotation pivot below
 const NEEDLE_ORIGIN = "15.5px 16.5px"
@@ -9,6 +9,8 @@ const NEEDLE_ORIGIN = "15.5px 16.5px"
 // ring, the small badge, and the needle's colored half moved to a green family; the grey dial
 // face, rose spikes, and needle's neutral half were left alone
 export function CompassLogo({ className }: { className?: string }) {
+  const reduceMotion = useReducedMotion()
+
   return (
     <svg
       width="100%"
@@ -90,7 +92,7 @@ export function CompassLogo({ className }: { className?: string }) {
           background rose/ring stay put while just the pointer wobbles */}
       <motion.g
         style={{ transformBox: "view-box", transformOrigin: NEEDLE_ORIGIN }}
-        animate={{ rotate: [0, 55, 0, -55, 0] }}
+        animate={reduceMotion ? undefined : { rotate: [0, 55, 0, -55, 0] }}
         transition={{
           duration: 6,
           times: [0, 0.25, 0.5, 0.75, 1],

@@ -22,6 +22,8 @@ export function SearchField({ search, onSearchChange }: SearchProps) {
       </InputGroupAddon>
       <InputGroupInput
         autoFocus
+        type="search"
+        enterKeyHint="search"
         value={search}
         onChange={(e) => onSearchChange(e.target.value)}
         placeholder="Search places..."

@@ -5,9 +5,10 @@ import { SquircleFuserContainer } from "@/components/SquircleFuser"
 import { ICONS } from "@/icons"
 import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shadcn/ui/tooltip"
-import type { LocationStatus } from "./useUserLocation"
+import { useInstallPrompt } from "@/utils/useInstallPrompt"
 import { SearchField, type SearchProps } from "./MapSearch"
 import { type FilterProps, TagPills } from "./MapTagFilter"
+import type { LocationStatus } from "./useUserLocation"
 
 const LOCATE_TOOLTIP_TEXT: Record<LocationStatus, string> = {
   idle: "Use my location",
@@ -31,6 +32,7 @@ export function MapControls({
     onLocate: () => void
   }) {
   const { search, activeTagIds } = props
+  const { canInstall, promptInstall } = useInstallPrompt()
 
   const popoverButtons = [
     {
@@ -109,7 +111,7 @@ export function MapControls({
                   ? OFF_CAMPUS_TEXT
                   : LOCATE_TOOLTIP_TEXT[locationStatus]
               }
-              className={isOffCampus ? "animate-wiggle" : undefined}
+              className={isOffCampus ? "motion-safe:animate-wiggle" : undefined}
             />
           </TooltipTrigger>
           <TooltipContent side="bottom" sideOffset={6}>
@@ -131,6 +133,21 @@ export function MapControls({
             About this project
           </TooltipContent>
         </Tooltip>
+
+        {canInstall && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <IconButton
+                icon={ICONS.download}
+                onClick={promptInstall}
+                aria-label="Install app"
+              />
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={6}>
+              Install app
+            </TooltipContent>
+          </Tooltip>
+        )}
       </>
     )
   }

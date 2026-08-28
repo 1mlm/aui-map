@@ -1,8 +1,8 @@
 "use client"
 
 import Image from "next/image"
-import { useState } from "react"
-import { Icon, type HugeIcon } from "@/components/Icon"
+import { useEffect, useState } from "react"
+import { type HugeIcon, Icon } from "@/components/Icon"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
 import { ICONS } from "@/icons"
 import { Button } from "@/shadcn/ui/button"
@@ -14,8 +14,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/shadcn/ui/dialog"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shadcn/ui/tooltip"
 import { cn } from "@/shadcn/utils"
+import { useNetworkStatus } from "@/utils/useNetworkStatus"
 import { SuggestionForm } from "./SuggestionForm"
+import { useSharedFeedbackDraft } from "./useSharedFeedbackDraft"
 
 const AUTHOR = {
   name: "Malik Lahlou",
@@ -55,11 +58,11 @@ function CreditTag({
     // the "About the project" paragraph sets text-indent for its own first-line indent — that
     // inherits into this flex container and, since the label is a bare text node, gets applied
     // to it as if it were its own indented line, shoving it away from the icon. Reset it here
-    "relative -my-0.5 inline-flex w-fit shrink-0 items-center gap-1.5 indent-0 whitespace-nowrap rounded-full corner-squircle bg-white/5 py-0.5 pr-3 pl-2 font-semibold text-foreground outline-none",
+    "relative -my-0.5 inline-flex w-fit shrink-0 items-center gap-1.5 indent-0 whitespace-nowrap rounded-full corner-squircle bg-foreground/5 py-0.5 pr-3 pl-2 font-semibold text-foreground outline-none",
     // only a linked tag (opens something on click) gets the hover/press affordance — the
     // MapCredit bottom line's plain author tag isn't clickable, so it shouldn't look like it is
     href &&
-      "transition-all duration-200 hover:-translate-y-2 hover:scale-105 hover:bg-white/10 focus-visible:-translate-y-2 focus-visible:scale-105 focus-visible:bg-white/10 active:-translate-y-2 active:scale-105 active:bg-white/10",
+      "transition-all duration-200 hover:-translate-y-1 hover:scale-105 hover:bg-foreground/10 focus-visible:-translate-y-1 focus-visible:scale-105 focus-visible:bg-foreground/10 active:-translate-y-1 active:scale-105 active:bg-foreground/10",
     rotation,
   )
 
@@ -108,6 +111,16 @@ export function NoticeDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const { online } = useNetworkStatus()
+  const draft = useSharedFeedbackDraft()
+
+  // a share-target hand-off should land straight in the feedback form, already open and
+  // pre-filled, rather than making someone re-open both dialogs and retype what they just shared
+  useEffect(() => {
+    if (!draft) return
+    onOpenChange(true)
+    setFeedbackOpen(true)
+  }, [draft, onOpenChange])
 
   return (
     <Dialog {...{ open, onOpenChange }}>
@@ -154,15 +167,29 @@ export function NoticeDialog({
         </DialogHeader>
 
         <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
-          <DialogTrigger asChild>
-            <Button
-              size="sm"
-              className="w-fit self-center rounded-full corner-squircle"
-            >
-              <Icon icon={ICONS.suggestions} />
-              Provide feedback
-            </Button>
-          </DialogTrigger>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              {/* span wrapper: a disabled button swallows pointer events, which would take the
+                  tooltip down with it */}
+              <span className="justify-self-center">
+                <DialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    disabled={!online}
+                    className="w-fit rounded-full corner-squircle"
+                  >
+                    <Icon icon={ICONS.suggestions} />
+                    Provide feedback
+                  </Button>
+                </DialogTrigger>
+              </span>
+            </TooltipTrigger>
+            {!online && (
+              <TooltipContent>
+                You're offline — feedback needs a connection to send
+              </TooltipContent>
+            )}
+          </Tooltip>
           <DialogContent className="corner-squircle sm:max-w-sm">
             <DialogHeader>
               <DialogTitle>Send feedback</DialogTitle>
@@ -170,7 +197,11 @@ export function NoticeDialog({
                 Report a bug or suggest something.
               </DialogDescription>
             </DialogHeader>
-            <SuggestionForm onSent={() => setFeedbackOpen(false)} />
+            <SuggestionForm
+              onSent={() => setFeedbackOpen(false)}
+              initialMessage={draft?.message}
+              initialAttachment={draft?.attachment ?? undefined}
+            />
           </DialogContent>
         </Dialog>
 

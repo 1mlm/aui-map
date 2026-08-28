@@ -24,7 +24,8 @@ import {
   positionToStyle,
   screenPointToPosition,
 } from "./geo"
-import { MapPin, type PinSizeTuning, PIN_TIP_FRACTION } from "./MapPin"
+import { MapPin, PIN_TIP_FRACTION, type PinSizeTuning } from "./MapPin"
+import { OffCampusIndicator } from "./OffCampusIndicator"
 import type { CrayonTuning } from "./tagColor"
 import type { MapItem } from "./types"
 import { type UserLocation, UserLocationMarker } from "./UserLocationMarker"
@@ -58,7 +59,7 @@ function DroppedPinMarker({ position }: { position: NormalizedPosition }) {
       }}
     >
       <span
-        className="absolute left-1/2 size-5 -translate-1/2 animate-ping rounded-full opacity-60"
+        className="absolute left-1/2 size-5 -translate-1/2 rounded-full opacity-60 motion-safe:animate-ping"
         style={{ backgroundColor: glow, top: `${(11 / 24) * 100}%` }}
       />
       <Icon
@@ -125,6 +126,7 @@ export function MapCanvas({
   selectedId,
   onSelect,
   userPosition,
+  offCampusPosition,
   compassHeading,
   compassPermission,
   onRequestCompass,
@@ -137,6 +139,7 @@ export function MapCanvas({
   selectedId: string | null
   onSelect: (id: string | null) => void
   userPosition: UserLocation["position"]
+  offCampusPosition: UserLocation["rawPosition"]
   compassHeading: number | null
   compassPermission: CompassPermission
   onRequestCompass: () => void
@@ -288,6 +291,9 @@ export function MapCanvas({
                 compassPermission={compassPermission}
                 onRequestCompass={onRequestCompass}
               />
+              {offCampusPosition && (
+                <OffCampusIndicator position={offCampusPosition} />
+              )}
               {items.map((item) => (
                 <MapPin
                   key={item.id}

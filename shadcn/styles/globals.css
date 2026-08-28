@@ -3,43 +3,79 @@
 @import "../../node_modules/shadcn/dist/tailwind.css";
 @plugin "@toolwind/corner-shape";
 
+/* light values live on bare :root, dark ones override inside a media query — deliberately NOT
+   light-dark() + `color-scheme: light dark`. lightningcss (1.32.0, as used by this Tailwind v4
+   setup) silently collapses a lone `color-scheme: light dark` declaration down to just `dark`
+   during minification, which makes light-dark() always resolve dark regardless of the system
+   preference. This is the boring, decades-old pattern instead — no build-tool exposure */
 :root {
-  color-scheme: dark;
+  color-scheme: light;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.42 0.1 152);
+  --primary-foreground: oklch(0.98 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.205 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.62 0.13 152);
+    --primary-foreground: oklch(0.15 0.02 152);
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.556 0 0);
+    --sidebar: oklch(0.205 0 0);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.556 0 0);
+  }
 }
 
 @theme inline {
-    --background: light-dark(oklch(1 0 0), oklch(0.145 0 0));
-    --foreground: light-dark(oklch(0.145 0 0), oklch(0.985 0 0));
-    --card: light-dark(oklch(1 0 0), oklch(0.205 0 0));
-    --card-foreground: light-dark(oklch(0.145 0 0), oklch(0.985 0 0));
-    --popover: light-dark(oklch(1 0 0), oklch(0.205 0 0));
-    --popover-foreground: light-dark(oklch(0.145 0 0), oklch(0.985 0 0));
-    --primary: light-dark(oklch(0.42 0.1 152), oklch(0.62 0.13 152));
-    --primary-foreground: light-dark(oklch(0.98 0 0), oklch(0.15 0.02 152));
-    --secondary: light-dark(oklch(0.97 0 0), oklch(0.269 0 0));
-    --secondary-foreground: light-dark(oklch(0.205 0 0), oklch(0.985 0 0));
-    --muted: light-dark(oklch(0.97 0 0), oklch(0.269 0 0));
-    --muted-foreground: light-dark(oklch(0.556 0 0), oklch(0.708 0 0));
-    --accent: light-dark(oklch(0.97 0 0), oklch(0.269 0 0));
-    --accent-foreground: light-dark(oklch(0.205 0 0), oklch(0.985 0 0));
-    --destructive: light-dark(oklch(0.577 0.245 27.325), oklch(0.704 0.191 22.216));
-    --border: light-dark(oklch(0.922 0 0), oklch(1 0 0 / 10%));
-    --input: light-dark(oklch(0.922 0 0), oklch(1 0 0 / 15%));
-    --ring: light-dark(oklch(0.708 0 0), oklch(0.556 0 0));
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
     --radius: 0.875rem;
-    --sidebar: light-dark(oklch(0.985 0 0), oklch(0.205 0 0));
-    --sidebar-foreground: light-dark(oklch(0.145 0 0), oklch(0.985 0 0));
-    --sidebar-primary: light-dark(oklch(0.205 0 0), oklch(0.488 0.243 264.376));
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: light-dark(oklch(0.97 0 0), oklch(0.269 0 0));
-    --sidebar-accent-foreground: light-dark(oklch(0.205 0 0), oklch(0.985 0 0));
-    --sidebar-border: light-dark(oklch(0.922 0 0), oklch(1 0 0 / 10%));
-    --sidebar-ring: light-dark(oklch(0.708 0 0), oklch(0.556 0 0));
 
     --color-background: var(--background);
     --color-foreground: var(--foreground);
@@ -177,4 +213,16 @@
 }
 .animate-wiggle {
   animation: wiggle 0.5s ease-in-out;
+}
+
+/* Windows High Contrast correctly strips this app's custom background-color, which is how most
+   of its buttons/pills communicate their own edges today (no border, just a tinted background) —
+   without an explicit border here they'd render as bare unbounded icons/text with no visible
+   click target once that background is gone */
+@media (forced-colors: active) {
+  button,
+  [role="button"],
+  .corner-squircle {
+    border: 1px solid ButtonText;
+  }
 }

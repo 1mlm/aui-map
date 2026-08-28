@@ -51,9 +51,14 @@ export const metadata: Metadata = {
   },
 }
 
-// matches the manifest's background_color/theme_color — see src/app/manifest.ts
+// the manifest's background_color/theme_color (src/app/manifest.ts) can't be conditional, so the
+// PWA splash screen always uses the dark value — this is what colors the live browser/OS chrome
+// (installed PWA title bar, mobile status bar) once the app has actually loaded and follows system theme
 export const viewport: Viewport = {
-  themeColor: "#0a0a0a",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+  ],
   width: "device-width",
   initialScale: 1,
 }

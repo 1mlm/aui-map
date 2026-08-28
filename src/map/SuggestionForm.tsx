@@ -1,7 +1,13 @@
 "use client"
 
 import { upload } from "@vercel/blob/client"
-import { type ChangeEvent, useRef, useState, useTransition } from "react"
+import {
+  type ChangeEvent,
+  type ClipboardEvent,
+  useRef,
+  useState,
+  useTransition,
+} from "react"
 import { FormError } from "@/components/FormError"
 import { Icon } from "@/components/Icon"
 import { ICONS } from "@/icons"
@@ -18,17 +24,55 @@ import { submitSuggestion } from "./suggestionActions"
 
 const SENT_FEEDBACK_MS = 2000
 
-export function SuggestionForm({ onSent }: { onSent?: () => void }) {
-  const [message, setMessage] = useState("")
-  const [file, setFile] = useState<File | null>(null)
+// either a fresh file picked in this browser (needs uploading on send) or one a share-target
+// submission already uploaded server-side (see src/app/share-target/route.ts) — nothing left to
+// do with the latter but hand its reference straight to submitSuggestion
+type PendingAttachment =
+  | { kind: "new"; file: File }
+  | { kind: "uploaded"; url: string; fileName: string; mimeType: string | null }
+
+export function SuggestionForm({
+  onSent,
+  initialMessage,
+  initialAttachment,
+}: {
+  onSent?: () => void
+  // seeded from a Web Share Target hand-off (someone shared a link/photo into the installed app)
+  initialMessage?: string
+  initialAttachment?: { url: string; fileName: string; mimeType: string | null }
+}) {
+  const [message, setMessage] = useState(initialMessage ?? "")
+  const [attachment, setAttachment] = useState<PendingAttachment | null>(
+    initialAttachment ? { kind: "uploaded", ...initialAttachment } : null,
+  )
   const [pending, startTransition] = useTransition()
   const [sent, setSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    setFile(event.target.files?.[0] ?? null)
+    const file = event.target.files?.[0]
+    setAttachment(file ? { kind: "new", file } : null)
     event.target.value = ""
+  }
+
+  // pasting a screenshot straight in is faster than "save it, then browse for it" — grabs the
+  // first image on the clipboard, if any, same as picking one through the file input
+  function handlePaste(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const imageItem = [...event.clipboardData.items].find((item) =>
+      item.type.startsWith("image/"),
+    )
+    const file = imageItem?.getAsFile()
+    if (!file) return
+    event.preventDefault()
+    setAttachment({ kind: "new", file })
+  }
+
+  function attachmentPreview() {
+    if (!attachment) return null
+    if (attachment.kind === "new")
+      return { name: attachment.file.name, mimeType: attachment.file.type }
+    return { name: attachment.fileName, mimeType: attachment.mimeType ?? "" }
   }
 
   function handleSend() {
@@ -37,30 +81,41 @@ export function SuggestionForm({ onSent }: { onSent?: () => void }) {
     startTransition(async () => {
       try {
         // uploads straight to Blob storage from the browser (bypasses the 4.5mb body limit a
-        // server action would hit), then just tells the db the file landed
-        const blob = file
-          ? await upload(`aui-map/${crypto.randomUUID()}-${file.name}`, file, {
-              access: "public",
-              handleUploadUrl: "/api/contribute/upload",
-              multipart: true,
-            })
-          : null
-        const result = await submitSuggestion(
-          message,
-          blob && file
+        // server action would hit), then just tells the db the file landed. An already-uploaded
+        // (share-target) attachment skips this — it's already sitting in Blob storage
+        const blob =
+          attachment?.kind === "new"
+            ? await upload(
+                `aui-map/${crypto.randomUUID()}-${attachment.file.name}`,
+                attachment.file,
+                {
+                  access: "public",
+                  handleUploadUrl: "/api/contribute/upload",
+                  multipart: true,
+                },
+              )
+            : null
+        const blobInfo =
+          attachment?.kind === "uploaded"
             ? {
-                url: blob.url,
-                fileName: file.name,
-                mimeType: file.type || null,
+                url: attachment.url,
+                fileName: attachment.fileName,
+                mimeType: attachment.mimeType,
               }
-            : null,
-        )
+            : blob && attachment?.kind === "new"
+              ? {
+                  url: blob.url,
+                  fileName: attachment.file.name,
+                  mimeType: attachment.file.type || null,
+                }
+              : null
+        const result = await submitSuggestion(message, blobInfo)
         if (result?.error) {
           setError(result.error)
           return
         }
         setMessage("")
-        setFile(null)
+        setAttachment(null)
         setSent(true)
         triggerConfetti()
         setTimeout(() => {
@@ -73,6 +128,8 @@ export function SuggestionForm({ onSent }: { onSent?: () => void }) {
     })
   }
 
+  const preview = attachmentPreview()
+
   return (
     <div className="flex w-72 flex-col gap-2">
       <InputGroup className="corner-squircle">
@@ -80,16 +137,21 @@ export function SuggestionForm({ onSent }: { onSent?: () => void }) {
           placeholder="Report a bug or suggest something…"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
+          onPaste={handlePaste}
+          enterKeyHint="send"
           rows={3}
         />
-        {file && (
+        {preview && (
           <InputGroupAddon align="block-start" className="border-b">
             <span className="flex w-full items-center gap-1.5 text-xs text-muted-foreground">
-              <Icon icon={iconForMimeType(file.type)} className="shrink-0" />
-              <span className="truncate">{file.name}</span>
+              <Icon
+                icon={iconForMimeType(preview.mimeType)}
+                className="shrink-0"
+              />
+              <span className="truncate">{preview.name}</span>
               <button
                 type="button"
-                onClick={() => setFile(null)}
+                onClick={() => setAttachment(null)}
                 aria-label="Remove file"
                 className="ml-auto shrink-0 rounded-full corner-squircle p-0.5 hover:bg-foreground/10"
               >

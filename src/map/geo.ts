@@ -24,14 +24,19 @@ export type NormalizedPosition = [x: number, y: number]
 // reads the "latitude, longitude" string map items store — the same text you'd copy out of
 // Google Maps, so what's in the data file is exactly what the place really is
 export function parseCoordinates(coord: string) {
-  const [latitude, longitude] = coord.split(",").map((part) => Number(part.trim()))
+  const [latitude, longitude] = coord
+    .split(",")
+    .map((part) => Number(part.trim()))
   if (Number.isNaN(latitude) || Number.isNaN(longitude))
     throw new Error(`Malformed coordinates: "${coord}"`)
   return { latitude, longitude }
 }
 
 // real coordinates -> image-relative (0-1 across the whole image), top-left origin
-export function latLongToPosition(latitude: number, longitude: number): NormalizedPosition {
+export function latLongToPosition(
+  latitude: number,
+  longitude: number,
+): NormalizedPosition {
   const { topLat, bottomLat, leftLong, rightLong } = MAP_BOUNDING_BOX
   return [
     (longitude - leftLong) / (rightLong - leftLong),
@@ -41,8 +46,14 @@ export function latLongToPosition(latitude: number, longitude: number): Normaliz
 
 // where a point on screen falls inside the map image. `imageBox` is the image's live on-screen
 // rect, which the browser has already applied the pan and zoom to, so neither shows up here
-export function screenPointToPosition(point: Point, imageBox: DOMRect): NormalizedPosition {
-  return [(point.x - imageBox.left) / imageBox.width, (point.y - imageBox.top) / imageBox.height]
+export function screenPointToPosition(
+  point: Point,
+  imageBox: DOMRect,
+): NormalizedPosition {
+  return [
+    (point.x - imageBox.left) / imageBox.width,
+    (point.y - imageBox.top) / imageBox.height,
+  ]
 }
 
 // image-relative (0-1) -> real coordinates, the exact inverse of latLongToPosition
@@ -68,11 +79,36 @@ export function formatCoordinates({
 export function isWithinCampusBounds(latitude: number, longitude: number) {
   const { topLat, bottomLat, leftLong, rightLong } = MAP_BOUNDING_BOX
   return (
-    latitude <= topLat && latitude >= bottomLat && longitude >= leftLong && longitude <= rightLong
+    latitude <= topLat &&
+    latitude >= bottomLat &&
+    longitude >= leftLong &&
+    longitude <= rightLong
   )
 }
 
 // the fraction values a NormalizedPosition holds are only ever consumed as CSS percentages
 export function positionToStyle([x, y]: NormalizedPosition) {
   return { left: `${x * 100}%`, top: `${y * 100}%` }
+}
+
+// how far from the map image's true edge the off-campus indicator sits — flush with 0/1 would
+// clip half the arrow off the image
+const EDGE_INSET = 0.045
+
+// for a real-world position outside MAP_BOUNDING_BOX: where to draw the indicator (clamped to
+// just inside the image) and which way to point it (the true bearing from that clamped point
+// back out to the real position) — the GTA5 "objective marker" treatment for a point off the map
+export function clampToMapEdge(position: NormalizedPosition) {
+  const [x, y] = position
+  const edgePosition: NormalizedPosition = [
+    Math.min(Math.max(x, EDGE_INSET), 1 - EDGE_INSET),
+    Math.min(Math.max(y, EDGE_INSET), 1 - EDGE_INSET),
+  ]
+  const dx = x - edgePosition[0]
+  const dy = y - edgePosition[1]
+  // clockwise from north (0 = up), matching the heading arrow's own rotation convention —
+  // atan2's arguments are swapped and y-negated so "north" (dx=0, dy<0) lands on 0 rather than
+  // math convention's "east"
+  const bearingDeg = (Math.atan2(dx, -dy) * (180 / Math.PI) + 360) % 360
+  return { edgePosition, bearingDeg }
 }

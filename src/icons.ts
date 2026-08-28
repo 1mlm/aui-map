@@ -65,6 +65,8 @@ import {
   Upload01Icon,
   Video01Icon,
   WashingMachineIcon,
+  WifiLowSignalIcon,
+  WifiOff01Icon,
 } from "@hugeicons/core-free-icons"
 import type { HugeIcon } from "@/components/Icon"
 
@@ -97,6 +99,8 @@ export const ICONS = {
   notice: InformationCircleIcon,
   locate: Gps02Icon,
   heading: ArrowDown02Icon,
+  offline: WifiOff01Icon,
+  slowConnection: WifiLowSignalIcon,
 
   // suggestions & contribute
   suggestions: BulbIcon,

@@ -40,7 +40,7 @@ export function UserLocationMarker({
 
   const dotChildren = (
     <>
-      <span className="absolute inset-0 animate-ping rounded-full bg-blue-500 opacity-75" />
+      <span className="absolute inset-0 rounded-full bg-blue-500 opacity-75 motion-safe:animate-ping" />
       {heading !== null && (
         // inset-0 matches the dot's own box exactly, so the default center transform-origin is
         // the dot's real center — rotating this wrapper sweeps the tip around that point at a

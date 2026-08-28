@@ -10,11 +10,13 @@ import { MapControls } from "./MapControls"
 import { MapCredit, NoticeDialog } from "./MapCredit"
 import { MapDetailPanel } from "./MapDetailPanel"
 import { DEFAULT_PIN_SIZE_TUNING, type PinSizeTuning } from "./MapPin"
+import { NetworkStatusBanner } from "./NetworkStatusBanner"
 import { DEFAULT_CRAYON_TUNING, type TagColorName } from "./tagColor"
 import type { MapItem, MapItemTag } from "./types"
 import { useAvailableSpace } from "./useAvailableSpace"
 import { useCompassHeading } from "./useCompassHeading"
 import { useHashState } from "./useHashState"
+import { useShakeGesture } from "./useShakeGesture"
 import { useUserLocation } from "./useUserLocation"
 import { useWakeLock } from "./useWakeLock"
 
@@ -65,6 +67,22 @@ export function MapExperience({
     location.requestLocation()
     if (location.position) mapCanvasRef.current?.centerOn(location.position)
   }
+
+  // a real shake is the same "get me back to where I am" intent as tapping the locate button —
+  // handy one-handed outdoors, where reaching for a tiny on-screen button while walking is
+  // more awkward than just shaking the phone. Only recenters an existing fix, never requests
+  // location itself — useUserLocation deliberately waits for an explicit tap on non-desktop
+  // instead of auto-fetching, and a jostle-triggered permission prompt would undo that
+  useShakeGesture(() => {
+    if (location.status === "granted" && location.position)
+      mapCanvasRef.current?.centerOn(location.position)
+  })
+
+  // best-effort ask not to have the offline map cache silently evicted under storage pressure —
+  // no permission prompt, browsers just grant or don't based on site engagement signals
+  useEffect(() => {
+    navigator.storage?.persist?.()
+  }, [])
 
   const [search, setSearch] = useState("")
   const [activeTagIds, setActiveTagIds] = useState<Set<string>>(new Set())
@@ -139,6 +157,7 @@ export function MapExperience({
           items={visibleItems}
           onSelect={setSelectedId}
           userPosition={location.position}
+          offCampusPosition={location.isOffCampus ? location.rawPosition : null}
           compassHeading={compass.heading}
           compassPermission={compass.permission}
           onRequestCompass={compass.requestPermission}
@@ -146,6 +165,7 @@ export function MapExperience({
         />
 
         <MapBrand />
+        <NetworkStatusBanner />
 
         <MapControls
           tags={effectiveTags}

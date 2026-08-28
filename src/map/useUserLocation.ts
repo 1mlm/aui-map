@@ -1,7 +1,15 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { isWithinCampusBounds, latLongToPosition } from "./geo"
+import {
+  isWithinCampusBounds,
+  latLongToPosition,
+  type NormalizedPosition,
+} from "./geo"
+import {
+  type LatLong,
+  watchPositionAcrossTabs,
+} from "./watchPositionAcrossTabs"
 
 export type LocationStatus = "idle" | "requesting" | "granted" | "denied"
 
@@ -18,7 +26,12 @@ function hasGrantedLocationBefore() {
 // (requestLocation) starts watching, unless this browser's granted it before, in which case
 // there's nothing left to ask permission for, so this just goes ahead and shows where they are
 export function useUserLocation() {
-  const [position, setPosition] = useState<[number, number] | null>(null)
+  const [position, setPosition] = useState<NormalizedPosition | null>(null)
+  // the same fix, but never nulled out for being off-campus -- lets the off-campus edge
+  // indicator point somewhere real instead of just knowing a boolean
+  const [rawPosition, setRawPosition] = useState<NormalizedPosition | null>(
+    null,
+  )
   const [status, setStatus] = useState<LocationStatus>("idle")
   // true once a fix has landed outside the map's own bounds -- distinct from position being
   // null, which also just means "no fix yet"
@@ -32,29 +45,23 @@ export function useUserLocation() {
       return
     }
     setStatus("requesting")
-    const watchId = navigator.geolocation.watchPosition(
-      ({ coords }) => {
-        setStatus("granted")
-        localStorage.setItem(LOCATION_GRANTED_STORAGE_KEY, "true")
-        const withinCampus = isWithinCampusBounds(
-          coords.latitude,
-          coords.longitude,
-        )
-        setIsOffCampus(!withinCampus)
-        setPosition(
-          withinCampus
-            ? latLongToPosition(coords.latitude, coords.longitude)
-            : null,
-        )
-      },
-      () => setStatus("denied"),
-      { enableHighAccuracy: true, timeout: 10_000 },
-    )
-    return () => navigator.geolocation.clearWatch(watchId)
+
+    function handlePosition({ latitude, longitude }: LatLong) {
+      setStatus("granted")
+      localStorage.setItem(LOCATION_GRANTED_STORAGE_KEY, "true")
+      const withinCampus = isWithinCampusBounds(latitude, longitude)
+      const nextPosition = latLongToPosition(latitude, longitude)
+      setIsOffCampus(!withinCampus)
+      setRawPosition(nextPosition)
+      setPosition(withinCampus ? nextPosition : null)
+    }
+
+    return watchPositionAcrossTabs(handlePosition, () => setStatus("denied"))
   }, [requested])
 
   return {
     position,
+    rawPosition,
     status,
     isOffCampus,
     requestLocation: () => setRequested(true),
