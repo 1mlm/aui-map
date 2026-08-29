@@ -18,12 +18,20 @@ Live at [auimap.ma](https://auimap.ma).
 <td><img src="docs/screenshots/mobile-detail.jpg" height="360" alt="Mobile pin detail sheet, the library"></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/zoomed-labels.jpg" height="360" alt="Pin labels appearing on zoom"></td>
-<td><img src="docs/screenshots/filtering.jpg" height="360" alt="Filtering pins by tag"></td>
+<td><img src="docs/screenshots/desktop-zoomed-labels.jpg" height="360" alt="Desktop pin labels appearing on zoom"></td>
+<td><img src="docs/screenshots/mobile-zoomed-labels.jpg" height="360" alt="Mobile pin labels appearing on zoom"></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/searching.jpg" height="360" alt="Searching for a pin"></td>
-<td><img src="docs/screenshots/location.jpg" height="360" alt="Live location on the map"></td>
+<td><img src="docs/screenshots/desktop-filtering.jpg" height="360" alt="Desktop filtering pins by tag"></td>
+<td><img src="docs/screenshots/mobile-filtering.jpg" height="360" alt="Mobile filtering pins by tag"></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/desktop-searching.jpg" height="360" alt="Desktop searching for a pin"></td>
+<td><img src="docs/screenshots/mobile-searching.jpg" height="360" alt="Mobile searching for a pin"></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/desktop-location.jpg" height="360" alt="Desktop live location on the map"></td>
+<td><img src="docs/screenshots/mobile-location.jpg" height="360" alt="Mobile live location on the map"></td>
 </tr>
 </table>
 
