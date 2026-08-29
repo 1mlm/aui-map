@@ -2,7 +2,7 @@
 
 import {
   ArrowDown01Icon,
-  ArrowUp10Icon,
+  ArrowUp01Icon,
   Cancel01Icon,
   CheckIcon,
   FilterIcon,
@@ -330,7 +330,7 @@ function TagsFilterContent<T>({
 
 // numeric columns sort with an up/down-digit icon, everything else with an A-Z/Z-A icon
 const getSortIcon = (dir: "asc" | "desc", numeric: boolean) =>
-  dir === "asc" ? (numeric ? ArrowDown01Icon : SortingAZ02Icon) : numeric ? ArrowUp10Icon : SortingZA01Icon
+  dir === "asc" ? (numeric ? ArrowDown01Icon : SortingAZ02Icon) : numeric ? ArrowUp01Icon : SortingZA01Icon
 
 function SortSubmenuContent({
   numeric,
