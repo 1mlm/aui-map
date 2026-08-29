@@ -83,6 +83,19 @@ const cornerNudgeByAlign: Partial<Record<Align, string>> = {
   "bottom-right": "translate-x-px translate-y-px",
 }
 
+// same chrome subpixel-rounding gap, but between each fuser patch and the pill it's docked
+// against — `at` always carries exactly one "*-full" token naming which pill edge the fuser
+// touches, so nudging 1.1px toward that edge closes the seam on both the pill and the outer
+// border it's meant to fuse into. Classes are written out literally (not templated) since
+// tailwind's build-time scanner can't see an arbitrary-value class assembled at runtime
+export function fuserOverlapClass(at: string): string {
+  if (at.includes("right-full")) return "translate-x-[1.1px]"
+  if (at.includes("left-full")) return "-translate-x-[1.1px]"
+  if (at.includes("top-full")) return "-translate-y-[1.1px]"
+  if (at.includes("bottom-full")) return "translate-y-[1.1px]"
+  return ""
+}
+
 // ported from o41's SquircleFuserContainer: a pill-shaped badge/bar that fuses into its
 // surroundings by squaring off the edges touching a page corner, then bridging the gap with
 // external SquircleFuser patches so the outer silhouette still reads as one smooth squircle
@@ -125,7 +138,7 @@ export function SquircleFuserContainer({
       {layout.fusers.map(({ corner, at }) => (
         <SquircleFuser
           key={`${corner}-${at}`}
-          className={cn("absolute", at)}
+          className={cn("absolute", at, fuserOverlapClass(at))}
           {...{ corner, background }}
         />
       ))}

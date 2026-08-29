@@ -5,7 +5,7 @@ import Image from "next/image"
 import { useState } from "react"
 import { Icon } from "@/components/Icon"
 import { IconButton } from "@/components/IconButton"
-import { SquircleFuser } from "@/components/SquircleFuser"
+import { fuserOverlapClass, SquircleFuser } from "@/components/SquircleFuser"
 import { DateCell } from "@/components/table/CustomTableCell"
 import { ICONS } from "@/icons"
 import {
@@ -84,7 +84,12 @@ export function MapDetailPanel({
       exit={enterFrom}
       transition={{ type: "spring", stiffness: 340, damping: 32 }}
       className={cn(
-        "absolute z-10 text-base",
+        // will-change-transform keeps this panel promoted to its own GPU compositing layer at
+        // all times, not just mid-animation — on some Android Chrome builds a layer that gets
+        // demoted once the spring settles can briefly paint behind the map's own (always-layered,
+        // transform-panned) pins until the next repaint, which read as pins floating on top of the
+        // panel until scrolling/panning forced a fresh composite
+        "absolute z-20 text-base will-change-transform",
         // no height cap here on purpose — the scrollable box below owns its own height in
         // viewport units, since a percentage cap on this auto-height wrapper wouldn't resolve
         docked ? "inset-x-0 bottom-0" : "inset-y-0 right-0 w-80",
@@ -97,22 +102,34 @@ export function MapDetailPanel({
         <>
           <SquircleFuser
             corner="bottom-left"
-            className="absolute bottom-full left-0"
+            className={cn(
+              "absolute bottom-full left-0",
+              fuserOverlapClass("bottom-full left-0"),
+            )}
           />
           <SquircleFuser
             corner="bottom-right"
-            className="absolute right-0 bottom-full"
+            className={cn(
+              "absolute right-0 bottom-full",
+              fuserOverlapClass("right-0 bottom-full"),
+            )}
           />
         </>
       ) : (
         <>
           <SquircleFuser
             corner="top-right"
-            className="absolute top-0 right-full"
+            className={cn(
+              "absolute top-0 right-full",
+              fuserOverlapClass("top-0 right-full"),
+            )}
           />
           <SquircleFuser
             corner="bottom-right"
-            className="absolute right-full bottom-0"
+            className={cn(
+              "absolute right-full bottom-0",
+              fuserOverlapClass("right-full bottom-0"),
+            )}
           />
         </>
       )}
@@ -257,10 +274,10 @@ function HeroHeading({
         "relative -mt-6 h-40 shrink-0 overflow-hidden corner-squircle text-left",
         docked
           ? "-mx-6"
-          : // only the left edge is the panel's open, fused-into-the-map side — the top-right
-            // corner sits on the frame's own rounded corner, so it needs the same radius or the
-            // frame's overflow-clip notches a chunk out of the photo there
-            "-ml-6 rounded-tl-[1em] sm:rounded-tr-[3rem]",
+          : // left edge is the panel's open, fused-into-the-map side; right edge sits on the
+            // frame's own rounded corner — both need to bleed past the panel's own p-6, or the
+            // padding leaves a gap of bare panel bg between the photo and that corner
+            "-mx-6 rounded-tl-[1em] sm:rounded-tr-[3rem]",
       )}
     >
       <Image
