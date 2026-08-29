@@ -157,6 +157,7 @@ export function MapExperience({
           items={visibleItems}
           onSelect={setSelectedId}
           userPosition={location.position}
+          userAccuracy={location.accuracy}
           offCampusPosition={location.isOffCampus ? location.rawPosition : null}
           compassHeading={compass.heading}
           compassPermission={compass.permission}

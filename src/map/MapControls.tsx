@@ -2,10 +2,9 @@
 
 import { IconButton } from "@/components/IconButton"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/Tooltip"
 import { ICONS } from "@/icons"
 import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/shadcn/ui/tooltip"
-import { useInstallPrompt } from "@/utils/useInstallPrompt"
 import { SearchField, type SearchProps } from "./MapSearch"
 import { type FilterProps, TagPills } from "./MapTagFilter"
 import type { LocationStatus } from "./useUserLocation"
@@ -14,7 +13,8 @@ const LOCATE_TOOLTIP_TEXT: Record<LocationStatus, string> = {
   idle: "Use my location",
   requesting: "Finding you…",
   granted: "Center me",
-  denied: "Location unavailable",
+  denied: "Location permission denied",
+  unavailable: "Couldn't get your location — tap to retry",
 }
 const OFF_CAMPUS_TEXT = "You're not on campus 💀??"
 
@@ -32,7 +32,6 @@ export function MapControls({
     onLocate: () => void
   }) {
   const { search, activeTagIds } = props
-  const { canInstall, promptInstall } = useInstallPrompt()
 
   const popoverButtons = [
     {
@@ -133,21 +132,6 @@ export function MapControls({
             About this project
           </TooltipContent>
         </Tooltip>
-
-        {canInstall && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <IconButton
-                icon={ICONS.download}
-                onClick={promptInstall}
-                aria-label="Install app"
-              />
-            </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={6}>
-              Install app
-            </TooltipContent>
-          </Tooltip>
-        )}
       </>
     )
   }

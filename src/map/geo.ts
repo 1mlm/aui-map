@@ -76,6 +76,25 @@ export function formatCoordinates({
   return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
 }
 
+const METERS_PER_DEGREE_LATITUDE = 111_320
+
+function metersPerDegreeLongitudeAt(latitude: number) {
+  return METERS_PER_DEGREE_LATITUDE * Math.cos((latitude * Math.PI) / 180)
+}
+
+// how big a real-world radius (in meters, e.g. GeolocationCoordinates.accuracy) is as a fraction
+// of the map image in each axis — used to size the "how sure are we" halo around the user's dot.
+// Same flat lat/long-lerp simplification MAP_BOUNDING_BOX's comment already justifies for this
+// image's scale
+export function metersToNormalizedRadius(meters: number) {
+  const { topLat, bottomLat, leftLong, rightLong } = MAP_BOUNDING_BOX
+  const centerLat = (topLat + bottomLat) / 2
+  const widthMeters =
+    (rightLong - leftLong) * metersPerDegreeLongitudeAt(centerLat)
+  const heightMeters = (topLat - bottomLat) * METERS_PER_DEGREE_LATITUDE
+  return { rx: meters / widthMeters, ry: meters / heightMeters }
+}
+
 export function isWithinCampusBounds(latitude: number, longitude: number) {
   const { topLat, bottomLat, leftLong, rightLong } = MAP_BOUNDING_BOX
   return (

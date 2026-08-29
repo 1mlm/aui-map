@@ -10,14 +10,24 @@ import {
   FullScreenIcon,
 } from "@hugeicons/core-free-icons"
 import { Icon } from "@/components/Icon"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/Tooltip"
 import { Badge } from "@/shadcn/ui/badge"
 import { Button } from "@/shadcn/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/shadcn/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/shadcn/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/shadcn/ui/tooltip"
 import { cn } from "@/shadcn/utils"
 import { getColorStyle } from "@/utils/color"
-import { formatDetailedDuration, formatExactDate, formatRelativeDate } from "@/utils/date"
+import {
+  formatDetailedDuration,
+  formatExactDate,
+  formatRelativeDate,
+} from "@/utils/date"
 import { useCopyFeedback } from "@/utils/useCopyFeedback"
 import type { CustomTableColumn, CustomTableEnumValue } from "./CustomTable"
 import { CustomTableEmptyValue } from "./CustomTableEmptyValue"
@@ -26,7 +36,10 @@ export function EnumBadge({ value }: { value: CustomTableEnumValue }) {
   const badge = (
     <Badge
       style={getColorStyle(value.color)}
-      className={cn("shadow-sm text-shadow-2xs text-shadow-black/2", value.onClick && "cursor-pointer hover:underline underline-offset-2")}
+      className={cn(
+        "shadow-sm text-shadow-2xs text-shadow-black/2",
+        value.onClick && "cursor-pointer hover:underline underline-offset-2",
+      )}
     >
       <Icon icon={value.icon} />
       {value.label}
@@ -44,7 +57,12 @@ function CopyButton({ value }: { value: string }) {
   const { copied, copy } = useCopyFeedback(1000)
 
   return (
-    <Button variant="ghost" size="icon" className="size-6" onClick={() => copy(value)}>
+    <Button
+      variant="ghost"
+      size="icon"
+      className="size-6"
+      onClick={() => copy(value)}
+    >
       <Icon icon={copied ? CheckIcon : Copy01Icon} />
     </Button>
   )
@@ -58,7 +76,12 @@ export function DateCell({ date }: { date: Date | undefined }) {
       {formatRelativeDate(date)}
       <Tooltip>
         <TooltipTrigger asChild>
-          <button type="button" className="opacity-0 group-hover/date:opacity-100 focus-visible:opacity-100 transition-opacity">
+          <button
+            type="button"
+            // touch devices have no hover state to reveal this on, so it has to default visible
+            // there instead of staying permanently invisible
+            className="opacity-0 transition-opacity group-hover/date:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+          >
             <Icon icon={Clock01Icon} className="size-3" />
           </button>
         </TooltipTrigger>
@@ -83,26 +106,50 @@ export function DateCell({ date }: { date: Date | undefined }) {
 }
 
 // keeps the start and a fixed-length tail visible, ellipsizing only the middle
-function MiddleTruncatedText({ value, monospace }: { value: string; monospace?: boolean }) {
+function MiddleTruncatedText({
+  value,
+  monospace,
+}: {
+  value: string
+  monospace?: boolean
+}) {
   const tailLength = Math.min(8, Math.floor(value.length / 3))
   const head = value.slice(0, value.length - tailLength)
   const tail = value.slice(value.length - tailLength)
 
   return (
-    <span className={cn("flex max-w-64 items-center", monospace && "font-mono text-xs")}>
-      <span className="overflow-hidden text-ellipsis whitespace-pre">{head}</span>
+    <span
+      className={cn(
+        "flex max-w-64 items-center",
+        monospace && "font-mono text-xs",
+      )}
+    >
+      <span className="overflow-hidden text-ellipsis whitespace-pre">
+        {head}
+      </span>
       <span className="shrink-0 whitespace-pre">{tail}</span>
     </span>
   )
 }
 
-function TagsCell({ tags, itemLabel }: { tags: CustomTableEnumValue[]; itemLabel: string }) {
+function TagsCell({
+  tags,
+  itemLabel,
+}: {
+  tags: CustomTableEnumValue[]
+  itemLabel: string
+}) {
   const hasOverflow = tags.length > 2
 
   return (
     <Dialog>
       <div className="relative">
-        <div className={cn("flex max-h-11 flex-wrap justify-center gap-1 overflow-hidden", hasOverflow && "max-h-14 mask-b-from-60%")}>
+        <div
+          className={cn(
+            "flex max-h-11 flex-wrap justify-center gap-1 overflow-hidden",
+            hasOverflow && "max-h-14 mask-b-from-60%",
+          )}
+        >
           {tags.map((tag) => (
             <EnumBadge key={tag.label} value={tag} />
           ))}
@@ -135,7 +182,13 @@ function TagsCell({ tags, itemLabel }: { tags: CustomTableEnumValue[]; itemLabel
   )
 }
 
-export function CustomTableCell<T>({ column, item }: { column: CustomTableColumn<T>; item: T }) {
+export function CustomTableCell<T>({
+  column,
+  item,
+}: {
+  column: CustomTableColumn<T>
+  item: T
+}) {
   if (column.type === "string") {
     const value = column.getString(item)
     if (!value) return <CustomTableEmptyValue />
@@ -143,11 +196,17 @@ export function CustomTableCell<T>({ column, item }: { column: CustomTableColumn
       column.truncate === "middle" ? (
         <MiddleTruncatedText value={value} monospace={column.monospace} />
       ) : (
-        <span className={cn(column.monospace && "font-mono text-xs")}>{value}</span>
+        <span className={cn(column.monospace && "font-mono text-xs")}>
+          {value}
+        </span>
       )
     if (!column.onClick) return content
     return (
-      <button type="button" onClick={() => column.onClick?.(item)} className="cursor-pointer hover:underline underline-offset-2">
+      <button
+        type="button"
+        onClick={() => column.onClick?.(item)}
+        className="cursor-pointer hover:underline underline-offset-2"
+      >
         {content}
       </button>
     )
@@ -169,7 +228,8 @@ export function CustomTableCell<T>({ column, item }: { column: CustomTableColumn
 
   if (column.type === "enum") {
     const value = column.getValue(item)
-    const enumValue = value !== undefined ? column.enumOptions[value] : undefined
+    const enumValue =
+      value !== undefined ? column.enumOptions[value] : undefined
     if (!enumValue) return <CustomTableEmptyValue />
     const popoverContent = column.getPopoverContent?.(item)
     if (!popoverContent) return <EnumBadge value={enumValue} />

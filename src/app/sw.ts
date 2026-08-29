@@ -6,7 +6,7 @@ import type {
   RuntimeCaching,
   SerwistGlobalConfig,
 } from "serwist"
-import { CacheFirst, Serwist } from "serwist"
+import { CacheFirst, NetworkFirst, Serwist } from "serwist"
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -24,12 +24,21 @@ const mapImageCaching: RuntimeCaching = {
   handler: new CacheFirst({ cacheName: "campus-map-image" }),
 }
 
+// the installed-app manifest icons — must stay off the generic static-image-assets cache
+// (StaleWhileRevalidate, defaultCache) so Chrome's periodic manifest-icon check actually sees
+// fresh bytes instead of a 30-day-stale copy, otherwise the OS-level "update this app?" icon
+// prompt never fires when we ship a new logo
+const manifestIconCaching: RuntimeCaching = {
+  matcher: /\/icons\/icon-.*\.png$/,
+  handler: new NetworkFirst({ cacheName: "manifest-icons" }),
+}
+
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
-  runtimeCaching: [mapImageCaching, ...defaultCache],
+  runtimeCaching: [mapImageCaching, manifestIconCaching, ...defaultCache],
   fallbacks: {
     entries: [
       {

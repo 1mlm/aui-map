@@ -4,6 +4,7 @@ import Image from "next/image"
 import { useEffect, useState } from "react"
 import { type HugeIcon, Icon } from "@/components/Icon"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/Tooltip"
 import { ICONS } from "@/icons"
 import { Button } from "@/shadcn/ui/button"
 import {
@@ -14,7 +15,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/shadcn/ui/dialog"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/shadcn/ui/tooltip"
 import { cn } from "@/shadcn/utils"
 import { useNetworkStatus } from "@/utils/useNetworkStatus"
 import { SuggestionForm } from "./SuggestionForm"
@@ -205,7 +205,7 @@ export function NoticeDialog({
           </DialogContent>
         </Dialog>
 
-        <div className="flex flex-wrap items-center justify-center gap-1.5 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-center gap-1.5 text-sm">
           Made with ❤️ by
           <CreditTag
             label={AUTHOR.name}
@@ -234,7 +234,7 @@ export function MapCredit() {
       align="bottom-center"
       superClassName="map-credit absolute bottom-0 left-1/2 -translate-x-1/2"
     >
-      <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+      <span className="flex items-center gap-1.5 text-sm">
         Made with ❤️ by
         <CreditTag
           label={AUTHOR.name}

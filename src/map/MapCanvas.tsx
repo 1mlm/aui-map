@@ -126,6 +126,7 @@ export function MapCanvas({
   selectedId,
   onSelect,
   userPosition,
+  userAccuracy,
   offCampusPosition,
   compassHeading,
   compassPermission,
@@ -139,6 +140,7 @@ export function MapCanvas({
   selectedId: string | null
   onSelect: (id: string | null) => void
   userPosition: UserLocation["position"]
+  userAccuracy: UserLocation["accuracy"]
   offCampusPosition: UserLocation["rawPosition"]
   compassHeading: number | null
   compassPermission: CompassPermission
@@ -288,6 +290,7 @@ export function MapCanvas({
               <UserLocationMarker
                 position={userPosition}
                 heading={compassHeading}
+                accuracy={userAccuracy}
                 compassPermission={compassPermission}
                 onRequestCompass={onRequestCompass}
               />
@@ -313,10 +316,12 @@ export function MapCanvas({
             </div>
           </motion.div>
 
-          {/* recesses the map behind the border and the squircle containers floating above it */}
+          {/* recesses the map behind the border and the squircle containers floating above it.
+          color comes from --map-vignette (theme-aware) rather than a flat black, so this doesn't
+          read as a hard dark ring against the containers' bg-background fusers in light mode */}
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-0 shadow-[inset_0_0_32px_8px_rgba(0,0,0,0.55)]"
+            className="pointer-events-none absolute inset-0 shadow-[inset_0_0_32px_8px_var(--color-map-vignette)]"
           />
 
           {surveyedCoord && (
