@@ -88,13 +88,20 @@ export const DEFAULT_CRAYON_TUNING: CrayonTuning = {
 // blue at full crayon chroma), making them near-duplicates of a vivid color instead of a neutral
 const ACHROMATIC_CHROMA_THRESHOLD = 0.06
 
+// tailwind writes a fully desaturated ramp as `oklch(87% 0 none)`. `none` is a real css keyword for
+// "no hue", not a broken value, but reading it as a number gives NaN — and NaN loses every
+// comparison, so the achromatic check below silently failed and neutrals got built into an invalid
+// `oklch(80% 0.25 NaN)`, which svg paints as black
+const oklchComponent = (raw?: string) =>
+  raw && raw !== "none" ? Number(raw) : 0
+
 function parseOklch(value: string) {
   const [, lightness, chroma, hue] =
-    value.match(/oklch\(([\d.]+)%\s+([\d.]+)\s+([\d.]+)/) ?? []
+    value.match(/oklch\(([\d.]+|none)%?\s+([\d.]+|none)\s+([\d.]+|none)/) ?? []
   return {
-    lightness: Number(lightness),
-    chroma: Number(chroma),
-    hue: Number(hue),
+    lightness: oklchComponent(lightness),
+    chroma: oklchComponent(chroma),
+    hue: oklchComponent(hue),
   }
 }
 
