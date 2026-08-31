@@ -165,3 +165,21 @@ model Suggestion {
   submittedAt DateTime @default(now())
   resolved    Boolean  @default(false)
 }
+
+// a wide flat photo of campus placed at a coordinate, deliberately not attached to a Pin —
+// panoramas are about the space between buildings, so forcing an owner pin would misfile them.
+// Flat, not 360, so there's no viewer dependency: it's a horizontally scrollable image
+model Panorama {
+  uuid      String   @id @default(uuid())
+  url       String
+  // small standin loaded with the map; the full file only downloads when someone opens one
+  thumbnailUrl String
+  caption   String?
+  // which way the camera was facing, in degrees clockwise from north. Flat panoramas don't need
+  // it to render — it's stored because it's impossible to recover later if it isn't captured now
+  heading   Float?
+  latitude  Float
+  longitude Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

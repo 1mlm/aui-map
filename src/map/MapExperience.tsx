@@ -14,7 +14,7 @@ import { DEFAULT_PIN_SIZE_TUNING, type PinSizeTuning } from "./MapPin"
 import { MapFilterBar } from "./MapTagFilter"
 import { NetworkStatusBanner } from "./NetworkStatusBanner"
 import { DEFAULT_CRAYON_TUNING, type TagColorName } from "./tagColor"
-import type { MapItem, MapItemTag } from "./types"
+import type { MapItem, MapItemTag, MapPanorama } from "./types"
 import { useAvailableSpace } from "./useAvailableSpace"
 import { useCompassHeading } from "./useCompassHeading"
 import { useHashState } from "./useHashState"
@@ -51,9 +51,11 @@ const ZERO_RESULT_SEARCH_TRACK_DELAY_MS = 800
 export function MapExperience({
   items,
   tags,
+  panoramas,
 }: {
   items: MapItem[]
   tags: MapItemTag[]
+  panoramas: MapPanorama[]
 }) {
   const shellRef = useRef<HTMLDivElement>(null)
   const mapCanvasRef = useRef<MapCanvasHandle>(null)
@@ -169,7 +171,7 @@ export function MapExperience({
           compassHeading={compass.heading}
           compassPermission={compass.permission}
           onRequestCompass={compass.requestPermission}
-          {...{ selectedId, hoveredTagId, tuning, sizeTuning }}
+          {...{ selectedId, hoveredTagId, tuning, sizeTuning, panoramas }}
         />
 
         <MapBrand />

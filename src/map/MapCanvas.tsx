@@ -25,9 +25,10 @@ import {
   screenPointToPosition,
 } from "./geo"
 import { MapPin, PIN_TIP_FRACTION, type PinSizeTuning } from "./MapPin"
+import { PanoramaLayer } from "./PanoramaLayer"
 import { OffCampusIndicator } from "./OffCampusIndicator"
 import type { CrayonTuning } from "./tagColor"
-import type { MapItem } from "./types"
+import type { MapItem, MapPanorama } from "./types"
 import { type UserLocation, UserLocationMarker } from "./UserLocationMarker"
 import type { CompassPermission } from "./useCompassHeading"
 import { useMapPanZoom } from "./useMapPanZoom"
@@ -134,6 +135,7 @@ export function MapCanvas({
   hoveredTagId,
   tuning,
   sizeTuning,
+  panoramas,
   ref,
 }: {
   items: MapItem[]
@@ -150,6 +152,7 @@ export function MapCanvas({
   tuning?: CrayonTuning
   // only ever overridden by the dev-only PinTuningPlayground — real visitors always get the default
   sizeTuning?: PinSizeTuning
+  panoramas: MapPanorama[]
   ref?: React.Ref<MapCanvasHandle>
 }) {
   const panZoom = useMapPanZoom()
@@ -310,6 +313,7 @@ export function MapCanvas({
                   {...{ item, tuning, sizeTuning }}
                 />
               ))}
+              <PanoramaLayer viewportScale={panZoom.scale} {...{ panoramas }} />
               {contextMenuPosition && (
                 <DroppedPinMarker position={contextMenuPosition} />
               )}

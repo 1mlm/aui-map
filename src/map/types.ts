@@ -55,3 +55,13 @@ export type MapItem = {
   underConstruction: boolean
   updatedAt: Date
 }
+
+// a wide flat photo placed at a coordinate, with no owning pin — see Panorama in the schema
+export type MapPanorama = {
+  uuid: string
+  url: string
+  thumbnailUrl: string
+  caption: string | null
+  latitude: number
+  longitude: number
+}
