@@ -1,25 +1,41 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { IconButton } from "@/components/IconButton"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/Tooltip"
 import { ICONS } from "@/icons"
 import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover"
 import { SearchField, type SearchProps } from "./MapSearch"
 import { type FilterProps, TagPills } from "./MapTagFilter"
 import type { LocationStatus } from "./useUserLocation"
 
-const LOCATE_TOOLTIP_TEXT: Record<LocationStatus, string> = {
-  idle: "Use my location",
-  requesting: "Finding you…",
-  granted: "Center me",
-  denied: "Location permission denied",
-  unavailable: "Couldn't get your location — tap to retry",
+const LOCATE_LABEL: Record<LocationStatus, string> = {
+  idle: "Locate",
+  requesting: "Finding…",
+  granted: "Center",
+  denied: "No access",
+  unavailable: "Retry",
 }
 const OFF_CAMPUS_TEXT = "You're not on campus 💀??"
 
+type MapControl = {
+  id: string
+  icon: (typeof ICONS)[keyof typeof ICONS]
+  label: string
+  active?: boolean
+  badgeCount?: number
+  iconClassName?: string
+  className?: string
+  onClick?: () => void
+  popover?: { className: string; content: ReactNode }
+  // the roomy layout already has a permanent filter bar docked along the bottom, so its copy of
+  // the filter button would be a second control for something already on screen
+  compactOnly?: boolean
+}
+
 export function MapControls({
   onOpenNotice,
+  onOpenContribute,
   locationStatus,
   isOffCampus,
   onLocate,
@@ -27,113 +43,106 @@ export function MapControls({
 }: SearchProps &
   FilterProps & {
     onOpenNotice: () => void
+    onOpenContribute: () => void
     locationStatus: LocationStatus
     isOffCampus: boolean
     onLocate: () => void
   }) {
   const { search, activeTagIds } = props
 
-  const popoverButtons = [
+  const controls: MapControl[] = [
     {
       id: "search",
       icon: ICONS.search,
       label: "Search",
-      active: search.length > 0 || activeTagIds.size > 0,
+      active: search.length > 0,
+      popover: {
+        className: "flex w-80 flex-col gap-2.5",
+        content: <SearchField {...props} />,
+      },
+    },
+    {
+      id: "filter",
+      icon: ICONS.filter,
+      label: "Filter",
+      active: activeTagIds.size > 0,
       badgeCount: activeTagIds.size,
-      contentClassName: "flex w-80 flex-col gap-2.5",
-      content: (
-        <>
-          <SearchField {...props} />
-          <div className="flex flex-wrap gap-1.5">
-            <TagPills {...props} />
-          </div>
-        </>
-      ),
+      compactOnly: true,
+      popover: {
+        className: "flex w-72 flex-wrap gap-1.5",
+        content: <TagPills {...props} />,
+      },
+    },
+    {
+      id: "locate",
+      icon: locationStatus === "requesting" ? ICONS.loading : ICONS.locate,
+      label: isOffCampus ? "Off campus" : LOCATE_LABEL[locationStatus],
+      active: locationStatus === "granted",
+      iconClassName:
+        locationStatus === "requesting" ? "animate-spin" : undefined,
+      className: isOffCampus ? "motion-safe:animate-wiggle" : undefined,
+      onClick: onLocate,
+    },
+    {
+      id: "contribute",
+      icon: ICONS.contributeMenu,
+      label: "Contribute",
+      onClick: onOpenContribute,
+    },
+    {
+      id: "about",
+      icon: ICONS.notice,
+      label: "About",
+      onClick: onOpenNotice,
     },
   ]
 
-  function renderButtons() {
-    return (
-      <>
-        {popoverButtons.map(
-          ({
-            id,
-            icon,
-            label,
-            active,
-            badgeCount,
-            contentClassName,
-            content,
-          }) => (
+  function renderControls(compact: boolean) {
+    return controls
+      .filter((control) => compact || !control.compactOnly)
+      .map(
+        ({
+          id,
+          icon,
+          label,
+          active,
+          badgeCount,
+          iconClassName,
+          className,
+          onClick,
+          popover,
+        }) => {
+          const button = (
+            <IconButton
+              aria-label={
+                id === "locate" && isOffCampus ? OFF_CAMPUS_TEXT : label
+              }
+              tone={active ? "primary" : "subtle"}
+              {...{ icon, label, iconClassName, className, onClick }}
+            />
+          )
+
+          return (
             <span key={id} className="relative">
-              <Popover>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <PopoverTrigger asChild>
-                      <IconButton
-                        aria-label={label}
-                        tone={active ? "primary" : "subtle"}
-                        {...{ icon }}
-                      />
-                    </PopoverTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" sideOffset={6}>
-                    {label}
-                  </TooltipContent>
-                </Tooltip>
-                <PopoverContent className={contentClassName}>
-                  {content}
-                </PopoverContent>
-              </Popover>
-              {badgeCount > 0 && (
+              {popover ? (
+                <Popover>
+                  <PopoverTrigger asChild>{button}</PopoverTrigger>
+                  <PopoverContent className={popover.className}>
+                    {popover.content}
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                button
+              )}
+              {Boolean(badgeCount) && (
                 <span className="pointer-events-none absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground ring-2 ring-background">
                   {badgeCount}
                 </span>
               )}
             </span>
-          ),
-        )}
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <IconButton
-              icon={
-                locationStatus === "requesting" ? ICONS.loading : ICONS.locate
-              }
-              iconClassName={
-                locationStatus === "requesting" ? "animate-spin" : undefined
-              }
-              onClick={onLocate}
-              tone={locationStatus === "granted" ? "primary" : "subtle"}
-              aria-label={
-                isOffCampus
-                  ? OFF_CAMPUS_TEXT
-                  : LOCATE_TOOLTIP_TEXT[locationStatus]
-              }
-              className={isOffCampus ? "motion-safe:animate-wiggle" : undefined}
-            />
-          </TooltipTrigger>
-          <TooltipContent side="bottom" sideOffset={6}>
-            {isOffCampus
-              ? OFF_CAMPUS_TEXT
-              : LOCATE_TOOLTIP_TEXT[locationStatus]}
-          </TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <IconButton
-              icon={ICONS.notice}
-              onClick={onOpenNotice}
-              aria-label="About this project"
-            />
-          </TooltipTrigger>
-          <TooltipContent side="bottom" sideOffset={6}>
-            About this project
-          </TooltipContent>
-        </Tooltip>
-      </>
-    )
+          )
+        },
+      )
   }
 
   // both variants render unconditionally; which one is actually visible is decided by a CSS
@@ -142,16 +151,16 @@ export function MapControls({
   // flashing the wrong one while JS boots up
   return (
     <>
-      <div className="map-controls-compact pointer-events-auto absolute top-4 left-1/2 flex -translate-x-1/2 items-center justify-center gap-2.5 rounded-full corner-squircle bg-background px-4 py-2.5 drop-shadow-lg drop-shadow-black/40">
-        {renderButtons()}
+      <div className="map-controls-compact pointer-events-auto absolute top-4 left-1/2 flex -translate-x-1/2 items-center justify-center gap-1.5 rounded-3xl corner-squircle bg-background px-3 py-2 drop-shadow-lg drop-shadow-black/40">
+        {renderControls(true)}
       </div>
 
       <SquircleFuserContainer
         align="top-right"
         superClassName="map-controls-full pointer-events-auto absolute top-0 right-0"
-        className="gap-2"
+        className="gap-1.5"
       >
-        {renderButtons()}
+        {renderControls(false)}
       </SquircleFuserContainer>
     </>
   )

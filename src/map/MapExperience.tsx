@@ -5,11 +5,13 @@ import { AnimatePresence } from "motion/react"
 import dynamic from "next/dynamic"
 import { useEffect, useRef, useState } from "react"
 import { MapBrand } from "./MapBrand"
+import { ContributeDialog } from "./ContributeDialog"
 import { MapCanvas, type MapCanvasHandle } from "./MapCanvas"
 import { MapControls } from "./MapControls"
-import { MapCredit, NoticeDialog } from "./MapCredit"
-import { MapDetailPanel } from "./MapDetailPanel"
+import { NoticeDialog } from "./MapCredit"
+import { MapDetailPanel, UNDOCKED_PANEL_WIDTH } from "./MapDetailPanel"
 import { DEFAULT_PIN_SIZE_TUNING, type PinSizeTuning } from "./MapPin"
+import { MapFilterBar } from "./MapTagFilter"
 import { NetworkStatusBanner } from "./NetworkStatusBanner"
 import { DEFAULT_CRAYON_TUNING, type TagColorName } from "./tagColor"
 import type { MapItem, MapItemTag } from "./types"
@@ -88,6 +90,7 @@ export function MapExperience({
   const [activeTagIds, setActiveTagIds] = useState<Set<string>>(new Set())
   const [hoveredTagId, setHoveredTagId] = useState<string | null>(null)
   const [noticeOpen, setNoticeOpen] = useState(false)
+  const [contributeOpen, setContributeOpen] = useState(false)
   // in the url hash so a place can be linked to directly: /#m6l
   const [selectedId, setSelectedId] = useHashState()
 
@@ -178,6 +181,7 @@ export function MapExperience({
           onSearchChange={setSearch}
           onHoverTag={setHoveredTagId}
           onOpenNotice={() => setNoticeOpen(true)}
+          onOpenContribute={() => setContributeOpen(true)}
           locationStatus={location.status}
           isOffCampus={location.isOffCampus}
           onLocate={handleLocate}
@@ -194,8 +198,20 @@ export function MapExperience({
           )}
         </AnimatePresence>
 
-        <MapCredit />
+        <MapFilterBar
+          reservedRight={
+            selected && !space.docksPanel ? UNDOCKED_PANEL_WIDTH : "0rem"
+          }
+          tags={effectiveTags}
+          onToggle={toggleTag}
+          onHoverTag={setHoveredTagId}
+          {...{ activeTagIds, hoveredTagId }}
+        />
         <NoticeDialog open={noticeOpen} onOpenChange={setNoticeOpen} />
+        <ContributeDialog
+          open={contributeOpen}
+          onOpenChange={setContributeOpen}
+        />
       </div>
 
       {LEVA_PLAYGROUND_ENABLED && process.env.NODE_ENV === "development" && (

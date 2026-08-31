@@ -80,17 +80,37 @@ enum SubmissionStatus {
   REJECTED
 }
 
+// what a visitor was actually trying to contribute. Everything used to be an ATTACHMENT because
+// a file for an existing pin was the only thing the UI could send — the other three arrive from
+// the contribute picker, and each one leaves a different set of columns empty
+enum SubmissionKind {
+  ATTACHMENT
+  PANORAMA
+  NEW_PIN
+  PIN_EDIT
+}
+
 // a visitor-contributed file for a pin — a photo, but also a video, a menu PDF, a floor plan,
 // a spreadsheet, whatever. Approving one promotes it into that pin's Attachment gallery, typed
 // and rendered per its mimeType
 model Submission {
   id          String           @id @default(cuid())
-  pinId       String
-  pin         Pin              @relation(fields: [pinId], references: [uuid], onDelete: Cascade)
-  fileUrl     String
-  fileName    String
-  mimeType    String
+  kind        SubmissionKind   @default(ATTACHMENT)
+  // null for a NEW_PIN, which is a request for a pin that doesn't exist yet
+  pinId       String?
+  pin         Pin?             @relation(fields: [pinId], references: [uuid], onDelete: Cascade)
+  // null for the text-only kinds (NEW_PIN, PIN_EDIT) — those carry `message` instead
+  fileUrl     String?
+  fileName    String?
+  mimeType    String?
   caption     String?
+  // what the contributor wrote: the pitch for a new pin, or what's wrong with an existing one
+  message     String?
+  // where a NEW_PIN or PANORAMA should sit. Kept off the Pin/Panorama tables until an admin
+  // approves it, so an unreviewed guess never shows up on the map
+  latitude    Float?
+  longitude   Float?
+  title       String?
   status      SubmissionStatus @default(PENDING)
   submittedAt DateTime         @default(now())
   reviewedAt  DateTime?

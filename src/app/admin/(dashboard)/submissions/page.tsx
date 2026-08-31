@@ -14,12 +14,17 @@ export default async function AdminSubmissionsPage() {
 
   const submissions: PendingSubmission[] = submissionRows.map((submission) => ({
     id: submission.id,
+    kind: submission.kind,
     fileUrl: submission.fileUrl,
     fileName: submission.fileName,
     mimeType: submission.mimeType,
     caption: submission.caption,
+    message: submission.message,
+    title: submission.title,
+    latitude: submission.latitude,
+    longitude: submission.longitude,
     pinId: submission.pinId,
-    pinTitle: submission.pin.title,
+    pinTitle: submission.pin?.title ?? null,
     submittedAt: submission.submittedAt.toISOString(),
   }))
 

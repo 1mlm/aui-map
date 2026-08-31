@@ -8,6 +8,7 @@ import { IconButton } from "@/components/IconButton"
 import { fuserOverlapClass, SquircleFuser } from "@/components/SquircleFuser"
 import { DateCell } from "@/components/table/CustomTableCell"
 import { ICONS } from "@/icons"
+import { Button } from "@/shadcn/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +35,11 @@ const DOCKED_COLLAPSED_HEIGHT = "60vh"
 const DOCKED_EXPANDED_HEIGHT = "92vh"
 const DRAG_TOGGLE_THRESHOLD_PX = 60
 const DRAG_DISMISS_THRESHOLD_PX = 100
+
+// the side panel's width when it docks to the right edge. Shared because the bottom filter bar
+// has to shrink out from under it — a bar that keeps centering on the whole shell ends up with
+// half of itself, and one of its fuser patches, hidden behind the panel
+export const UNDOCKED_PANEL_WIDTH = "20rem"
 
 export function MapDetailPanel({
   item,
@@ -83,6 +89,7 @@ export function MapDetailPanel({
       animate={restingAt}
       exit={enterFrom}
       transition={{ type: "spring", stiffness: 340, damping: 32 }}
+      style={docked ? undefined : { width: UNDOCKED_PANEL_WIDTH }}
       className={cn(
         // will-change-transform keeps this panel promoted to its own GPU compositing layer at
         // all times, not just mid-animation — on some Android Chrome builds a layer that gets
@@ -92,7 +99,7 @@ export function MapDetailPanel({
         "absolute z-20 text-base will-change-transform",
         // no height cap here on purpose — the scrollable box below owns its own height in
         // viewport units, since a percentage cap on this auto-height wrapper wouldn't resolve
-        docked ? "inset-x-0 bottom-0" : "inset-y-0 right-0 w-80",
+        docked ? "inset-x-0 bottom-0" : "inset-y-0 right-0",
       )}
     >
       {/* patches on the outside of the panel's one open edge — the left edge undocked, the top
@@ -153,6 +160,7 @@ export function MapDetailPanel({
             : "100%",
         }}
         transition={{ type: "spring", stiffness: 340, damping: 32 }}
+      style={docked ? undefined : { width: UNDOCKED_PANEL_WIDTH }}
         className={cn(
           // radius matches the fuser patches' 1em fillet, so their arcs meet — the panel itself
           // stays square on its open edge, same trick both docked and undocked. max-height (not
@@ -205,8 +213,16 @@ export function MapDetailPanel({
         <AttachmentStrip
           attachments={item.attachments}
           onOpen={setOpenAttachmentIndex}
-          onAdd={() => setContributeOpen(true)}
         />
+
+        <Button
+          variant="outline"
+          className="w-full rounded-full corner-squircle"
+          onClick={() => setContributeOpen(true)}
+        >
+          <Icon icon={ICONS.contributeMenu} />
+          Contribute
+        </Button>
 
         <div className="mt-auto flex flex-col gap-1.5">
           <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
@@ -226,8 +242,7 @@ export function MapDetailPanel({
       )}
 
       <ContributeDialog
-        pinId={item.id}
-        pinTitle={item.title}
+        pin={{ id: item.id, title: item.title }}
         open={contributeOpen}
         onOpenChange={setContributeOpen}
       />

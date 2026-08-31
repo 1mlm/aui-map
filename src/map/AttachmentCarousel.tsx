@@ -36,15 +36,17 @@ function StripTile({ attachment }: { attachment: MapItemAttachment }) {
   )
 }
 
+// display only — contributing a file is one of the cards in ContributeDialog now, reached from
+// the panel's own Contribute button, so this no longer carries a dropper of its own
 export function AttachmentStrip({
   attachments,
   onOpen,
-  onAdd,
 }: {
   attachments: MapItemAttachment[]
   onOpen: (index: number) => void
-  onAdd: () => void
 }) {
+  if (attachments.length === 0) return null
+
   return (
     <div className="flex flex-col gap-2">
       <span className="flex items-center gap-1.5 text-xs font-medium opacity-60">
@@ -52,40 +54,18 @@ export function AttachmentStrip({
         Files
       </span>
 
-      {attachments.length === 0 ? (
-        <button
-          type="button"
-          onClick={onAdd}
-          className="flex flex-col items-center justify-center gap-1.5 rounded-2xl corner-squircle border border-dashed border-border py-6 text-muted-foreground transition-colors hover:bg-foreground/10"
-        >
-          <Icon icon={ICONS.contribute} className="size-6" />
-          <span className="text-sm">Contribute a media file</span>
-        </button>
-      ) : (
-        <div className={cn("flex gap-2 overflow-x-auto py-1", HIDE_SCROLLBAR)}>
-          {attachments.map((attachment, index) => (
-            <button
-              key={attachment.id}
-              type="button"
-              onClick={() => onOpen(index)}
-              className="relative size-16 shrink-0 overflow-hidden rounded-xl corner-squircle ring-1 ring-border transition-transform hover:scale-105"
-            >
-              <StripTile {...{ attachment }} />
-            </button>
-          ))}
-          {/* not ICONS.add — this doesn't add a file directly like the admin gallery does, it
-              opens ContributeDialog, which sends the file for review. FileAddIcon (the same glyph
-              the standalone contribute button elsewhere uses) reads as "suggest a file" instead */}
+      <div className={cn("flex gap-2 overflow-x-auto py-1", HIDE_SCROLLBAR)}>
+        {attachments.map((attachment, index) => (
           <button
+            key={attachment.id}
             type="button"
-            onClick={onAdd}
-            aria-label="Contribute a file"
-            className="flex size-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl corner-squircle border border-dashed border-border text-muted-foreground transition-colors hover:bg-foreground/10"
+            onClick={() => onOpen(index)}
+            className="relative size-16 shrink-0 overflow-hidden rounded-xl corner-squircle ring-1 ring-border transition-transform hover:scale-105"
           >
-            <Icon icon={ICONS.contribute} className="size-5" />
+            <StripTile {...{ attachment }} />
           </button>
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   )
 }

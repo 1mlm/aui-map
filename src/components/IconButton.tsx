@@ -22,6 +22,7 @@ const sizeClasses = {
 
 export function IconButton({
   icon,
+  label,
   tone = "subtle",
   size = "md",
   iconClassName,
@@ -30,6 +31,10 @@ export function IconButton({
   ...props
 }: ComponentProps<"button"> & {
   icon: HugeIcon
+  // when set, the button grows a caption under its glyph instead of staying a bare square. A
+  // glyph alone asks people to guess; the word under it means they don't have to, and it costs
+  // one line of height rather than a tooltip they'd have to hover to discover
+  label?: string
   tone?: keyof typeof toneClasses
   size?: keyof typeof sizeClasses
   iconClassName?: string
@@ -40,7 +45,9 @@ export function IconButton({
       className={cn(
         "flex items-center justify-center rounded-full corner-squircle transition-colors",
         toneClasses[tone],
-        sizeClasses[size],
+        label
+          ? "min-w-14 flex-col gap-0.5 rounded-2xl px-2 py-1.5"
+          : sizeClasses[size],
         className,
       )}
       onClick={(e) => {
@@ -50,6 +57,9 @@ export function IconButton({
       {...props}
     >
       <Icon {...{ icon }} className={iconClassName} />
+      {label && (
+        <span className="text-[0.65rem] leading-none font-medium">{label}</span>
+      )}
     </button>
   )
 }

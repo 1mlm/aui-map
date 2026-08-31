@@ -1,0 +1,13 @@
+-- CreateEnum
+CREATE TYPE "SubmissionKind" AS ENUM ('ATTACHMENT', 'PANORAMA', 'NEW_PIN', 'PIN_EDIT');
+
+-- AlterTable
+ALTER TABLE "Submission" ADD COLUMN     "kind" "SubmissionKind" NOT NULL DEFAULT 'ATTACHMENT',
+ADD COLUMN     "latitude" DOUBLE PRECISION,
+ADD COLUMN     "longitude" DOUBLE PRECISION,
+ADD COLUMN     "message" TEXT,
+ADD COLUMN     "title" TEXT,
+ALTER COLUMN "pinId" DROP NOT NULL,
+ALTER COLUMN "fileUrl" DROP NOT NULL,
+ALTER COLUMN "fileName" DROP NOT NULL,
+ALTER COLUMN "mimeType" DROP NOT NULL;

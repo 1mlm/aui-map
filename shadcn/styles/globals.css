@@ -173,7 +173,7 @@
 
 .map-brand,
 .map-controls-full,
-.map-credit {
+.map-filter-bar {
   display: none !important;
 }
 
@@ -188,7 +188,7 @@
     display: none !important;
   }
   .map-controls-full,
-  .map-credit {
+  .map-filter-bar {
     display: block !important;
   }
 }

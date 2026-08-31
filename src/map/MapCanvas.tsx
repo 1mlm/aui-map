@@ -326,8 +326,8 @@ export function MapCanvas({
 
           {surveyedCoord && (
             <SquircleFuserContainer
-              align="bottom-center"
-              superClassName="absolute bottom-0 left-1/2 -translate-x-1/2"
+              align="bottom-left"
+              superClassName="absolute bottom-0 left-0"
               className="gap-2 text-sm"
             >
               <Icon icon={ICONS.copy} className="text-muted-foreground" />
