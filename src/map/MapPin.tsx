@@ -62,6 +62,17 @@ export type PinSizeTuning = {
   // little see-through keeps the buildings/paths underneath legible without the pin itself
   // reading as faded or broken
   pinOpacity: number
+  // deliberately hairline: the pin's outline and the icon inside it are the same dark color, so a
+  // heavy teardrop edge competes with the glyph for attention instead of framing it. Thin enough
+  // to read as a rim around the fill, not as a shape of its own
+  pinStrokeWidth: number
+  // the tag icon drawn inside the pin head, as a fraction of the pin's own box. The teardrop
+  // narrows fast below its widest point, so anything much past this pokes its corners out
+  // through the outline
+  innerIconFraction: number
+  // heavier than the pin outline's own 1.8 on purpose — hugeicons' free set is stroke-only (no
+  // solid variants), so at ~11px the default weight dissolves into the fill
+  innerIconStrokeWidth: number
 }
 
 export const DEFAULT_PIN_SIZE_TUNING: PinSizeTuning = {
@@ -73,6 +84,9 @@ export const DEFAULT_PIN_SIZE_TUNING: PinSizeTuning = {
   labelStrokeWidth: 3.2,
   labelGapPx: 4,
   pinOpacity: 0.9,
+  pinStrokeWidth: 0.75,
+  innerIconFraction: 0.42,
+  innerIconStrokeWidth: 2.4,
 }
 
 const LABEL_MONO_FONT_STACK =
@@ -261,7 +275,7 @@ export function MapPin({
         <Icon
           icon={ICONS.pin}
           {...{ fill }}
-          strokeWidth={1.8}
+          strokeWidth={sizeTuning.pinStrokeWidth}
           style={{
             // the stroke follows currentColor, and color-mix() only parses reliably as a css
             // property — as hugeicons' `color` svg attribute it can silently fall back
@@ -274,6 +288,29 @@ export function MapPin({
             height: sizeTuning.pinBaseSizePx,
           }}
           className="pin-filter relative block"
+        />
+        {/* the tag's own icon, sitting in the head rather than the middle of the box — the
+            teardrop's round part is the top half, so PIN_HEAD_FRACTION (the same anchor the glow
+            and the label already use) is where "centered" actually looks centered. Dark outline
+            color on the light crayon fill, which is the strongest contrast pair the tag already
+            has. Not inside the <Icon> above because that one carries the selection drop-shadow,
+            and a glow around the pin shouldn't also bloom around the glyph inside it */}
+        <Icon
+          icon={item.tag.icon}
+          aria-hidden
+          strokeWidth={sizeTuning.innerIconStrokeWidth}
+          style={{
+            color: outline,
+            left: "50%",
+            top: `${PIN_HEAD_FRACTION * 100}%`,
+            transform: "translate(-50%, -50%)",
+            opacity: item.underConstruction
+              ? UNDER_CONSTRUCTION_OPACITY
+              : sizeTuning.pinOpacity,
+            width: sizeTuning.pinBaseSizePx * sizeTuning.innerIconFraction,
+            height: sizeTuning.pinBaseSizePx * sizeTuning.innerIconFraction,
+          }}
+          className="pointer-events-none absolute block"
         />
       </motion.button>
       {/* zoomed-in-only name label, Google Maps-style — white text with a soft dark halo instead

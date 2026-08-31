@@ -56,7 +56,7 @@ export function AttachmentStrip({
         <button
           type="button"
           onClick={onAdd}
-          className="flex flex-col items-center justify-center gap-1.5 rounded-2xl corner-squircle border border-dashed border-white/15 py-6 text-muted-foreground transition-colors hover:bg-foreground/10"
+          className="flex flex-col items-center justify-center gap-1.5 rounded-2xl corner-squircle border border-dashed border-border py-6 text-muted-foreground transition-colors hover:bg-foreground/10"
         >
           <Icon icon={ICONS.contribute} className="size-6" />
           <span className="text-sm">Contribute a media file</span>
@@ -68,7 +68,7 @@ export function AttachmentStrip({
               key={attachment.id}
               type="button"
               onClick={() => onOpen(index)}
-              className="relative size-16 shrink-0 overflow-hidden rounded-xl corner-squircle ring-1 ring-white/10 transition-transform hover:scale-105"
+              className="relative size-16 shrink-0 overflow-hidden rounded-xl corner-squircle ring-1 ring-border transition-transform hover:scale-105"
             >
               <StripTile {...{ attachment }} />
             </button>
@@ -80,7 +80,7 @@ export function AttachmentStrip({
             type="button"
             onClick={onAdd}
             aria-label="Contribute a file"
-            className="flex size-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl corner-squircle border border-dashed border-white/20 text-muted-foreground transition-colors hover:bg-foreground/10"
+            className="flex size-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl corner-squircle border border-dashed border-border text-muted-foreground transition-colors hover:bg-foreground/10"
           >
             <Icon icon={ICONS.contribute} className="size-5" />
           </button>

@@ -83,6 +83,32 @@ export function PinTuningPlayground({
       label: "pin opacity",
       onChange: (pinOpacity: number) => onTuningChange({ pinOpacity }),
     },
+    pinStrokeWidth: {
+      value: tuning.pinStrokeWidth,
+      min: 0,
+      max: 4,
+      step: 0.05,
+      label: "pin outline width",
+      onChange: (pinStrokeWidth: number) => onTuningChange({ pinStrokeWidth }),
+    },
+    innerIconFraction: {
+      value: tuning.innerIconFraction,
+      min: 0,
+      max: 0.8,
+      step: 0.01,
+      label: "tag icon size",
+      onChange: (innerIconFraction: number) =>
+        onTuningChange({ innerIconFraction }),
+    },
+    innerIconStrokeWidth: {
+      value: tuning.innerIconStrokeWidth,
+      min: 0.5,
+      max: 6,
+      step: 0.1,
+      label: "tag icon weight",
+      onChange: (innerIconStrokeWidth: number) =>
+        onTuningChange({ innerIconStrokeWidth }),
+    },
   })
 
   // the implicit auto-mounted panel leva spawns from useControls alone uses its default theme

@@ -320,7 +320,6 @@ const rawMapItems: {
     title: "B57",
     tag: "unknownHousing",
     coord: "33.542751, -5.106217",
-    underConstruction: true,
   },
   {
     id: "atm",

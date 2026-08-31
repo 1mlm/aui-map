@@ -148,9 +148,13 @@ export function MapExperience({
 
   return (
     <div className="h-dvh w-dvw bg-background sm:p-3">
+      {/* the shell's shadow is dark-mode only: the gutter around it and the corner fusers inside it
+          are both bg-background, so in light mode the only thing separating them was this shadow
+          spilling outward and greying the gutter to ~250 against the fusers' 255, which read as a
+          seam exactly where the chrome is supposed to look fused into the frame */}
       <div
         ref={shellRef}
-        className="map-shell relative h-full w-full overflow-hidden bg-background sm:rounded-[3rem] sm:corner-squircle sm:shadow-2xl"
+        className="map-shell relative h-full w-full overflow-hidden bg-background sm:rounded-[3rem] sm:corner-squircle dark:sm:shadow-2xl"
       >
         <MapCanvas
           ref={mapCanvasRef}

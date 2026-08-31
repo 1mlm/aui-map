@@ -133,6 +133,26 @@ export function tagLabelTextColor(name?: TagColorName) {
   return `oklch(${LABEL_TEXT_LIGHTNESS}% ${LABEL_TEXT_CHROMA} ${hue})`
 }
 
+// past this the 500 shade is bright enough (yellow, lime, amber, and the near-white custom
+// grayscale families) that white text on it stops being readable. On tailwind's own scale, which
+// writes lightness as a percentage — `oklch(62.3% ...)` — so parseOklch hands back 62.3, not 0.623
+const PALE_SOLID_LIGHTNESS = 70
+
+// an active chip paints its solid tag color as the background, so the text has to pick whichever
+// end of the scale the background isn't
+function activeChipTextColor(name?: TagColorName) {
+  const shades = getShades(name)
+  const { lightness } = parseOklch(shades[500])
+  return lightness > PALE_SOLID_LIGHTNESS ? shades[950] : "white"
+}
+
+// an inactive chip used to hardcode the 400 shade, which only ever worked on a dark panel — in
+// light mode a pale tag color on a pale tint of that same color is invisible. Mixing toward
+// currentColor instead makes the ink follow the theme for free: `currentColor` inside the `color`
+// property resolves to the inherited color, which is --foreground, near-black in light and
+// near-white in dark. Keeps enough of the tag's hue that the chip still reads as its own color
+const INACTIVE_CHIP_HUE_SHARE = 55
+
 // tailwind's utility classes can't be built from a runtime variable (the compiler only picks up
 // literal class strings), so tag colors resolve through tailwindcss's own color palette instead
 // and get applied as inline styles
@@ -141,13 +161,13 @@ export function tagColorStyle(name: TagColorName | undefined, active: boolean) {
   if (active)
     return {
       backgroundColor: solid,
-      color: "white",
+      color: activeChipTextColor(name),
       // just a soft drop shadow to lift it off the page, no inset rim
       boxShadow: "0 6px 18px -4px rgba(0,0,0,0.6)",
     }
   return {
     backgroundColor: `color-mix(in oklch, ${solid} 15%, transparent)`,
-    color: getShades(name)[400],
+    color: `color-mix(in oklch, ${solid} ${INACTIVE_CHIP_HUE_SHARE}%, currentColor)`,
     boxShadow: `inset 0 0 0 1px color-mix(in oklch, ${solid} 30%, transparent)`,
   }
 }
