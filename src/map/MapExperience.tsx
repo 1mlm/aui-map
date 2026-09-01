@@ -118,6 +118,11 @@ export function MapExperience({
   }))
 
   const selected = effectiveItems.find((item) => item.id === selectedId) ?? null
+  const contributePins = effectiveItems.map((item) => ({
+    id: item.id,
+    title: item.title,
+    icon: item.tag.icon,
+  }))
   const visibleItems = effectiveItems.filter(
     (item) =>
       matchesSearch(item, search) &&
@@ -185,7 +190,7 @@ export function MapExperience({
           isOffCampus={location.isOffCampus}
           accuracy={location.accuracy}
           onLocate={handleLocate}
-          {...{ search, activeTagIds, hoveredTagId }}
+          {...{ search, activeTagIds, hoveredTagId, contributePins }}
         />
 
         <AnimatePresence>

@@ -6,15 +6,15 @@ import { SquircleFuserContainer } from "@/components/SquircleFuser"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/Tooltip"
 import { ICONS } from "@/icons"
 import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover"
-import { ContributeMenu } from "./ContributeMenu"
+import { ContributeMenu, type ContributePin } from "./ContributeMenu"
 import { SearchField, type SearchProps } from "./MapSearch"
 import { type FilterProps, TagPills } from "./MapTagFilter"
 import type { LocationStatus } from "./useUserLocation"
 
 const LOCATE_LABEL: Record<LocationStatus, string> = {
-  idle: "Focus me",
+  idle: "Locate",
   requesting: "Finding…",
-  granted: "Focus me",
+  granted: "Locate",
   denied: "No access",
   unavailable: "Retry",
 }
@@ -49,6 +49,7 @@ export function MapControls({
   isOffCampus,
   accuracy,
   onLocate,
+  contributePins,
   ...props
 }: SearchProps &
   FilterProps & {
@@ -57,9 +58,19 @@ export function MapControls({
     isOffCampus: boolean
     accuracy: number | null
     onLocate: () => void
+    contributePins: ContributePin[]
   }) {
-  // controlled only so the menu can close itself once something has been sent
-  const [contributeOpen, setContributeOpen] = useState(false)
+  // controlled only so the menu can close itself once something has been sent. Two independent
+  // states, not one shared boolean -- both the compact and full control bars are always mounted
+  // (see the render's own comment on why), so a single shared `open` flips both Popover instances
+  // true on one click; the hidden instance's own dismiss-layer then sees that same click as
+  // happening outside its own (still off-screen) trigger and immediately closes it right back down
+  const [contributeOpenCompact, setContributeOpenCompact] = useState(false)
+  const [contributeOpenFull, setContributeOpenFull] = useState(false)
+  const closeContribute = () => {
+    setContributeOpenCompact(false)
+    setContributeOpenFull(false)
+  }
   const { search, activeTagIds } = props
   const fixIsVague =
     locationStatus === "granted" &&
@@ -111,7 +122,9 @@ export function MapControls({
       label: "Contribute",
       popover: {
         className: "flex max-h-[70vh] w-80 flex-col gap-2 overflow-y-auto",
-        content: <ContributeMenu onClose={() => setContributeOpen(false)} />,
+        content: (
+          <ContributeMenu items={contributePins} onClose={closeContribute} />
+        ),
       },
     },
     {
@@ -142,6 +155,7 @@ export function MapControls({
             <IconButton
               aria-label={tooltip ?? label}
               tone={active ? "primary" : "subtle"}
+              layout={compact ? "stack" : "inline"}
               {...{ icon, label, iconClassName, className, onClick }}
             />
           )
@@ -160,9 +174,19 @@ export function MapControls({
             <span key={id} className="relative">
               {popover ? (
                 <Popover
-                  open={id === "contribute" ? contributeOpen : undefined}
+                  open={
+                    id === "contribute"
+                      ? compact
+                        ? contributeOpenCompact
+                        : contributeOpenFull
+                      : undefined
+                  }
                   onOpenChange={
-                    id === "contribute" ? setContributeOpen : undefined
+                    id === "contribute"
+                      ? compact
+                        ? setContributeOpenCompact
+                        : setContributeOpenFull
+                      : undefined
                   }
                 >
                   <PopoverTrigger asChild>{button}</PopoverTrigger>

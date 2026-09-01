@@ -46,7 +46,9 @@ export function MiniMapPicker({
       type="button"
       onClick={handleClick}
       className={cn(
-        "relative block w-full cursor-crosshair overflow-hidden rounded-xl corner-squircle border border-border",
+        // touch-manipulation drops the browser's default double-tap-to-zoom delay, which inside a
+        // scrollable popover can otherwise eat the first tap as a pan gesture instead of a click
+        "relative block w-full cursor-crosshair touch-manipulation overflow-hidden rounded-xl corner-squircle border border-border",
         className,
       )}
     >

@@ -2,10 +2,12 @@
 
 import { type MotionValue, motion, useTransform } from "motion/react"
 import Image from "next/image"
-import { useState } from "react"
+import { type PointerEvent as ReactPointerEvent, useRef, useState } from "react"
+import { IconButton } from "@/components/IconButton"
 import { Icon } from "@/components/Icon"
 import { ICONS } from "@/icons"
 import { Dialog, DialogContent, DialogTitle } from "@/shadcn/ui/dialog"
+import { cn } from "@/shadcn/utils"
 import { triggerHaptic } from "@/utils/haptics"
 import { latLongToPosition, positionToStyle } from "./geo"
 import type { MapPanorama } from "./types"
@@ -54,17 +56,27 @@ export function PanoramaLayer({
             width: MARKER_SIZE_PX,
             height: MARKER_SIZE_PX,
           }}
-          className="absolute -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full corner-squircle border-2 border-white/90 shadow-md shadow-black/40"
+          className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full shadow-[0_2px_4px_rgba(0,0,0,0.5),0_6px_16px_rgba(0,0,0,0.55)] ring-4 ring-black/25"
         >
           {/* the thumbnail must never be the thing a tap lands on, or a panorama sitting over a
               pin would swallow taps meant for it — the button itself is the target */}
-          <Image
-            src={panorama.thumbnailUrl}
-            alt=""
-            fill
-            sizes="34px"
-            className="pointer-events-none object-cover"
-          />
+          <div className="relative size-full overflow-hidden rounded-full corner-squircle border-2 border-white">
+            <Image
+              src={panorama.thumbnailUrl}
+              alt=""
+              fill
+              sizes="34px"
+              className="pointer-events-none object-cover"
+            />
+          </div>
+          {/* a plain round thumbnail reads as just another pin from a distance — this badge is
+              what actually says "this one is a panorama" */}
+          <span className="pointer-events-none absolute right-0 bottom-0 flex size-3.5 -translate-y-px translate-x-px items-center justify-center rounded-full border border-white bg-black/80">
+            <Icon
+              icon={ICONS.contributePanorama}
+              className="size-2 text-white"
+            />
+          </span>
         </motion.button>
       ))}
 
@@ -72,25 +84,95 @@ export function PanoramaLayer({
         open={open !== null}
         onOpenChange={(next) => !next && setOpenUuid(null)}
       >
-        <DialogContent className="flex max-h-[90vh] w-[95vw] max-w-6xl flex-col gap-3 overflow-hidden rounded-[2rem] corner-squircle border-none bg-black/95 p-4 sm:max-w-6xl">
-          <DialogTitle className="flex items-center gap-2 text-sm text-white">
-            <Icon icon={ICONS.contributePanorama} />
+        <DialogContent
+          showCloseButton={false}
+          className="fixed top-0 left-0 h-dvh w-dvw max-w-none translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none border-none bg-black p-0 ring-0 sm:max-w-none"
+        >
+          <DialogTitle className="sr-only">
             {open?.caption ?? "Panorama"}
           </DialogTitle>
-          {/* a wide flat photo, so the whole viewer is just a horizontal scroller — no 360
-              library, nothing to load before it can show anything */}
-          {open && (
-            <div className="overflow-x-auto overflow-y-hidden">
-              {/* biome-ignore lint/performance/noImgElement: intrinsic-width scroller, next/image needs a fixed box */}
-              <img
-                src={open.url}
-                alt={open.caption ?? ""}
-                className="h-[70vh] max-w-none rounded-xl corner-squircle"
-              />
+          {open && <PanoramaScroller panorama={open} />}
+
+          <IconButton
+            icon={ICONS.close}
+            tone="overlay"
+            onClick={() => setOpenUuid(null)}
+            className="absolute top-4 right-4 z-10"
+            aria-label="Close"
+          />
+
+          {open?.caption && (
+            <div className="pointer-events-none absolute bottom-6 left-1/2 max-w-[90vw] -translate-x-1/2 rounded-full corner-squircle bg-black/60 px-4 py-2 text-center text-sm text-white backdrop-blur-sm">
+              {open.caption}
             </div>
           )}
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+// a wide flat photo, so the whole viewer is a horizontal scroller — no 360 library, nothing to
+// load before it can show anything. Native overflow-x-auto alone reads as "a picture with a
+// scrollbar", not a place you're looking around, so pointer-drag panning (grab/grabbing cursor,
+// scrollLeft driven straight off pointer movement) sits on top of the same native scroll, and
+// edge gradients hint there's more image past either side
+function PanoramaScroller({ panorama }: { panorama: MapPanorama }) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const dragOrigin = useRef<{ pointerX: number; scrollLeft: number } | null>(
+    null,
+  )
+  const [dragging, setDragging] = useState(false)
+
+  function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    const el = scrollRef.current
+    if (!el) return
+    dragOrigin.current = { pointerX: event.clientX, scrollLeft: el.scrollLeft }
+    el.setPointerCapture(event.pointerId)
+    setDragging(true)
+  }
+
+  function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const el = scrollRef.current
+    if (!el || !dragOrigin.current) return
+    el.scrollLeft =
+      dragOrigin.current.scrollLeft -
+      (event.clientX - dragOrigin.current.pointerX)
+  }
+
+  function endDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    scrollRef.current?.releasePointerCapture(event.pointerId)
+    dragOrigin.current = null
+    setDragging(false)
+  }
+
+  return (
+    <div className="relative h-full w-full">
+      {/* absolute + inset-0, not a flex child sized by its content -- a flex item without an
+          explicit width shrinks to fit its image instead of the dialog, which quietly turns off
+          the whole scroller (nothing left to scroll once the container is already as wide as the
+          image) */}
+      <div
+        ref={scrollRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        className={cn(
+          "absolute inset-0 flex touch-pan-x items-center overflow-x-auto overflow-y-hidden select-none",
+          dragging ? "cursor-grabbing" : "cursor-grab",
+        )}
+      >
+        {/* biome-ignore lint/performance/noImgElement: intrinsic-width scroller, next/image needs a fixed box */}
+        <img
+          src={panorama.url}
+          alt={panorama.caption ?? ""}
+          draggable={false}
+          className="h-full max-w-none shrink-0"
+        />
+      </div>
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-black/70 to-transparent" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-black/70 to-transparent" />
+    </div>
   )
 }

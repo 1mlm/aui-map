@@ -10,11 +10,12 @@ import {
 } from "react"
 import { FieldLabel } from "@/components/FieldLabel"
 import { FormError } from "@/components/FormError"
-import { Icon } from "@/components/Icon"
+import { Icon, type HugeIcon } from "@/components/Icon"
 import { ICONS } from "@/icons"
 import { Button } from "@/shadcn/ui/button"
 import { Input } from "@/shadcn/ui/input"
 import { Textarea } from "@/shadcn/ui/textarea"
+import { cn } from "@/shadcn/utils"
 import { extractErrorMessage } from "@/utils/error"
 import { triggerHaptic } from "@/utils/haptics"
 import {
@@ -106,7 +107,7 @@ const CONTRIBUTION_TYPES = [
 
 type ContributionType = (typeof CONTRIBUTION_TYPES)[number]
 
-export type ContributePin = { id: string; title: string }
+export type ContributePin = { id: string; title: string; icon: HugeIcon }
 
 function FilePreview({ file }: { file: File }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -164,10 +165,28 @@ function ContributionForm({
   const [title, setTitle] = useState("")
   const [message, setMessage] = useState("")
   const [coord, setCoord] = useState<Placement | null>(null)
+  const [locating, setLocating] = useState(false)
   const [extrasOpen, setExtrasOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // a one-shot fix, not useUserLocation's continuous watch -- this just fills in one field once,
+  // it doesn't need to keep tracking after that
+  function handleUseMyLocation() {
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocating(false)
+        setCoord({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        })
+      },
+      () => setLocating(false),
+      { enableHighAccuracy: true, timeout: 10_000 },
+    )
+  }
 
   const fields: readonly FieldName[] = type.fields
   const filled: Record<FieldName, boolean> = {
@@ -247,9 +266,26 @@ function ContributionForm({
 
   const coordField = fields.includes("coord") && (
     <div className="flex flex-col gap-1.5">
-      <FieldLabel icon={ICONS.place}>
-        {coord ? "Where it is" : "Where is it? (optional)"}
-      </FieldLabel>
+      <div className="flex items-center justify-between gap-2">
+        <FieldLabel icon={ICONS.place}>
+          {coord ? "Where it is" : "Where is it? (optional)"}
+        </FieldLabel>
+        <button
+          type="button"
+          onClick={handleUseMyLocation}
+          disabled={locating}
+          className="flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-60"
+        >
+          <Icon
+            icon={ICONS.locate}
+            className={cn("size-3.5", locating && "animate-pulse")}
+          />
+          {locating ? "Finding…" : "Use my location"}
+        </button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Tap the map, or use your device's location if you're there right now.
+      </p>
       <MiniMapPicker value={coord} onPick={setCoord} />
     </div>
   )
@@ -397,17 +433,69 @@ function ContributionForm({
   )
 }
 
-// the body of the contribute popover: pick what you're giving, then fill in only what that kind
-// needs. Rendered from the map (nothing preselected) and from a pin's panel, which passes that
-// pin so the two pin-bound kinds have something to attach to
+// the two pin-bound kinds (a photo for a place, a fix to one) need to know which place before
+// they can go anywhere. Rather than only answering that from a pin's own panel, this searches
+// the whole map so the one global Contribute button can handle those kinds too
+function PinPicker({
+  items,
+  onPick,
+}: {
+  items: ContributePin[]
+  onPick: (pin: ContributePin) => void
+}) {
+  const [query, setQuery] = useState("")
+  const q = query.trim().toLowerCase()
+  const matches = q
+    ? items.filter((item) => item.title.toLowerCase().includes(q))
+    : items
+
+  return (
+    <div className="flex flex-col gap-2">
+      <FieldLabel icon={ICONS.place}>Which place?</FieldLabel>
+      <Input
+        autoFocus
+        placeholder="Search places…"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        className="corner-squircle"
+      />
+      <div className="flex max-h-64 flex-col gap-1 overflow-y-auto">
+        {matches.length === 0 && (
+          <p className="p-2 text-center text-xs text-muted-foreground">
+            No place matches that.
+          </p>
+        )}
+        {matches.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => {
+              triggerHaptic()
+              onPick(item)
+            }}
+            className="flex cursor-pointer items-center gap-2.5 rounded-xl corner-squircle p-2 text-left transition-colors hover:bg-muted"
+          >
+            <Icon icon={item.icon} className="size-4 shrink-0" />
+            <span className="truncate text-sm">{item.title}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// the body of the contribute popover: pick what you're giving, then (for the two kinds tied to a
+// place) which place, then fill in only what that kind needs. One entry point for everything, so
+// it carries the whole map's pins to search rather than expecting one handed to it already picked
 export function ContributeMenu({
-  pin = null,
+  items,
   onClose,
 }: {
-  pin?: ContributePin | null
+  items: ContributePin[]
   onClose: () => void
 }) {
   const [picked, setPicked] = useState<ContributionType | null>(null)
+  const [pin, setPin] = useState<ContributePin | null>(null)
   const [submitted, setSubmitted] = useState(false)
 
   if (submitted)
@@ -418,9 +506,10 @@ export function ContributeMenu({
       </div>
     )
 
-  // the two pin-bound kinds are only answerable about a place you already have open, so from the
-  // map's own button they'd be a dead end asking "which pin?" with no way to say
-  const offered = CONTRIBUTION_TYPES.filter((type) => pin || !type.needsPin)
+  function reset() {
+    setPicked(null)
+    setPin(null)
+  }
 
   if (!picked)
     return (
@@ -431,12 +520,10 @@ export function ContributeMenu({
             Contribute
           </span>
           <span className="text-xs text-muted-foreground">
-            {pin
-              ? `Help fill in ${pin.title}, or flag something else.`
-              : "I read everything before it goes on the map."}
+            I read everything before it goes on the map.
           </span>
         </div>
-        {offered.map((type) => (
+        {CONTRIBUTION_TYPES.map((type) => (
           <button
             key={type.id}
             type="button"
@@ -458,6 +545,21 @@ export function ContributeMenu({
       </div>
     )
 
+  if (picked.needsPin && !pin)
+    return (
+      <div className="flex flex-col gap-3">
+        <PinPicker {...{ items }} onPick={setPin} />
+        <button
+          type="button"
+          onClick={() => setPicked(null)}
+          className="flex cursor-pointer items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+        >
+          <Icon icon={ICONS.carouselPrev} className="size-3.5" />
+          Something else
+        </button>
+      </div>
+    )
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-0.5">
@@ -465,7 +567,9 @@ export function ContributeMenu({
           <Icon icon={picked.icon} />
           {picked.label}
         </span>
-        <span className="text-xs text-muted-foreground">{picked.blurb}</span>
+        <span className="text-xs text-muted-foreground">
+          {pin ? `About ${pin.title}.` : picked.blurb}
+        </span>
       </div>
 
       <ContributionForm
@@ -477,14 +581,26 @@ export function ContributeMenu({
         {...{ pin }}
       />
 
-      <button
-        type="button"
-        onClick={() => setPicked(null)}
-        className="flex cursor-pointer items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-      >
-        <Icon icon={ICONS.carouselPrev} className="size-3.5" />
-        Something else
-      </button>
+      <div className="flex items-center justify-center gap-3">
+        {pin && (
+          <button
+            type="button"
+            onClick={() => setPin(null)}
+            className="flex cursor-pointer items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <Icon icon={ICONS.place} className="size-3.5" />
+            Change place
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={reset}
+          className="flex cursor-pointer items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+        >
+          <Icon icon={ICONS.carouselPrev} className="size-3.5" />
+          Something else
+        </button>
+      </div>
     </div>
   )
 }

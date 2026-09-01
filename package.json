@@ -1,6 +1,6 @@
 {
   "name": "aui-map",
-  "version": "0.1.46",
+  "version": "0.1.47",
   "private": true,
   "packageManager": "pnpm@11.6.0",
   "scripts": {

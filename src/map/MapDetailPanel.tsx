@@ -8,7 +8,6 @@ import { IconButton } from "@/components/IconButton"
 import { fuserOverlapClass, SquircleFuser } from "@/components/SquircleFuser"
 import { DateCell } from "@/components/table/CustomTableCell"
 import { ICONS } from "@/icons"
-import { Button } from "@/shadcn/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,7 +20,6 @@ import { triggerHaptic } from "@/utils/haptics"
 import { isImageMimeType } from "@/utils/mimeType"
 import { useCopyFeedback } from "@/utils/useCopyFeedback"
 import { AttachmentCarousel, AttachmentStrip } from "./AttachmentCarousel"
-import { ContributeMenu } from "./ContributeMenu"
 import { formatCoordinates } from "./geo"
 import { TagChipIcon, tagChipClassName } from "./MapTagFilter"
 import { ShareMenu } from "./ShareMenu"
@@ -67,7 +65,6 @@ export function MapDetailPanel({
   const [openAttachmentIndex, setOpenAttachmentIndex] = useState<number | null>(
     null,
   )
-  const [contributeOpen, setContributeOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)
   useDismissKey(onClose)
 
@@ -160,7 +157,7 @@ export function MapDetailPanel({
             : "100%",
         }}
         transition={{ type: "spring", stiffness: 340, damping: 32 }}
-      style={docked ? undefined : { width: UNDOCKED_PANEL_WIDTH }}
+        style={docked ? undefined : { width: UNDOCKED_PANEL_WIDTH }}
         className={cn(
           // radius matches the fuser patches' 1em fillet, so their arcs meet — the panel itself
           // stays square on its open edge, same trick both docked and undocked. max-height (not
@@ -221,26 +218,6 @@ export function MapDetailPanel({
             <DateCell date={item.updatedAt} />
           </div>
           <MapsMenuButton {...{ item }} />
-          <Popover open={contributeOpen} onOpenChange={setContributeOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full cursor-pointer rounded-full corner-squircle"
-              >
-                <Icon icon={ICONS.contributeMenu} />
-                Contribute
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent
-              side="top"
-              className="flex max-h-[60vh] w-80 flex-col gap-2 overflow-y-auto"
-            >
-              <ContributeMenu
-                pin={{ id: item.id, title: item.title }}
-                onClose={() => setContributeOpen(false)}
-              />
-            </PopoverContent>
-          </Popover>
         </div>
       </motion.div>
 
@@ -251,8 +228,6 @@ export function MapDetailPanel({
           onClose={() => setOpenAttachmentIndex(null)}
         />
       )}
-
-
     </motion.div>
   )
 }
