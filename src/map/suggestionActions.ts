@@ -1,5 +1,6 @@
 "use server"
 
+import type { SuggestionKind } from "@/generated/prisma/client"
 import { escapeHtml, notifyAdmin } from "@/utils/notifyAdmin"
 import { prisma } from "@/utils/prisma"
 
@@ -10,6 +11,7 @@ import { prisma } from "@/utils/prisma"
 // uploads it client-side first (via src/app/api/contribute/upload) to stay under the 4.5mb
 // body limit a server action would otherwise hit
 export async function submitSuggestion(
+  kind: SuggestionKind,
   message: string,
   blob: { url: string; fileName: string; mimeType: string | null } | null,
 ): Promise<{ error: string } | undefined> {
@@ -17,6 +19,7 @@ export async function submitSuggestion(
   if (!trimmed) return { error: "Message required" }
   await prisma.suggestion.create({
     data: {
+      kind,
       message: trimmed,
       fileUrl: blob?.url,
       fileName: blob?.fileName,
@@ -25,7 +28,7 @@ export async function submitSuggestion(
   })
 
   await notifyAdmin(
-    "New feedback on AUI Map",
+    kind === "BUG" ? "New bug report on AUI Map" : "New feature idea for AUI Map",
     `<p>${escapeHtml(trimmed)}</p>${blob ? `<p>Attachment: <a href="${blob.url}">${escapeHtml(blob.fileName)}</a></p>` : ""}`,
   )
 }

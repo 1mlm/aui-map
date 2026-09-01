@@ -3,7 +3,6 @@
 import { motion } from "motion/react"
 import { useEffect, useRef, useState } from "react"
 import { Icon } from "@/components/Icon"
-import { IconButton } from "@/components/IconButton"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
 import { ICONS } from "@/icons"
 import { cn } from "@/shadcn/utils"
@@ -106,9 +105,10 @@ function TagPill({
 // left and right edges, and they're what sells the bar as melting into the frame rather than
 // sitting on top of it. Run it edge to edge and there's nowhere left for them to sit
 const FILTER_BAR_SIDE_INSET = "6rem"
-const FILTER_BAR_SCROLL_STEP_PX = 220
 // the scrollable strip fades out on whichever side still has chips hidden past the edge, so a
-// half-cut pill reads as "keep going" rather than as a clipping bug
+// half-cut pill reads as "keep going" rather than as a clipping bug. This is the whole overflow
+// affordance — scroll arrows were tried and cut: they had to hold their space to avoid shoving
+// the chips sideways at each end, which left two dead gutters and made the bar read as spaced out
 const SCROLL_FADE = "3rem"
 
 function scrollFadeMask(fadeLeft: boolean, fadeRight: boolean) {
@@ -129,9 +129,9 @@ export function MapFilterBar({
   const stripRef = useRef<HTMLDivElement>(null)
   const [overflow, setOverflow] = useState({ left: false, right: false })
 
-  // whether either arrow is warranted depends on the strip's scroll position AND on how much
-  // room the bar was given, which changes when the detail panel opens or the window resizes —
-  // so this watches the element itself rather than only listening for scroll events
+  // which side is cut off depends on the strip's scroll position AND on how much room the bar
+  // was given, which changes when the detail panel opens or the window resizes — so this watches
+  // the element itself rather than only listening for scroll events
   useEffect(() => {
     const strip = stripRef.current
     if (!strip) return
@@ -152,14 +152,6 @@ export function MapFilterBar({
     }
   }, [])
 
-  const scrollable = overflow.left || overflow.right
-
-  const scrollByStep = (direction: 1 | -1) =>
-    stripRef.current?.scrollBy({
-      left: direction * FILTER_BAR_SCROLL_STEP_PX,
-      behavior: "smooth",
-    })
-
   return (
     <div
       className="map-filter-bar pointer-events-none absolute inset-0 transition-[right] duration-300 ease-out"
@@ -168,23 +160,14 @@ export function MapFilterBar({
       <SquircleFuserContainer
         align="bottom-center"
         superClassName="pointer-events-auto absolute bottom-0 left-1/2 -translate-x-1/2"
-        className="gap-2"
+        className="gap-3"
         style={{ maxWidth: `calc(100% - ${FILTER_BAR_SIDE_INSET})` }}
       >
-        {/* permanently parked at the left edge so the row reads as "these are filters" without
-            anyone having to work it out from the chips themselves */}
-        <Icon
-          icon={ICONS.filter}
-          aria-hidden
-          className="size-4 shrink-0 text-muted-foreground"
-        />
-
-        <FilterScrollArrow
-          direction={-1}
-          shown={overflow.left}
-          scrollable={scrollable}
-          onClick={() => scrollByStep(-1)}
-        />
+        {/* named, not just a glyph — the row is only obviously a set of categories once it says so */}
+        <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <Icon icon={ICONS.filter} aria-hidden className="size-4" />
+          Categories
+        </span>
 
         <div
           ref={stripRef}
@@ -196,46 +179,7 @@ export function MapFilterBar({
         >
           <TagPills {...props} />
         </div>
-
-        <FilterScrollArrow
-          direction={1}
-          shown={overflow.right}
-          scrollable={scrollable}
-          onClick={() => scrollByStep(1)}
-        />
       </SquircleFuserContainer>
     </div>
-  )
-}
-
-// once the strip can scroll at all, both arrows hold their space and merely fade — otherwise
-// reaching either end would shove every chip sideways. When nothing overflows they take no room
-// at all, so a bar with a handful of tags doesn't carry two empty gutters
-function FilterScrollArrow({
-  direction,
-  shown,
-  scrollable,
-  onClick,
-}: {
-  direction: 1 | -1
-  shown: boolean
-  scrollable: boolean
-  onClick: () => void
-}) {
-  if (!scrollable) return null
-
-  return (
-    <IconButton
-      size="sm"
-      icon={direction === 1 ? ICONS.carouselNext : ICONS.carouselPrev}
-      aria-label={direction === 1 ? "More categories" : "Previous categories"}
-      aria-hidden={!shown}
-      tabIndex={shown ? undefined : -1}
-      className={cn(
-        "shrink-0 transition-opacity",
-        shown ? "opacity-100" : "pointer-events-none opacity-0",
-      )}
-      {...{ onClick }}
-    />
   )
 }

@@ -12,6 +12,7 @@ export default async function AdminSuggestionsPage() {
 
   const suggestions: SuggestionRow[] = suggestionRows.map((suggestion) => ({
     id: suggestion.id,
+    kind: suggestion.kind,
     message: suggestion.message,
     fileUrl: suggestion.fileUrl,
     fileName: suggestion.fileName,

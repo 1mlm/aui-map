@@ -4,19 +4,15 @@ import Image from "next/image"
 import { useEffect, useState } from "react"
 import { type HugeIcon, Icon } from "@/components/Icon"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/Tooltip"
 import { ICONS } from "@/icons"
-import { Button } from "@/shadcn/ui/button"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/shadcn/ui/dialog"
 import { cn } from "@/shadcn/utils"
-import { useNetworkStatus } from "@/utils/useNetworkStatus"
 import { SuggestionForm } from "./SuggestionForm"
 import { useSharedFeedbackDraft } from "./useSharedFeedbackDraft"
 
@@ -111,7 +107,6 @@ export function NoticeDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const [feedbackOpen, setFeedbackOpen] = useState(false)
-  const { online } = useNetworkStatus()
   const draft = useSharedFeedbackDraft()
 
   // a share-target hand-off should land straight in the feedback form, already open and
@@ -166,30 +161,10 @@ export function NoticeDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {/* no trigger button any more — reporting a bug and suggesting a feature are two cards
+            in the contribute popover. This stays mounted only so an Android share-target
+            hand-off still has somewhere to land, prefilled, via the draft effect above */}
         <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              {/* span wrapper: a disabled button swallows pointer events, which would take the
-                  tooltip down with it */}
-              <span className="justify-self-center">
-                <DialogTrigger asChild>
-                  <Button
-                    size="sm"
-                    disabled={!online}
-                    className="w-fit rounded-full corner-squircle"
-                  >
-                    <Icon icon={ICONS.suggestions} />
-                    Provide feedback
-                  </Button>
-                </DialogTrigger>
-              </span>
-            </TooltipTrigger>
-            {!online && (
-              <TooltipContent>
-                You're offline — feedback needs a connection to send
-              </TooltipContent>
-            )}
-          </Tooltip>
           <DialogContent className="corner-squircle sm:max-w-sm">
             <DialogHeader>
               <DialogTitle>Send feedback</DialogTitle>

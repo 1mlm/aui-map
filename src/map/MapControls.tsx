@@ -1,22 +1,30 @@
 "use client"
 
-import type { ReactNode } from "react"
+import { type ReactNode, useState } from "react"
 import { IconButton } from "@/components/IconButton"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/Tooltip"
 import { ICONS } from "@/icons"
 import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover"
+import { ContributeMenu } from "./ContributeMenu"
 import { SearchField, type SearchProps } from "./MapSearch"
 import { type FilterProps, TagPills } from "./MapTagFilter"
 import type { LocationStatus } from "./useUserLocation"
 
 const LOCATE_LABEL: Record<LocationStatus, string> = {
-  idle: "Locate",
+  idle: "Focus me",
   requesting: "Finding…",
-  granted: "Center",
+  granted: "Focus me",
   denied: "No access",
   unavailable: "Retry",
 }
 const OFF_CAMPUS_TEXT = "You're not on campus 💀??"
+// a browser with no GPS falls back to looking up the wifi network's registered location,
+// which on a campus resolves to one arbitrary point for the whole network -- hence the
+// classic "it thinks I'm at that roundabout" on a desktop. Past this the fix is too coarse
+// to mean anything at building scale, so the tooltip says why rather than letting people
+// assume the map itself is wrong
+const VAGUE_ACCURACY_METERS = 120
 
 type MapControl = {
   id: string
@@ -27,6 +35,8 @@ type MapControl = {
   iconClassName?: string
   className?: string
   onClick?: () => void
+  // only set when there is something to say beyond the label already under the glyph
+  tooltip?: string | null
   popover?: { className: string; content: ReactNode }
   // the roomy layout already has a permanent filter bar docked along the bottom, so its copy of
   // the filter button would be a second control for something already on screen
@@ -35,20 +45,31 @@ type MapControl = {
 
 export function MapControls({
   onOpenNotice,
-  onOpenContribute,
   locationStatus,
   isOffCampus,
+  accuracy,
   onLocate,
   ...props
 }: SearchProps &
   FilterProps & {
     onOpenNotice: () => void
-    onOpenContribute: () => void
     locationStatus: LocationStatus
     isOffCampus: boolean
+    accuracy: number | null
     onLocate: () => void
   }) {
+  // controlled only so the menu can close itself once something has been sent
+  const [contributeOpen, setContributeOpen] = useState(false)
   const { search, activeTagIds } = props
+  const fixIsVague =
+    locationStatus === "granted" &&
+    accuracy !== null &&
+    accuracy > VAGUE_ACCURACY_METERS
+  const locateTooltip = isOffCampus
+    ? OFF_CAMPUS_TEXT
+    : fixIsVague
+      ? `Your device placed you within about ${Math.round(accuracy)}m, so that is your wifi network's registered spot rather than a real fix. A phone with GPS will put you on the right building.`
+      : null
 
   const controls: MapControl[] = [
     {
@@ -81,13 +102,17 @@ export function MapControls({
       iconClassName:
         locationStatus === "requesting" ? "animate-spin" : undefined,
       className: isOffCampus ? "motion-safe:animate-wiggle" : undefined,
+      tooltip: locateTooltip,
       onClick: onLocate,
     },
     {
       id: "contribute",
       icon: ICONS.contributeMenu,
       label: "Contribute",
-      onClick: onOpenContribute,
+      popover: {
+        className: "flex max-h-[70vh] w-80 flex-col gap-2 overflow-y-auto",
+        content: <ContributeMenu onClose={() => setContributeOpen(false)} />,
+      },
     },
     {
       id: "about",
@@ -110,22 +135,36 @@ export function MapControls({
           iconClassName,
           className,
           onClick,
+          tooltip,
           popover,
         }) => {
-          const button = (
+          const plainButton = (
             <IconButton
-              aria-label={
-                id === "locate" && isOffCampus ? OFF_CAMPUS_TEXT : label
-              }
+              aria-label={tooltip ?? label}
               tone={active ? "primary" : "subtle"}
               {...{ icon, label, iconClassName, className, onClick }}
             />
+          )
+          const button = tooltip ? (
+            <Tooltip>
+              <TooltipTrigger asChild>{plainButton}</TooltipTrigger>
+              <TooltipContent side="bottom" sideOffset={6} className="max-w-64">
+                {tooltip}
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            plainButton
           )
 
           return (
             <span key={id} className="relative">
               {popover ? (
-                <Popover>
+                <Popover
+                  open={id === "contribute" ? contributeOpen : undefined}
+                  onOpenChange={
+                    id === "contribute" ? setContributeOpen : undefined
+                  }
+                >
                   <PopoverTrigger asChild>{button}</PopoverTrigger>
                   <PopoverContent className={popover.className}>
                     {popover.content}
@@ -151,7 +190,7 @@ export function MapControls({
   // flashing the wrong one while JS boots up
   return (
     <>
-      <div className="map-controls-compact pointer-events-auto absolute top-4 left-1/2 flex -translate-x-1/2 items-center justify-center gap-1.5 rounded-3xl corner-squircle bg-background px-3 py-2 drop-shadow-lg drop-shadow-black/40">
+      <div className="map-controls-compact pointer-events-auto absolute top-4 left-1/2 flex -translate-x-1/2 items-center justify-center gap-1.5 rounded-3xl corner-squircle bg-background/90 px-3 py-2 drop-shadow-lg drop-shadow-black/40 backdrop-blur-md">
         {renderControls(true)}
       </div>
 

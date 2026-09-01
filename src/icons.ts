@@ -1,5 +1,6 @@
 import {
   AlignLeftIcon,
+  ArrowDown01Icon,
   ArrowDown02Icon,
   ArrowExpandDiagonal01Icon,
   ArrowLeft01Icon,
@@ -7,6 +8,7 @@ import {
   ArrowUpRight01Icon,
   Atm01Icon,
   Briefcase01Icon,
+  Bug01Icon,
   BulbIcon,
   CallIcon,
   Cancel01Icon,
@@ -96,6 +98,8 @@ export const ICONS = {
   download: Download01Icon,
   share: Share08Icon,
   qrCode: QrCodeIcon,
+  // the little caret on a control that opens a menu rather than acting on its own
+  dropdown: ArrowDown01Icon,
   openExternalMap: MapsIcon,
   loading: Loading01Icon,
   github: Github,
@@ -117,6 +121,7 @@ export const ICONS = {
   contributePanorama: Rotate360Icon,
   contributeNewPin: MapPinpoint02Icon,
   contributeEdit: PencilEdit02Icon,
+  bug: Bug01Icon,
   caption: CaptionsIcon,
   photo: Image02Icon,
   photos: ImageAdd02Icon,

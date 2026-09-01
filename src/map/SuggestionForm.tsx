@@ -109,7 +109,7 @@ export function SuggestionForm({
                   mimeType: attachment.file.type || null,
                 }
               : null
-        const result = await submitSuggestion(message, blobInfo)
+        const result = await submitSuggestion("BUG", message, blobInfo)
         if (result?.error) {
           setError(result.error)
           return

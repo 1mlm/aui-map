@@ -155,8 +155,15 @@ model QrCodeEvent {
 }
 
 // general feedback/bug reports from the bulb icon on the public map — not tied to a pin
+// feedback about the app itself, as opposed to a Submission, which is about the map's contents
+enum SuggestionKind {
+  BUG
+  FEATURE
+}
+
 model Suggestion {
   id          String   @id @default(cuid())
+  kind        SuggestionKind @default(FEATURE)
   message     String
   // an optional attachment (screenshot, etc.) — most feedback is text-only, hence nullable
   fileUrl     String?

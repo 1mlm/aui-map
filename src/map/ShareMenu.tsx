@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { Icon } from "@/components/Icon"
-import { IconButton } from "@/components/IconButton"
 import { ICONS } from "@/icons"
 import { Button } from "@/shadcn/ui/button"
 import {
@@ -11,6 +10,12 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/shadcn/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/shadcn/ui/dropdown-menu"
 import { copyImageToClipboard } from "@/utils/clipboard"
 import { triggerHaptic } from "@/utils/haptics"
 import { useCopyFeedback } from "@/utils/useCopyFeedback"
@@ -122,20 +127,54 @@ export function ShareMenu({
     }
   }
 
+  // one control instead of two: the QRCode used to sit in the panel as its own button, which
+  // spent a permanent slot on the rarest of the three things you can do with a pin's link
+  const shareActions = [
+    {
+      id: "qrcode",
+      icon: ICONS.qrCode,
+      label: "Generate QRCode",
+      onSelect: handleOpenQrCode,
+    },
+    {
+      id: "copy",
+      icon: linkCopied ? ICONS.copied : ICONS.copy,
+      label: linkCopied ? "Link copied!" : "Copy link",
+      onSelect: () => {
+        triggerHaptic()
+        copyLink(getPinLink())
+      },
+    },
+    {
+      id: "export",
+      icon: ICONS.share,
+      label: "Export link",
+      onSelect: handleShare,
+    },
+  ]
+
   return (
     <>
-      <IconButton
-        icon={ICONS.qrCode}
-        tone="floating"
-        onClick={handleOpenQrCode}
-        aria-label="QRCode"
-      />
-      <IconButton
-        icon={linkCopied ? ICONS.copied : ICONS.share}
-        tone="floating"
-        onClick={handleShare}
-        aria-label={linkCopied ? "Link copied!" : "Share"}
-      />
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label="Share this place"
+            className="flex cursor-pointer items-center gap-0.5 rounded-full corner-squircle bg-white/10 px-2 py-2 text-white transition-colors hover:bg-white/20"
+          >
+            <Icon icon={linkCopied ? ICONS.copied : ICONS.share} />
+            <Icon icon={ICONS.dropdown} className="size-3" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {shareActions.map(({ id, icon, label, onSelect }) => (
+            <DropdownMenuItem key={id} className="cursor-pointer" {...{ onSelect }}>
+              <Icon {...{ icon }} />
+              {label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       <Dialog open={qrCodeOpen} onOpenChange={setQrCodeOpen}>
         <DialogContent className="flex w-auto flex-col items-center gap-3">

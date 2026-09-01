@@ -5,7 +5,6 @@ import { AnimatePresence } from "motion/react"
 import dynamic from "next/dynamic"
 import { useEffect, useRef, useState } from "react"
 import { MapBrand } from "./MapBrand"
-import { ContributeDialog } from "./ContributeDialog"
 import { MapCanvas, type MapCanvasHandle } from "./MapCanvas"
 import { MapControls } from "./MapControls"
 import { NoticeDialog } from "./MapCredit"
@@ -92,7 +91,6 @@ export function MapExperience({
   const [activeTagIds, setActiveTagIds] = useState<Set<string>>(new Set())
   const [hoveredTagId, setHoveredTagId] = useState<string | null>(null)
   const [noticeOpen, setNoticeOpen] = useState(false)
-  const [contributeOpen, setContributeOpen] = useState(false)
   // in the url hash so a place can be linked to directly: /#m6l
   const [selectedId, setSelectedId] = useHashState()
 
@@ -183,9 +181,9 @@ export function MapExperience({
           onSearchChange={setSearch}
           onHoverTag={setHoveredTagId}
           onOpenNotice={() => setNoticeOpen(true)}
-          onOpenContribute={() => setContributeOpen(true)}
           locationStatus={location.status}
           isOffCampus={location.isOffCampus}
+          accuracy={location.accuracy}
           onLocate={handleLocate}
           {...{ search, activeTagIds, hoveredTagId }}
         />
@@ -210,10 +208,6 @@ export function MapExperience({
           {...{ activeTagIds, hoveredTagId }}
         />
         <NoticeDialog open={noticeOpen} onOpenChange={setNoticeOpen} />
-        <ContributeDialog
-          open={contributeOpen}
-          onOpenChange={setContributeOpen}
-        />
       </div>
 
       {LEVA_PLAYGROUND_ENABLED && process.env.NODE_ENV === "development" && (

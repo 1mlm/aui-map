@@ -1,96 +1,16 @@
 "use client"
 
 import { upload } from "@vercel/blob/client"
-import Image from "next/image"
 import { type ChangeEvent, useRef, useState, useTransition } from "react"
 import { FieldLabel } from "@/components/FieldLabel"
 import { FormError } from "@/components/FormError"
 import { Icon } from "@/components/Icon"
 import { ICONS } from "@/icons"
-import {
-  latLongToPosition,
-  positionToLatLong,
-  positionToStyle,
-  screenPointToPosition,
-} from "@/map/geo"
+import { MiniMapPicker, type Placement } from "@/map/MiniMapPicker"
 import type { MapPanorama } from "@/map/types"
 import { Button } from "@/shadcn/ui/button"
 import { Input } from "@/shadcn/ui/input"
 import { createPanorama, deletePanorama, movePanorama } from "./actions"
-
-type Placement = { latitude: number; longitude: number }
-
-// the map is the placement control: clicking it is how a panorama gets its coordinates, and
-// dragging an existing marker is how one gets corrected. Reading a lat/long out of the photo's
-// EXIF would only ever be a prefill, and phones strip it often enough that the click has to work
-// on its own anyway
-function PlacementMap({
-  panoramas,
-  draft,
-  selectedUuid,
-  onPlace,
-  onSelect,
-}: {
-  panoramas: MapPanorama[]
-  draft: Placement | null
-  selectedUuid: string | null
-  onPlace: (placement: Placement) => void
-  onSelect: (uuid: string | null) => void
-}) {
-  const imageRef = useRef<HTMLImageElement>(null)
-
-  function handleClick(event: React.MouseEvent<HTMLElement>) {
-    const box = imageRef.current?.getBoundingClientRect()
-    if (!box) return
-    const position = screenPointToPosition(
-      { x: event.clientX, y: event.clientY },
-      box,
-    )
-    onPlace(positionToLatLong(position))
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={handleClick}
-      className="relative block w-full cursor-crosshair overflow-hidden rounded-xl corner-squircle border border-border"
-    >
-      <Image
-        ref={imageRef}
-        src="/auimap-1312.webp"
-        alt="Campus map"
-        width={1312}
-        height={1312}
-        className="w-full"
-      />
-      {panoramas.map((panorama) => (
-        <span
-          key={panorama.uuid}
-          onPointerDown={(event) => {
-            event.stopPropagation()
-            onSelect(panorama.uuid === selectedUuid ? null : panorama.uuid)
-          }}
-          style={positionToStyle(
-            latLongToPosition(panorama.latitude, panorama.longitude),
-          )}
-          className={`absolute size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 ${
-            panorama.uuid === selectedUuid
-              ? "border-primary bg-primary/60"
-              : "border-white bg-black/60"
-          }`}
-        />
-      ))}
-      {draft && (
-        <span
-          style={positionToStyle(
-            latLongToPosition(draft.latitude, draft.longitude),
-          )}
-          className="absolute size-4 -translate-x-1/2 -translate-y-1/2 animate-pulse rounded-full border-2 border-primary bg-primary"
-        />
-      )}
-    </button>
-  )
-}
 
 export function PanoramaPlacer({ panoramas }: { panoramas: MapPanorama[] }) {
   const [file, setFile] = useState<File | null>(null)
@@ -243,10 +163,18 @@ export function PanoramaPlacer({ panoramas }: { panoramas: MapPanorama[] }) {
         </div>
       </div>
 
-      <PlacementMap
-        onPlace={handlePlace}
-        onSelect={setSelectedUuid}
-        {...{ panoramas, draft, selectedUuid }}
+      <MiniMapPicker
+        value={draft}
+        markers={panoramas.map((panorama) => ({
+          id: panorama.uuid,
+          latitude: panorama.latitude,
+          longitude: panorama.longitude,
+          selected: panorama.uuid === selectedUuid,
+        }))}
+        onPick={handlePlace}
+        onSelectMarker={(id) =>
+          setSelectedUuid((current) => (current === id ? null : id))
+        }
       />
     </div>
   )

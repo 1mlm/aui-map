@@ -21,7 +21,7 @@ import { triggerHaptic } from "@/utils/haptics"
 import { isImageMimeType } from "@/utils/mimeType"
 import { useCopyFeedback } from "@/utils/useCopyFeedback"
 import { AttachmentCarousel, AttachmentStrip } from "./AttachmentCarousel"
-import { ContributeDialog } from "./ContributeDialog"
+import { ContributeMenu } from "./ContributeMenu"
 import { formatCoordinates } from "./geo"
 import { TagChipIcon, tagChipClassName } from "./MapTagFilter"
 import { ShareMenu } from "./ShareMenu"
@@ -215,21 +215,32 @@ export function MapDetailPanel({
           onOpen={setOpenAttachmentIndex}
         />
 
-        <Button
-          variant="outline"
-          className="w-full rounded-full corner-squircle"
-          onClick={() => setContributeOpen(true)}
-        >
-          <Icon icon={ICONS.contributeMenu} />
-          Contribute
-        </Button>
-
         <div className="mt-auto flex flex-col gap-1.5">
           <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
             Last updated
             <DateCell date={item.updatedAt} />
           </div>
           <MapsMenuButton {...{ item }} />
+          <Popover open={contributeOpen} onOpenChange={setContributeOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full cursor-pointer rounded-full corner-squircle"
+              >
+                <Icon icon={ICONS.contributeMenu} />
+                Contribute
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              side="top"
+              className="flex max-h-[60vh] w-80 flex-col gap-2 overflow-y-auto"
+            >
+              <ContributeMenu
+                pin={{ id: item.id, title: item.title }}
+                onClose={() => setContributeOpen(false)}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
       </motion.div>
 
@@ -241,11 +252,7 @@ export function MapDetailPanel({
         />
       )}
 
-      <ContributeDialog
-        pin={{ id: item.id, title: item.title }}
-        open={contributeOpen}
-        onOpenChange={setContributeOpen}
-      />
+
     </motion.div>
   )
 }
