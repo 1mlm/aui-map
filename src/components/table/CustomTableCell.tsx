@@ -73,7 +73,14 @@ export function DateCell({ date }: { date: Date | undefined }) {
 
   return (
     <span className="font-normal italic inline-flex items-center gap-2 group/date">
-      {formatRelativeDate(date)}
+      {/* formatRelativeDate compares against `new Date()` at render time, which almost never
+          lands on the same wall-clock instant server-side (page request) and client-side
+          (hydration) -- most of the time that's an invisible few-ms drift, but a submission that
+          landed right at a bucket boundary (e.g. server says "Just now", hydration a beat later
+          crosses into "1 minute ago") flips the label outright and React throws a hydration
+          mismatch. The client's value is the one worth keeping live, so this just tells React not
+          to fight it */}
+      <span suppressHydrationWarning>{formatRelativeDate(date)}</span>
       <Tooltip>
         <TooltipTrigger asChild>
           <button
