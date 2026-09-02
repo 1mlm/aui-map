@@ -57,13 +57,13 @@ export function UserLocationMarker({
           <Icon
             icon={ICONS.heading}
             strokeWidth={5}
-            // top-0 left-1/2 + -translate-x/y-1/2 pins the icon's own center exactly on the
-            // wrapper's top-center point (a flex items-start + negative-margin combo did this
-            // before, but that's one line-height/baseline quirk away from drifting a few px off,
-            // which is exactly what was showing up as "offset from center" once zoomed in).
-            // the icon points down by default — rotate-180 is a fixed correction so it points
-            // outward (up) at heading 0, independent of the heading rotation on the wrapper above
-            className="-translate-x-1/2 -translate-y-1/2 absolute top-0 left-1/2 size-2.5 rotate-180 text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.6)]"
+            // top-1/2 left-1/2 + -translate-x/y-1/2 pins the icon's own center exactly on the
+            // wrapper's center point, which is the dot's own center too (the wrapper is inset-0
+            // over the dot's box) -- it then just spins in place as heading changes, rather than
+            // sitting off at the dot's edge. The icon points down by default -- rotate-180 is a
+            // fixed correction so it points outward (up) at heading 0, independent of the
+            // heading rotation on the wrapper above
+            className="-translate-x-1/2 -translate-y-1/2 absolute top-1/2 left-1/2 size-2.5 rotate-180 text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.6)]"
           />
         </span>
       )}
