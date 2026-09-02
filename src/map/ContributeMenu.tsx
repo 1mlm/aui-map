@@ -1,6 +1,5 @@
 "use client"
 
-import { upload } from "@vercel/blob/client"
 import {
   type ChangeEvent,
   useEffect,
@@ -16,6 +15,7 @@ import { Button } from "@/shadcn/ui/button"
 import { Input } from "@/shadcn/ui/input"
 import { Textarea } from "@/shadcn/ui/textarea"
 import { cn } from "@/shadcn/utils"
+import { uploadFile } from "@/utils/cloudinaryUpload"
 import { extractErrorMessage } from "@/utils/error"
 import { triggerHaptic } from "@/utils/haptics"
 import {
@@ -219,18 +219,10 @@ function ContributionForm({
             return
           }
         } else {
-          // uploads straight to Blob storage from the browser (bypasses the 4.5mb body limit a
+          // uploads straight to Cloudinary from the browser (bypasses the 4.5mb body limit a
           // server action would hit), then just tells the db the file landed
-          const blob = file
-            ? await upload(
-                `aui-map/${crypto.randomUUID()}-${file.name}`,
-                file,
-                {
-                  access: "public",
-                  handleUploadUrl: "/api/contribute/upload",
-                  multipart: true,
-                },
-              )
+          const uploaded = file
+            ? await uploadFile(file, { signUrl: "/api/contribute/upload" })
             : null
           await submitContribution({
             kind:
@@ -243,9 +235,9 @@ function ContributionForm({
                     : "PIN_EDIT",
             pinSlug: type.needsPin ? pin?.id : null,
             file:
-              blob && file
+              uploaded && file
                 ? {
-                    url: blob.url,
+                    url: uploaded.url,
                     fileName: file.name,
                     mimeType: file.type || null,
                   }

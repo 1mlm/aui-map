@@ -1,6 +1,6 @@
 "use client"
 
-import { type ReactNode, useState } from "react"
+import { type ReactNode, useEffect, useState } from "react"
 import { IconButton } from "@/components/IconButton"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/Tooltip"
@@ -25,6 +25,9 @@ const OFF_CAMPUS_TEXT = "You're not on campus 💀??"
 // to mean anything at building scale, so the tooltip says why rather than letting people
 // assume the map itself is wrong
 const VAGUE_ACCURACY_METERS = 120
+// flips the Contribute button's pulse off for good, for anyone who's ever clicked it — set on
+// first click, checked on mount, never cleared
+const CONTRIBUTE_SEEN_KEY = "aui-map:contribute-seen"
 
 type MapControl = {
   id: string
@@ -70,6 +73,17 @@ export function MapControls({
   const closeContribute = () => {
     setContributeOpenCompact(false)
     setContributeOpenFull(false)
+  }
+  // starts false on the server so hydration always matches, then flips true on mount if this
+  // browser hasn't clicked Contribute yet -- the pulse announcing the fix is worth a one-frame
+  // delay rather than risking a hydration mismatch against localStorage
+  const [contributeUnseen, setContributeUnseen] = useState(false)
+  useEffect(() => {
+    if (!localStorage.getItem(CONTRIBUTE_SEEN_KEY)) setContributeUnseen(true)
+  }, [])
+  function markContributeSeen() {
+    localStorage.setItem(CONTRIBUTE_SEEN_KEY, "1")
+    setContributeUnseen(false)
   }
   const { search, activeTagIds } = props
   const fixIsVague =
@@ -120,6 +134,8 @@ export function MapControls({
       id: "contribute",
       icon: ICONS.contributeMenu,
       label: "Contribute",
+      className: contributeUnseen ? "animate-pulse-violet" : undefined,
+      onClick: markContributeSeen,
       popover: {
         className: "flex max-h-[70vh] w-80 flex-col gap-2 overflow-y-auto",
         content: (

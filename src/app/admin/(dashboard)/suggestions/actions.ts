@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { deleteFile } from "@/utils/blob"
+import { deleteFile } from "@/utils/cloudinary"
 import { prisma } from "@/utils/prisma"
 import { requireAuth } from "@/utils/requireAuth"
 

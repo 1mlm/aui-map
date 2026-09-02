@@ -1,6 +1,5 @@
 "use client"
 
-import { upload } from "@vercel/blob/client"
 import { Reorder } from "motion/react"
 import Image from "next/image"
 import { type ChangeEvent, useRef, useState, useTransition } from "react"
@@ -24,6 +23,7 @@ import {
   DialogTitle,
 } from "@/shadcn/ui/dialog"
 import { Input } from "@/shadcn/ui/input"
+import { uploadFile } from "@/utils/cloudinaryUpload"
 import { formatRelativeDate } from "@/utils/date"
 import { extractErrorMessage } from "@/utils/error"
 import {
@@ -272,28 +272,22 @@ export function AttachmentManager({
   const [actionError, setActionError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // uploads go straight from the browser to Blob storage (bypassing the 4.5mb body limit a
+  // uploads go straight from the browser to Cloudinary (bypassing the 4.5mb body limit a
   // server action would hit), then this just tells the db the file landed
   async function runUpload(key: string, file: File) {
     try {
-      const blob = await upload(
-        `aui-map/${crypto.randomUUID()}-${file.name}`,
-        file,
-        {
-          access: "public",
-          handleUploadUrl: "/api/admin/attachments/upload",
-          multipart: true,
-          onUploadProgress: ({ percentage }) =>
-            setPendingUploads((current) =>
-              current.map((p) =>
-                p.key === key ? { ...p, progress: percentage } : p,
-              ),
+      const uploaded = await uploadFile(file, {
+        signUrl: "/api/admin/attachments/upload",
+        onUploadProgress: ({ percentage }) =>
+          setPendingUploads((current) =>
+            current.map((p) =>
+              p.key === key ? { ...p, progress: percentage } : p,
             ),
-        },
-      )
+          ),
+      })
       onAttachmentsChange(
         await createAttachment(pinId, {
-          url: blob.url,
+          url: uploaded.url,
           fileName: file.name,
           mimeType: file.type || null,
         }),

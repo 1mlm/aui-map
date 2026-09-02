@@ -1,5 +1,5 @@
-import { put } from "@vercel/blob"
 import { NextResponse } from "next/server"
+import { uploadBuffer } from "@/utils/cloudinary"
 
 // registered as the PWA's Web Share Target (see share_target in src/app/manifest.ts) — lets
 // someone share a link/photo from another app straight into aui-map's feedback form, instead of
@@ -24,15 +24,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (message) redirectUrl.searchParams.set("sharedText", message)
 
   if (media instanceof File && media.size > 0) {
-    const blob = await put(
-      `aui-map/${crypto.randomUUID()}-${media.name}`,
-      media,
-      {
-        access: "public",
-        addRandomSuffix: true,
-      },
-    )
-    redirectUrl.searchParams.set("sharedFileUrl", blob.url)
+    const uploaded = await uploadBuffer(Buffer.from(await media.arrayBuffer()))
+    redirectUrl.searchParams.set("sharedFileUrl", uploaded.secure_url)
     redirectUrl.searchParams.set("sharedFileName", media.name)
     redirectUrl.searchParams.set("sharedMimeType", media.type)
   }

@@ -1,6 +1,5 @@
 "use client"
 
-import { upload } from "@vercel/blob/client"
 import { type ChangeEvent, useRef, useState, useTransition } from "react"
 import { FieldLabel } from "@/components/FieldLabel"
 import { FormError } from "@/components/FormError"
@@ -10,6 +9,7 @@ import { MiniMapPicker, type Placement } from "@/map/MiniMapPicker"
 import type { MapPanorama } from "@/map/types"
 import { Button } from "@/shadcn/ui/button"
 import { Input } from "@/shadcn/ui/input"
+import { uploadFile } from "@/utils/cloudinaryUpload"
 import { createPanorama, deletePanorama, movePanorama } from "./actions"
 
 export function PanoramaPlacer({ panoramas }: { panoramas: MapPanorama[] }) {
@@ -57,17 +57,11 @@ export function PanoramaPlacer({ panoramas }: { panoramas: MapPanorama[] }) {
     }
     setError(null)
     startTransition(async () => {
-      const blob = await upload(
-        `aui-map/raw-${crypto.randomUUID()}-${file.name}`,
-        file,
-        {
-          access: "public",
-          handleUploadUrl: "/api/contribute/upload",
-          multipart: true,
-        },
-      )
+      const uploaded = await uploadFile(file, {
+        signUrl: "/api/contribute/upload",
+      })
       const result = await createPanorama({
-        rawUrl: blob.url,
+        rawUrl: uploaded.url,
         latitude: draft.latitude,
         longitude: draft.longitude,
         caption: caption.trim() || null,
@@ -83,9 +77,7 @@ export function PanoramaPlacer({ panoramas }: { panoramas: MapPanorama[] }) {
     })
   }
 
-  const selected = panoramas.find(
-    (panorama) => panorama.uuid === selectedUuid,
-  )
+  const selected = panoramas.find((panorama) => panorama.uuid === selectedUuid)
 
   return (
     <div className="grid gap-4 p-6 lg:grid-cols-2">

@@ -130,6 +130,7 @@
     }
   button:not(:disabled), [role="button"]:not(:disabled) {
     cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
     }
   /* radix's menu items are role="menuitem"/"menuitemcheckbox"/"menuitemradio", not "button", so
      the rule above misses them — shadcn's own primitives ship with cursor-default on these.
@@ -193,6 +194,22 @@
   }
 }
 
+/* one tap response for every button in the app, instead of each one hand-rolling its own. Reads
+   the tailwind transform vars (translate/rotate) any given button might already carry so this
+   composes with those instead of stomping them — a MapPin's own -translate-x/y-1/2 centering,
+   say — and only multiplies in the extra press-scale on top */
+@media (prefers-reduced-motion: no-preference) {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    transition: transform 0.15s ease;
+  }
+  button:not(:disabled):active,
+  [role="button"]:not([aria-disabled="true"]):active {
+    transform: translate3d(var(--tw-translate-x, 0), var(--tw-translate-y, 0), 0)
+      rotate(var(--tw-rotate, 0)) scale(0.94);
+  }
+}
+
 /* a quick "no, that's wrong" shake for the locate button when a fix lands outside the campus's
    own bounds -- plays once as isOffCampus's class turns on, not on a loop, since a corner button
    shaking forever would just read as broken rather than as a one-time heads up */
@@ -216,6 +233,29 @@
 }
 .animate-wiggle {
   animation: wiggle 0.5s ease-in-out;
+}
+
+/* flags the Contribute button as newly-fixed/worth trying — a violet breathing glow plus a
+   slightly heavier ring, until MapControls.tsx's own "seen" flag turns it off for good on
+   first click. Scale stays tiny so it reads as "alive", not as an error/urgent state */
+.animate-pulse-violet {
+  border: 2px solid oklch(0.6 0.24 302 / 0.8);
+}
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes pulse-violet {
+    0%,
+    100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 oklch(0.6 0.24 302 / 0.5);
+    }
+    50% {
+      transform: scale(1.06);
+      box-shadow: 0 0 0 6px oklch(0.6 0.24 302 / 0);
+    }
+  }
+  .animate-pulse-violet {
+    animation: pulse-violet 1.8s ease-in-out infinite;
+  }
 }
 
 /* Windows High Contrast correctly strips this app's custom background-color, which is how most

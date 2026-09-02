@@ -24,7 +24,7 @@ const KIND_SUBJECT: Record<SubmissionKind, string> = {
 }
 
 // public — anyone on the map can contribute, no auth required. Everything lands as a PENDING
-// Submission the admin reviews at /admin/submissions. Any file is already sitting in Blob storage
+// Submission the admin reviews at /admin/submissions. Any file is already sitting in Cloudinary
 // by the time this runs (the dialog uploads it client-side first, via
 // src/app/api/contribute/upload, to stay under the 4.5mb body limit a server action would hit)
 export async function submitContribution(input: ContributionInput) {
@@ -59,8 +59,7 @@ export async function submitContribution(input: ContributionInput) {
       `<p>File: <a href="${input.file.url}">${escapeHtml(input.file.fileName)}</a></p>`,
     input.message && `<p>${escapeHtml(input.message)}</p>`,
     input.caption && `<p>${escapeHtml(input.caption)}</p>`,
-    input.coord &&
-      `<p>${input.coord.latitude}, ${input.coord.longitude}</p>`,
+    input.coord && `<p>${input.coord.latitude}, ${input.coord.longitude}</p>`,
   ].filter(Boolean)
 
   await notifyAdmin(subject, lines.join(""))

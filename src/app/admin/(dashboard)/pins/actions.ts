@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { Prisma } from "@/generated/prisma/client"
 import type { PinLink } from "@/map/types"
-import { deleteFile } from "@/utils/blob"
+import { deleteFile } from "@/utils/cloudinary"
 import { prisma } from "@/utils/prisma"
 import { RESERVED_PIN_IDS } from "@/utils/reservedPinIds"
 import { requireAuth } from "@/utils/requireAuth"
@@ -182,22 +182,22 @@ export async function deleteAttachment(pinId: string, attachmentId: string) {
   return getAttachments(pinId)
 }
 
-// the file is already sitting in Blob storage by the time this runs — AttachmentManager
+// the file is already sitting in Cloudinary by the time this runs — AttachmentManager
 // uploads it client-side first (see src/app/api/admin/attachments/upload) to stay under the
 // 4.5mb body limit a server action would otherwise hit, then calls this just to persist the row
 export async function createAttachment(
   pinId: string,
-  blob: { url: string; fileName: string; mimeType: string | null },
+  file: { url: string; fileName: string; mimeType: string | null },
 ) {
   await requireAuth()
   const order = await prisma.attachment.count({ where: { pinId } })
   await prisma.attachment.create({
     data: {
       pinId,
-      url: blob.url,
+      url: file.url,
       order,
-      mimeType: blob.mimeType,
-      fileName: blob.fileName,
+      mimeType: file.mimeType,
+      fileName: file.fileName,
     },
   })
 

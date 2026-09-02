@@ -1,6 +1,5 @@
 "use client"
 
-import { upload } from "@vercel/blob/client"
 import {
   type ChangeEvent,
   type ClipboardEvent,
@@ -17,6 +16,7 @@ import {
   InputGroupButton,
   InputGroupTextarea,
 } from "@/shadcn/ui/input-group"
+import { uploadFile } from "@/utils/cloudinaryUpload"
 import { triggerConfetti } from "@/utils/confetti"
 import { extractErrorMessage } from "@/utils/error"
 import { iconForMimeType } from "@/utils/mimeType"
@@ -80,36 +80,30 @@ export function SuggestionForm({
     setError(null)
     startTransition(async () => {
       try {
-        // uploads straight to Blob storage from the browser (bypasses the 4.5mb body limit a
+        // uploads straight to Cloudinary from the browser (bypasses the 4.5mb body limit a
         // server action would hit), then just tells the db the file landed. An already-uploaded
-        // (share-target) attachment skips this — it's already sitting in Blob storage
-        const blob =
+        // (share-target) attachment skips this — it's already sitting in Cloudinary
+        const uploaded =
           attachment?.kind === "new"
-            ? await upload(
-                `aui-map/${crypto.randomUUID()}-${attachment.file.name}`,
-                attachment.file,
-                {
-                  access: "public",
-                  handleUploadUrl: "/api/contribute/upload",
-                  multipart: true,
-                },
-              )
+            ? await uploadFile(attachment.file, {
+                signUrl: "/api/contribute/upload",
+              })
             : null
-        const blobInfo =
+        const attachmentInfo =
           attachment?.kind === "uploaded"
             ? {
                 url: attachment.url,
                 fileName: attachment.fileName,
                 mimeType: attachment.mimeType,
               }
-            : blob && attachment?.kind === "new"
+            : uploaded && attachment?.kind === "new"
               ? {
-                  url: blob.url,
+                  url: uploaded.url,
                   fileName: attachment.file.name,
                   mimeType: attachment.file.type || null,
                 }
               : null
-        const result = await submitSuggestion("BUG", message, blobInfo)
+        const result = await submitSuggestion("BUG", message, attachmentInfo)
         if (result?.error) {
           setError(result.error)
           return

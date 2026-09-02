@@ -1,8 +1,8 @@
 "use server"
 
-import { del, put } from "@vercel/blob"
 import { revalidatePath } from "next/cache"
 import sharp from "sharp"
+import { deleteFile, uploadBuffer } from "@/utils/cloudinary"
 import { prisma } from "@/utils/prisma"
 import { requireAuth } from "@/utils/requireAuth"
 
@@ -22,7 +22,7 @@ async function toWebp(source: Buffer, maxWidth: number, quality: number) {
     .toBuffer()
 }
 
-// the raw upload lands in Blob storage client-side first (panoramas are far past the 4.5mb body
+// the raw upload lands in Cloudinary client-side first (panoramas are far past the 4.5mb body
 // limit a server action accepts), so this takes the url it landed at, compresses both sizes from
 // it, and drops the original — nothing keeps a 20mb file around once the webp exists
 export async function createPanorama({
@@ -49,20 +49,17 @@ export async function createPanorama({
     toWebp(original, THUMBNAIL_MAX_WIDTH_PX, THUMBNAIL_QUALITY),
   ])
 
-  const stem = `aui-map/panorama-${crypto.randomUUID()}`
-  const [fullBlob, thumbnailBlob] = await Promise.all([
-    put(`${stem}.webp`, full, { access: "public", contentType: "image/webp" }),
-    put(`${stem}-thumb.webp`, thumbnail, {
-      access: "public",
-      contentType: "image/webp",
-    }),
+  const stem = `panorama-${crypto.randomUUID()}`
+  const [fullUpload, thumbnailUpload] = await Promise.all([
+    uploadBuffer(full, { publicId: stem }),
+    uploadBuffer(thumbnail, { publicId: `${stem}-thumb` }),
   ])
-  await del(rawUrl)
+  await deleteFile(rawUrl)
 
   await prisma.panorama.create({
     data: {
-      url: fullBlob.url,
-      thumbnailUrl: thumbnailBlob.url,
+      url: fullUpload.secure_url,
+      thumbnailUrl: thumbnailUpload.secure_url,
       latitude,
       longitude,
       caption,
@@ -90,13 +87,16 @@ export async function movePanorama(
   return { error: null }
 }
 
-// deletes the blobs too — unlike a pin's attachments, a panorama's files exist for nothing else,
+// deletes the files too — unlike a pin's attachments, a panorama's files exist for nothing else,
 // so leaving them behind would just be storage nobody can reach
 export async function deletePanorama(uuid: string) {
   await requireAuth()
   const panorama = await prisma.panorama.findUniqueOrThrow({ where: { uuid } })
   await prisma.panorama.delete({ where: { uuid } })
-  await del([panorama.url, panorama.thumbnailUrl])
+  await Promise.all([
+    deleteFile(panorama.url),
+    deleteFile(panorama.thumbnailUrl),
+  ])
   revalidatePath("/")
   revalidatePath("/admin/panoramas")
   return { error: null }
