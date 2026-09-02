@@ -33,7 +33,7 @@ export function LocateFloatingButton({
   if (isDone) return null
 
   return (
-    <div className="map-locate-floating pointer-events-auto absolute bottom-6 left-1/2 -translate-x-1/2">
+    <div className="map-locate-floating pointer-events-auto absolute right-4 bottom-20">
       <IconButton
         icon={
           isBusy

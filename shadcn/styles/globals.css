@@ -174,7 +174,7 @@
 
 .map-brand,
 .map-controls-full,
-.map-filter-bar {
+.map-filter-bar-full {
   display: none !important;
 }
 
@@ -186,11 +186,12 @@
 
 @container shell (min-width: 480px) and (min-height: 560px) {
   .map-controls-compact,
-  .map-locate-floating {
+  .map-locate-floating,
+  .map-filter-bar-compact {
     display: none !important;
   }
   .map-controls-full,
-  .map-filter-bar {
+  .map-filter-bar-full {
     display: block !important;
   }
 }

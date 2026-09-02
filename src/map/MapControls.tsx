@@ -9,7 +9,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover"
 import { cn } from "@/shadcn/utils"
 import { ContributeMenu, type ContributePin } from "./ContributeMenu"
 import { SearchField, type SearchProps } from "./MapSearch"
-import { type FilterProps, TagPills } from "./MapTagFilter"
 import type { CompassPermission } from "./useCompassHeading"
 import type { LocationStatus } from "./useUserLocation"
 
@@ -36,16 +35,12 @@ type MapControl = {
   icon: (typeof ICONS)[keyof typeof ICONS]
   label: string
   active?: boolean
-  badgeCount?: number
   iconClassName?: string
   className?: string
   onClick?: () => void
   // only set when there is something to say beyond the label already under the glyph
   tooltip?: string | null
   popover?: { className: string; content: ReactNode }
-  // the roomy layout already has a permanent filter bar docked along the bottom, so its copy of
-  // the filter button would be a second control for something already on screen
-  compactOnly?: boolean
   // the compact bar's own copy would be a second, more cramped "get located" flow next to
   // LocateFloatingButton's -- that one already owns this job on mobile
   fullOnly?: boolean
@@ -61,17 +56,16 @@ export function MapControls({
   onRequestCompass,
   contributePins,
   ...props
-}: SearchProps &
-  FilterProps & {
-    onOpenNotice: () => void
-    locationStatus: LocationStatus
-    isOffCampus: boolean
-    accuracy: number | null
-    onLocate: () => void
-    compassPermission: CompassPermission
-    onRequestCompass: () => void
-    contributePins: ContributePin[]
-  }) {
+}: SearchProps & {
+  onOpenNotice: () => void
+  locationStatus: LocationStatus
+  isOffCampus: boolean
+  accuracy: number | null
+  onLocate: () => void
+  compassPermission: CompassPermission
+  onRequestCompass: () => void
+  contributePins: ContributePin[]
+}) {
   // controlled only so the menu can close itself once something has been sent. Two independent
   // states, not one shared boolean -- both the compact and full control bars are always mounted
   // (see the render's own comment on why), so a single shared `open` flips both Popover instances
@@ -94,7 +88,7 @@ export function MapControls({
     localStorage.setItem(CONTRIBUTE_SEEN_KEY, "1")
     setContributeUnseen(false)
   }
-  const { search, activeTagIds } = props
+  const { search } = props
   const fixIsVague =
     locationStatus === "granted" &&
     accuracy !== null &&
@@ -120,18 +114,6 @@ export function MapControls({
       popover: {
         className: "flex w-80 flex-col gap-2.5",
         content: <SearchField {...props} />,
-      },
-    },
-    {
-      id: "filter",
-      icon: ICONS.filter,
-      label: "Filter",
-      active: activeTagIds.size > 0,
-      badgeCount: activeTagIds.size,
-      compactOnly: true,
-      popover: {
-        className: "flex w-72 flex-wrap gap-1.5",
-        content: <TagPills {...props} />,
       },
     },
     {
@@ -179,17 +161,13 @@ export function MapControls({
 
   function renderControls(compact: boolean) {
     return controls
-      .filter(
-        (control) =>
-          (compact || !control.compactOnly) && (!compact || !control.fullOnly),
-      )
+      .filter((control) => !compact || !control.fullOnly)
       .map(
         ({
           id,
           icon,
           label,
           active,
-          badgeCount,
           iconClassName,
           className,
           onClick,
@@ -241,11 +219,6 @@ export function MapControls({
                 </Popover>
               ) : (
                 button
-              )}
-              {Boolean(badgeCount) && (
-                <span className="pointer-events-none absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground ring-2 ring-background">
-                  {badgeCount}
-                </span>
               )}
             </span>
           )

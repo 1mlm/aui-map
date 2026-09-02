@@ -187,10 +187,7 @@ export function MapExperience({
         <NetworkStatusBanner />
 
         <MapControls
-          tags={effectiveTags}
-          onToggle={toggleTag}
           onSearchChange={setSearch}
-          onHoverTag={setHoveredTagId}
           onOpenNotice={() => setNoticeOpen(true)}
           locationStatus={location.status}
           isOffCampus={location.isOffCampus}
@@ -198,7 +195,7 @@ export function MapExperience({
           onLocate={handleLocate}
           compassPermission={compass.permission}
           onRequestCompass={compass.requestPermission}
-          {...{ search, activeTagIds, hoveredTagId, contributePins }}
+          {...{ search, contributePins }}
         />
         <LocateFloatingButton
           locationStatus={location.status}

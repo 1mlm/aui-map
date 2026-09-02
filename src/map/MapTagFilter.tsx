@@ -97,13 +97,15 @@ function TagPill({
     >
       <TagChipIcon {...{ tag, active }} />
       {tag.label}
+      {active && <Icon icon={ICONS.close} className="size-3.5" />}
     </motion.button>
   )
 }
 
-// the bar is deliberately not full-bleed: its two SquircleFuser patches live just outside its
-// left and right edges, and they're what sells the bar as melting into the frame rather than
-// sitting on top of it. Run it edge to edge and there's nowhere left for them to sit
+// the full-layout bar is deliberately not full-bleed: its two SquircleFuser patches live just
+// outside its left and right edges, and they're what sells the bar as melting into the frame
+// rather than sitting on top of it. Run it edge to edge and there's nowhere left for them to sit.
+// The compact bar skips this entirely -- a phone screen doesn't have the width to spare
 const FILTER_BAR_SIDE_INSET = "6rem"
 // the scrollable strip fades out on whichever side still has chips hidden past the edge, so a
 // half-cut pill reads as "keep going" rather than as a clipping bug. This is the whole overflow
@@ -120,18 +122,13 @@ function scrollFadeMask(fadeLeft: boolean, fadeRight: boolean) {
   return `linear-gradient(to right, ${stops[0]}, ${stops[1]})`
 }
 
-// wide dock for the map's roomy layout — replaced the decorative credit line that used to sit
-// here, which said nothing the About dialog doesn't already say
-export function MapFilterBar({
-  reservedRight,
-  ...props
-}: FilterProps & { reservedRight: string }) {
+// shared by both bar layouts: which side of the horizontally-scrolling strip is cut off depends
+// on its scroll position AND on how much room it was given, which changes when the detail panel
+// opens or the window resizes — so this watches the element itself rather than only scroll events
+function useScrollFadeMask() {
   const stripRef = useRef<HTMLDivElement>(null)
   const [overflow, setOverflow] = useState({ left: false, right: false })
 
-  // which side is cut off depends on the strip's scroll position AND on how much room the bar
-  // was given, which changes when the detail panel opens or the window resizes — so this watches
-  // the element itself rather than only listening for scroll events
   useEffect(() => {
     const strip = stripRef.current
     if (!strip) return
@@ -152,9 +149,39 @@ export function MapFilterBar({
     }
   }, [])
 
+  return { stripRef, maskImage: scrollFadeMask(overflow.left, overflow.right) }
+}
+
+// mobile: a plain full-width strip, bordered off from the map above it rather than docked as an
+// inset pill -- a phone doesn't have side margin to spare for the full bar's fuser patches
+function CompactFilterBar(props: FilterProps) {
+  const { stripRef, maskImage } = useScrollFadeMask()
+
+  return (
+    <div className="map-filter-bar-compact pointer-events-auto absolute inset-x-0 bottom-0 flex items-center gap-2 border-t bg-background/90 px-3 py-2.5 backdrop-blur-md">
+      <Icon icon={ICONS.filter} aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+      <div
+        ref={stripRef}
+        className={cn("flex gap-1.5 overflow-x-auto scroll-smooth", HIDE_SCROLLBAR)}
+        style={{ maskImage }}
+      >
+        <TagPills {...props} />
+      </div>
+    </div>
+  )
+}
+
+// wide dock for the map's roomy layout — replaced the decorative credit line that used to sit
+// here, which said nothing the About dialog doesn't already say
+function FullFilterBar({
+  reservedRight,
+  ...props
+}: FilterProps & { reservedRight: string }) {
+  const { stripRef, maskImage } = useScrollFadeMask()
+
   return (
     <div
-      className="map-filter-bar pointer-events-none absolute inset-0 transition-[right] duration-300 ease-out"
+      className="map-filter-bar-full pointer-events-none absolute inset-0 transition-[right] duration-300 ease-out"
       style={{ right: reservedRight }}
     >
       <SquircleFuserContainer
@@ -171,15 +198,24 @@ export function MapFilterBar({
 
         <div
           ref={stripRef}
-          className={cn(
-            "flex gap-1.5 overflow-x-auto scroll-smooth",
-            HIDE_SCROLLBAR,
-          )}
-          style={{ maskImage: scrollFadeMask(overflow.left, overflow.right) }}
+          className={cn("flex gap-1.5 overflow-x-auto scroll-smooth", HIDE_SCROLLBAR)}
+          style={{ maskImage }}
         >
           <TagPills {...props} />
         </div>
       </SquircleFuserContainer>
     </div>
+  )
+}
+
+// both layouts render unconditionally; which one is actually visible is decided by a CSS
+// container query (globals.css's .map-filter-bar-compact / .map-filter-bar-full rules), matching
+// how MapControls splits into its own compact/full pair
+export function MapFilterBar(props: FilterProps & { reservedRight: string }) {
+  return (
+    <>
+      <CompactFilterBar {...props} />
+      <FullFilterBar {...props} />
+    </>
   )
 }
