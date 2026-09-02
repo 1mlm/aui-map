@@ -185,7 +185,8 @@
 }
 
 @container shell (min-width: 480px) and (min-height: 560px) {
-  .map-controls-compact {
+  .map-controls-compact,
+  .map-locate-floating {
     display: none !important;
   }
   .map-controls-full,

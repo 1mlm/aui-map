@@ -30,7 +30,6 @@ import { OffCampusIndicator } from "./OffCampusIndicator"
 import type { CrayonTuning } from "./tagColor"
 import type { MapItem, MapPanorama } from "./types"
 import { type UserLocation, UserLocationMarker } from "./UserLocationMarker"
-import type { CompassPermission } from "./useCompassHeading"
 import { useMapPanZoom } from "./useMapPanZoom"
 
 const SURVEYED_COORD_TOAST_MS = 3000
@@ -130,8 +129,6 @@ export function MapCanvas({
   userAccuracy,
   offCampusPosition,
   compassHeading,
-  compassPermission,
-  onRequestCompass,
   hoveredTagId,
   tuning,
   sizeTuning,
@@ -145,8 +142,6 @@ export function MapCanvas({
   userAccuracy: UserLocation["accuracy"]
   offCampusPosition: UserLocation["rawPosition"]
   compassHeading: number | null
-  compassPermission: CompassPermission
-  onRequestCompass: () => void
   hoveredTagId: string | null
   // only ever overridden by the dev-only TagColorPlayground — real visitors always get the default
   tuning?: CrayonTuning
@@ -251,7 +246,13 @@ export function MapCanvas({
           onClick={copyCoordinateUnderCursor}
           style={{ touchAction: "none" }}
           className={cn(
-            "absolute inset-0 select-none overflow-hidden bg-background transition-[box-shadow]",
+            // isolate boxes in every z-index inside (selected pins go to 1000) so they only ever
+            // stack against each other, never against sibling UI chrome (top bar, brand, panel).
+            // That containment would otherwise come for free from the transform on the motion.div
+            // below -- a non-"none" transform creates a stacking context too -- except framer
+            // hasn't written that transform to the DOM yet on the very first frame(s), so pins
+            // could briefly out-rank the chrome around them until it does. isolate doesn't wait.
+            "absolute inset-0 isolate select-none overflow-hidden bg-background transition-[box-shadow]",
             panZoom.hitLimit && "shadow-[inset_0_0_0_4px_rgba(220,38,38,0.45)]",
           )}
         >
@@ -294,8 +295,6 @@ export function MapCanvas({
                 position={userPosition}
                 heading={compassHeading}
                 accuracy={userAccuracy}
-                compassPermission={compassPermission}
-                onRequestCompass={onRequestCompass}
               />
               {offCampusPosition && (
                 <OffCampusIndicator position={offCampusPosition} />

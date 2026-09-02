@@ -6,9 +6,11 @@ import { SquircleFuserContainer } from "@/components/SquircleFuser"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/Tooltip"
 import { ICONS } from "@/icons"
 import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover"
+import { cn } from "@/shadcn/utils"
 import { ContributeMenu, type ContributePin } from "./ContributeMenu"
 import { SearchField, type SearchProps } from "./MapSearch"
 import { type FilterProps, TagPills } from "./MapTagFilter"
+import type { CompassPermission } from "./useCompassHeading"
 import type { LocationStatus } from "./useUserLocation"
 
 const LOCATE_LABEL: Record<LocationStatus, string> = {
@@ -44,6 +46,9 @@ type MapControl = {
   // the roomy layout already has a permanent filter bar docked along the bottom, so its copy of
   // the filter button would be a second control for something already on screen
   compactOnly?: boolean
+  // the compact bar's own copy would be a second, more cramped "get located" flow next to
+  // LocateFloatingButton's -- that one already owns this job on mobile
+  fullOnly?: boolean
 }
 
 export function MapControls({
@@ -52,6 +57,8 @@ export function MapControls({
   isOffCampus,
   accuracy,
   onLocate,
+  compassPermission,
+  onRequestCompass,
   contributePins,
   ...props
 }: SearchProps &
@@ -61,6 +68,8 @@ export function MapControls({
     isOffCampus: boolean
     accuracy: number | null
     onLocate: () => void
+    compassPermission: CompassPermission
+    onRequestCompass: () => void
     contributePins: ContributePin[]
   }) {
   // controlled only so the menu can close itself once something has been sent. Two independent
@@ -95,6 +104,12 @@ export function MapControls({
     : fixIsVague
       ? `Your device placed you within about ${Math.round(accuracy)}m, so that is your wifi network's registered spot rather than a real fix. A phone with GPS will put you on the right building.`
       : null
+  // once located, iOS still gates the compass behind its own explicit tap -- rather than a
+  // separate control for that, the same button just asks for the next thing it needs
+  const needsCompassTap =
+    locationStatus === "granted" && compassPermission === "idle"
+  const isBusy =
+    locationStatus === "requesting" || compassPermission === "requesting"
 
   const controls: MapControl[] = [
     {
@@ -121,14 +136,25 @@ export function MapControls({
     },
     {
       id: "locate",
-      icon: locationStatus === "requesting" ? ICONS.loading : ICONS.locate,
-      label: isOffCampus ? "Off campus" : LOCATE_LABEL[locationStatus],
-      active: locationStatus === "granted",
-      iconClassName:
-        locationStatus === "requesting" ? "animate-spin" : undefined,
-      className: isOffCampus ? "motion-safe:animate-wiggle" : undefined,
+      fullOnly: true,
+      icon: isBusy
+        ? ICONS.loading
+        : needsCompassTap
+          ? ICONS.heading
+          : ICONS.locate,
+      label: isOffCampus
+        ? "Off campus"
+        : needsCompassTap
+          ? "Get orientation"
+          : LOCATE_LABEL[locationStatus],
+      active: locationStatus === "granted" && !needsCompassTap,
+      iconClassName: isBusy ? "animate-spin" : undefined,
+      className: cn(
+        isOffCampus && "motion-safe:animate-wiggle",
+        needsCompassTap && "animate-pulse-violet",
+      ),
       tooltip: locateTooltip,
-      onClick: onLocate,
+      onClick: needsCompassTap ? onRequestCompass : onLocate,
     },
     {
       id: "contribute",
@@ -153,7 +179,10 @@ export function MapControls({
 
   function renderControls(compact: boolean) {
     return controls
-      .filter((control) => compact || !control.compactOnly)
+      .filter(
+        (control) =>
+          (compact || !control.compactOnly) && (!compact || !control.fullOnly),
+      )
       .map(
         ({
           id,

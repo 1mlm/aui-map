@@ -4,6 +4,7 @@ import { track } from "@vercel/analytics"
 import { AnimatePresence } from "motion/react"
 import dynamic from "next/dynamic"
 import { useEffect, useRef, useState } from "react"
+import { LocateFloatingButton } from "./LocateFloatingButton"
 import { MapBrand } from "./MapBrand"
 import { MapCanvas, type MapCanvasHandle } from "./MapCanvas"
 import { MapControls } from "./MapControls"
@@ -172,8 +173,6 @@ export function MapExperience({
           userAccuracy={location.accuracy}
           offCampusPosition={location.isOffCampus ? location.rawPosition : null}
           compassHeading={compass.heading}
-          compassPermission={compass.permission}
-          onRequestCompass={compass.requestPermission}
           {...{ selectedId, hoveredTagId, tuning, sizeTuning, panoramas }}
         />
 
@@ -190,7 +189,15 @@ export function MapExperience({
           isOffCampus={location.isOffCampus}
           accuracy={location.accuracy}
           onLocate={handleLocate}
+          compassPermission={compass.permission}
+          onRequestCompass={compass.requestPermission}
           {...{ search, activeTagIds, hoveredTagId, contributePins }}
+        />
+        <LocateFloatingButton
+          locationStatus={location.status}
+          compassPermission={compass.permission}
+          onLocate={handleLocate}
+          onRequestCompass={compass.requestPermission}
         />
 
         <AnimatePresence>
