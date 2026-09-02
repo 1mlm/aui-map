@@ -34,6 +34,11 @@ const PIN_REFERENCE_SCALE = 4
 export const DEFAULT_PIN_GROWTH_EXPONENT = 0.1
 const DOUBLE_TAP_MAX_DELAY_MS = 300
 const DOUBLE_TAP_MAX_DISTANCE_PX = 24
+// a touch that starts on a pin is held as a tap candidate rather than a pan (see
+// handlePointerDown) so a real tap still selects it -- but pins are dense and this hit slop is
+// generous, so a finger meaning to drag the map often lands on one first. Once it moves past this
+// many px it's clearly not a tap, and gets promoted to a normal pan instead of just doing nothing
+const PIN_DRAG_PROMOTE_THRESHOLD_PX = 10
 const WHEEL_SETTLE_DELAY_MS = 220
 const LIMIT_FLASH_MS = 180
 // how long to keep pins' shadow filters off after the last non-animated scale change (wheel tick,
@@ -77,6 +82,13 @@ export function useMapPanZoom() {
 
   const activePointers = useRef(new Map<number, Point>())
   const panOrigin = useRef<{ pointer: Point; pan: Pan } | null>(null)
+  // a single touch that started on a pin -- not panning yet, just waiting to find out whether
+  // it's a tap (stays a candidate) or a drag (gets promoted to panOrigin in handlePointerMove)
+  const pinTapOrigin = useRef<{
+    pointer: Point
+    pan: Pan
+    pointerId: number
+  } | null>(null)
   const pinchOrigin = useRef<{
     distance: number
     scale: number
@@ -255,8 +267,16 @@ export function useMapPanZoom() {
     activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
 
     if (activePointers.current.size === 1) {
-      // a lone touch on a pin should resolve as its own tap, not start a pan
-      if (startedOnButton) return
+      // a lone touch on a pin should resolve as its own tap, not immediately start a pan -- but
+      // it's kept as a candidate in case it turns into a drag, see handlePointerMove
+      if (startedOnButton) {
+        pinTapOrigin.current = {
+          pointer: { x: e.clientX, y: e.clientY },
+          pan: getPan(),
+          pointerId: e.pointerId,
+        }
+        return
+      }
       panOrigin.current = {
         pointer: { x: e.clientX, y: e.clientY },
         pan: getPan(),
@@ -272,6 +292,7 @@ export function useMapPanZoom() {
         pan: getPan(),
       }
       panOrigin.current = null
+      pinTapOrigin.current = null
     }
   }
 
@@ -302,6 +323,28 @@ export function useMapPanZoom() {
       return
     }
 
+    if (
+      activePointers.current.size === 1 &&
+      !panOrigin.current &&
+      pinTapOrigin.current?.pointerId === e.pointerId &&
+      distanceBetween(pinTapOrigin.current.pointer, {
+        x: e.clientX,
+        y: e.clientY,
+      }) > PIN_DRAG_PROMOTE_THRESHOLD_PX
+    ) {
+      panOrigin.current = {
+        pointer: pinTapOrigin.current.pointer,
+        pan: pinTapOrigin.current.pan,
+      }
+      pinTapOrigin.current = null
+      // retargets this pointer's remaining events -- and, per spec, its eventual synthesized
+      // click -- to the canvas instead of the pin, so a drag that started on a pin doesn't also
+      // fire the pin's onClick once released
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId)
+      } catch {}
+    }
+
     if (activePointers.current.size === 1 && panOrigin.current) {
       const { pointer, pan } = panOrigin.current
       const dragged = {
@@ -322,6 +365,8 @@ export function useMapPanZoom() {
         DOUBLE_TAP_MAX_DISTANCE_PX
 
     activePointers.current.delete(e.pointerId)
+    if (pinTapOrigin.current?.pointerId === e.pointerId)
+      pinTapOrigin.current = null
     if (activePointers.current.size < 2) pinchOrigin.current = null
 
     const [remaining] = [...activePointers.current.values()]
