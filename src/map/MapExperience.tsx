@@ -162,6 +162,15 @@ export function MapExperience({
     return () => clearTimeout(timer)
   }, [search, effectiveItems])
 
+  // once a search narrows the map down to a single pin there's nothing left to browse, so open
+  // it straight away instead of making the last click a separate step
+  useEffect(() => {
+    if (!search.trim()) return
+    if (visibleItems.length !== 1) return
+    const [onlyMatch] = visibleItems
+    if (onlyMatch.id !== selectedId) setSelectedId(onlyMatch.id)
+  }, [search, visibleItems, selectedId, setSelectedId])
+
   return (
     <div className="h-dvh w-dvw bg-background sm:p-3">
       {/* the shell's shadow is dark-mode only: the gutter around it and the corner fusers inside it

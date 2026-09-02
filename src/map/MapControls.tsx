@@ -5,6 +5,7 @@ import { IconButton } from "@/components/IconButton"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/Tooltip"
 import { ICONS } from "@/icons"
+import { Dialog, DialogContent, DialogTitle } from "@/shadcn/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover"
 import { cn } from "@/shadcn/utils"
 import { ContributeMenu, type ContributePin } from "./ContributeMenu"
@@ -63,17 +64,10 @@ export function MapControls({
   onRequestCompass: () => void
   contributePins: ContributePin[]
 }) {
-  // controlled only so the menu can close itself once something has been sent. Two independent
-  // states, not one shared boolean -- both the compact and full control bars are always mounted
-  // (see the render's own comment on why), so a single shared `open` flips both Popover instances
-  // true on one click; the hidden instance's own dismiss-layer then sees that same click as
-  // happening outside its own (still off-screen) trigger and immediately closes it right back down
-  const [contributeOpenCompact, setContributeOpenCompact] = useState(false)
-  const [contributeOpenFull, setContributeOpenFull] = useState(false)
-  const closeContribute = () => {
-    setContributeOpenCompact(false)
-    setContributeOpenFull(false)
-  }
+  // a single shared boolean is enough here, unlike the popover-based controls -- a Dialog is one
+  // portal-rendered modal regardless of which of the two (compact/full) trigger buttons opened
+  // it, not a separate instance anchored to each
+  const [contributeOpen, setContributeOpen] = useState(false)
   // starts false on the server so hydration always matches, then flips true on mount if this
   // browser hasn't clicked Contribute yet -- the pulse announcing the fix is worth a one-frame
   // delay rather than risking a hydration mismatch against localStorage
@@ -81,9 +75,10 @@ export function MapControls({
   useEffect(() => {
     if (!localStorage.getItem(CONTRIBUTE_SEEN_KEY)) setContributeUnseen(true)
   }, [])
-  function markContributeSeen() {
+  function openContribute() {
     localStorage.setItem(CONTRIBUTE_SEEN_KEY, "1")
     setContributeUnseen(false)
+    setContributeOpen(true)
   }
   const { search } = props
   const fixIsVague =
@@ -165,13 +160,7 @@ export function MapControls({
       icon: ICONS.contributeMenu,
       label: "Contribute",
       className: contributeUnseen ? "animate-pulse-violet" : undefined,
-      onClick: markContributeSeen,
-      popover: {
-        className: "flex max-h-[70vh] w-80 flex-col gap-2 overflow-y-auto",
-        content: (
-          <ContributeMenu items={contributePins} onClose={closeContribute} />
-        ),
-      },
+      onClick: openContribute,
     },
     {
       id: "about",
@@ -221,22 +210,7 @@ export function MapControls({
           return (
             <span key={id} className="relative">
               {popover ? (
-                <Popover
-                  open={
-                    id === "contribute"
-                      ? compact
-                        ? contributeOpenCompact
-                        : contributeOpenFull
-                      : undefined
-                  }
-                  onOpenChange={
-                    id === "contribute"
-                      ? compact
-                        ? setContributeOpenCompact
-                        : setContributeOpenFull
-                      : undefined
-                  }
-                >
+                <Popover>
                   <PopoverTrigger asChild>{button}</PopoverTrigger>
                   <PopoverContent className={popover.className}>
                     {popover.content}
@@ -268,6 +242,18 @@ export function MapControls({
       >
         {renderControls(false)}
       </SquircleFuserContainer>
+
+      {/* a modal, not a popover -- the form underneath (file uploads, a map picker, multi-step)
+          is real content to focus on, not a quick anchored menu next to the icon that opened it */}
+      <Dialog open={contributeOpen} onOpenChange={setContributeOpen}>
+        <DialogContent className="flex max-h-[85vh] flex-col gap-2 overflow-y-auto sm:max-w-sm">
+          <DialogTitle className="sr-only">Contribute</DialogTitle>
+          <ContributeMenu
+            items={contributePins}
+            onClose={() => setContributeOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
