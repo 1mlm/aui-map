@@ -37,11 +37,18 @@ const PinTuningPlayground = dynamic(
   { ssr: false },
 )
 
+// strips everything but letters/digits before comparing, so "aud17" matches both the id
+// ("aud17") and the title ("AUD 17") -- spaces, hyphens, whatever punctuation someone's aliases
+// happen to use shouldn't be a reason a real match doesn't show up
+function normalizeForSearch(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "")
+}
+
 function matchesSearch(item: MapItem, query: string) {
   if (!query) return true
-  const q = query.toLowerCase()
-  return [item.title, ...item.aliases].some((name) =>
-    name.toLowerCase().includes(q),
+  const normalizedQuery = normalizeForSearch(query)
+  return [item.id, item.title, ...item.aliases].some((value) =>
+    normalizeForSearch(value).includes(normalizedQuery),
   )
 }
 
