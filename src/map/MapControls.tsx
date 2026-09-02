@@ -1,6 +1,6 @@
 "use client"
 
-import { type ReactNode, useEffect, useState } from "react"
+import { type ReactNode, useEffect, useRef, useState } from "react"
 import { IconButton } from "@/components/IconButton"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/Tooltip"
@@ -10,7 +10,7 @@ import { cn } from "@/shadcn/utils"
 import { ContributeMenu, type ContributePin } from "./ContributeMenu"
 import { SearchField, type SearchProps } from "./MapSearch"
 import type { CompassPermission } from "./useCompassHeading"
-import type { LocationStatus } from "./useUserLocation"
+import { type LocationStatus, VAGUE_ACCURACY_METERS } from "./useUserLocation"
 
 const LOCATE_LABEL: Record<LocationStatus, string> = {
   idle: "Locate",
@@ -20,12 +20,9 @@ const LOCATE_LABEL: Record<LocationStatus, string> = {
   unavailable: "Retry",
 }
 const OFF_CAMPUS_TEXT = "You're not on campus 💀??"
-// a browser with no GPS falls back to looking up the wifi network's registered location,
-// which on a campus resolves to one arbitrary point for the whole network -- hence the
-// classic "it thinks I'm at that roundabout" on a desktop. Past this the fix is too coarse
-// to mean anything at building scale, so the tooltip says why rather than letting people
-// assume the map itself is wrong
-const VAGUE_ACCURACY_METERS = 120
+// how long the imprecise-fix tooltip stays forced open once a vague fix lands, before it goes
+// back to normal hover-only behavior
+const LOCATE_HINT_VISIBLE_MS = 10_000
 // flips the Contribute button's pulse off for good, for anyone who's ever clicked it — set on
 // first click, checked on mount, never cleared
 const CONTRIBUTE_SEEN_KEY = "aui-map:contribute-seen"
@@ -96,8 +93,33 @@ export function MapControls({
   const locateTooltip = isOffCampus
     ? OFF_CAMPUS_TEXT
     : fixIsVague
-      ? `Your device placed you within about ${Math.round(accuracy)}m, so that is your wifi network's registered spot rather than a real fix. A phone with GPS will put you on the right building.`
+      ? `That's a rough fix — about ${Math.round(accuracy)}m off, from the nearest wifi router rather than your exact spot. A phone with GPS puts you right on the building.`
       : null
+
+  // forced open for a few seconds right when a vague fix lands, instead of leaving that
+  // explanation waiting behind a hover nobody thinks to try on a desktop. Reverts to Tooltip's
+  // normal hover/focus behavior once the timer clears -- onOpenChange still drives it the same
+  // way Radix would internally, so hovering still works throughout
+  const [locateHintOpen, setLocateHintOpen] = useState(false)
+  const locateHintTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  )
+  useEffect(() => () => clearTimeout(locateHintTimer.current), [])
+  // only on the transition into a vague fix, not on every re-render while it stays vague (the
+  // fix keeps refining in the background as watchPosition reports back)
+  const previousFixWasVagueRef = useRef(false)
+  useEffect(() => {
+    if (fixIsVague && !previousFixWasVagueRef.current) {
+      clearTimeout(locateHintTimer.current)
+      setLocateHintOpen(true)
+      locateHintTimer.current = setTimeout(
+        () => setLocateHintOpen(false),
+        LOCATE_HINT_VISIBLE_MS,
+      )
+    }
+    previousFixWasVagueRef.current = fixIsVague
+  }, [fixIsVague])
+
   // once located, iOS still gates the compass behind its own explicit tap -- rather than a
   // separate control for that, the same button just asks for the next thing it needs
   const needsCompassTap =
@@ -183,7 +205,10 @@ export function MapControls({
             />
           )
           const button = tooltip ? (
-            <Tooltip>
+            <Tooltip
+              open={id === "locate" ? locateHintOpen : undefined}
+              onOpenChange={id === "locate" ? setLocateHintOpen : undefined}
+            >
               <TooltipTrigger asChild>{plainButton}</TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={6} className="max-w-64">
                 {tooltip}

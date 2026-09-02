@@ -21,10 +21,25 @@ export type LocationStatus =
 // once the browser's actually granted this before, it won't re-prompt anyway -- so a later visit
 // can go straight to watching position instead of waiting for another tap
 const LOCATION_GRANTED_STORAGE_KEY = "aui-map:location-granted"
+// set on every fix that lands past VAGUE_ACCURACY_METERS -- a device with no GPS falls back to
+// wifi-triangulated location, coarse enough on a campus that auto-resuming it unprompted on every
+// return visit does more harm than good. Persisted (not just an in-memory flag) so a desktop that
+// got a bad fix once stays gated on later visits too, without needing to detect *why* the fix was
+// bad -- it self-corrects the moment a real fix lands, same key, opposite value
+const LOCATION_VAGUE_STORAGE_KEY = "aui-map:location-vague"
+// a browser with no GPS falls back to looking up the wifi network's registered location, which on
+// a campus resolves to whichever router's closest, not an actual position. Past this the fix is
+// too coarse to mean anything at building scale
+export const VAGUE_ACCURACY_METERS = 120
 
 function hasGrantedLocationBefore() {
   if (typeof window === "undefined") return false
   return localStorage.getItem(LOCATION_GRANTED_STORAGE_KEY) === "true"
+}
+
+function wasLastFixVague() {
+  if (typeof window === "undefined") return false
+  return localStorage.getItem(LOCATION_VAGUE_STORAGE_KEY) === "true"
 }
 
 // neither the browser's own `timeout` option nor its error callback are reliable everywhere --
@@ -34,10 +49,10 @@ function hasGrantedLocationBefore() {
 const WATCHDOG_MS = 15_000
 
 // never fires the permission prompt on its own, on any device -- only an explicit tap
-// (requestLocation) starts watching, unless this browser's granted it before, in which case
-// there's nothing left to ask permission for, so this just goes ahead and shows where they are.
-// `attempt` (not a boolean) so a retry tap after a failure always re-runs the effect below, even
-// though it was already "requested" once
+// (requestLocation) starts watching, unless this browser's granted it before and its last fix
+// was a real one, in which case there's nothing left to ask permission for, so this just goes
+// ahead and shows where they are. `attempt` (not a boolean) so a retry tap after a failure always
+// re-runs the effect below, even though it was already "requested" once
 export function useUserLocation() {
   const [position, setPosition] = useState<NormalizedPosition | null>(null)
   // the same fix, but never nulled out for being off-campus -- lets the off-campus edge
@@ -54,7 +69,7 @@ export function useUserLocation() {
   // (WiFi/IP-based indoors, no clean GPS lock, ...)
   const [accuracy, setAccuracy] = useState<number | null>(null)
   const [attempt, setAttempt] = useState(() =>
-    hasGrantedLocationBefore() ? 1 : 0,
+    hasGrantedLocationBefore() && !wasLastFixVague() ? 1 : 0,
   )
 
   useEffect(() => {
@@ -71,6 +86,10 @@ export function useUserLocation() {
       clearTimeout(watchdog)
       setStatus("granted")
       localStorage.setItem(LOCATION_GRANTED_STORAGE_KEY, "true")
+      localStorage.setItem(
+        LOCATION_VAGUE_STORAGE_KEY,
+        String(accuracy > VAGUE_ACCURACY_METERS),
+      )
       const withinCampus = isWithinCampusBounds(latitude, longitude)
       const nextPosition = latLongToPosition(latitude, longitude)
       setIsOffCampus(!withinCampus)
