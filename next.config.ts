@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { hostname: "github.com" },
       { hostname: "avatars.githubusercontent.com" },
-      { hostname: "*.public.blob.vercel-storage.com" },
+      { hostname: "res.cloudinary.com" },
     ],
   },
   async headers() {

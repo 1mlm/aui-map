@@ -2,7 +2,12 @@
 
 import { type MotionValue, motion, useTransform } from "motion/react"
 import Image from "next/image"
-import { type PointerEvent as ReactPointerEvent, useRef, useState } from "react"
+import {
+  type PointerEvent as ReactPointerEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react"
 import { IconButton } from "@/components/IconButton"
 import { Icon } from "@/components/Icon"
 import { ICONS } from "@/icons"
@@ -18,6 +23,15 @@ import type { MapPanorama } from "./types"
 const PANORAMA_FADE_START_SCALE = 1.9
 const PANORAMA_FADE_END_SCALE = 2.4
 const MARKER_SIZE_PX = 34
+
+// how much taller than the viewer the image renders once zoomed in, in percent of its own
+// unzoomed height -- width grows with it (the image scales by its own aspect ratio), so this is
+// really "how much more of the photo can you pan across once zoomed"
+const ZOOMED_HEIGHT_PERCENT = 170
+// friction applied to the fling velocity every animation frame -- tuned by feel, not physics, to
+// land somewhere between "stops dead" (1) and "never stops" (closer to 1)
+const FLING_FRICTION_PER_FRAME = 0.94
+const FLING_STOP_VELOCITY_PX_MS = 0.02
 
 export function PanoramaLayer({
   panoramas,
@@ -113,21 +127,46 @@ export function PanoramaLayer({
 }
 
 // a wide flat photo, so the whole viewer is a horizontal scroller — no 360 library, nothing to
-// load before it can show anything. Native overflow-x-auto alone reads as "a picture with a
-// scrollbar", not a place you're looking around, so pointer-drag panning (grab/grabbing cursor,
-// scrollLeft driven straight off pointer movement) sits on top of the same native scroll, and
-// edge gradients hint there's more image past either side
+// load before it can show anything. Touch already gets real native momentum scrolling for free
+// from overflow-x-auto; this only steps in for mouse drag (which has none on its own), tracking
+// recent pointer speed and flinging scrollLeft on release with the same kind of decay a native
+// scroll gives touch, so the two input methods end up feeling like the same viewer instead of a
+// smooth one and a dead one. Double-click/tap zooms in to look closer, still pannable either way
 function PanoramaScroller({ panorama }: { panorama: MapPanorama }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const dragOrigin = useRef<{ pointerX: number; scrollLeft: number } | null>(
     null,
   )
+  // last few samples of (time, scrollLeft) taken while dragging, just enough to get a release
+  // velocity from -- overwritten every frame, never grows unbounded
+  const velocitySamples = useRef<{ time: number; scrollLeft: number }[]>([])
+  const flingFrame = useRef<number | null>(null)
   const [dragging, setDragging] = useState(false)
+  const [zoomed, setZoomed] = useState(false)
+
+  useEffect(() => {
+    return () => {
+      if (flingFrame.current !== null) cancelAnimationFrame(flingFrame.current)
+    }
+  }, [])
+
+  function stopFling() {
+    if (flingFrame.current !== null) {
+      cancelAnimationFrame(flingFrame.current)
+      flingFrame.current = null
+    }
+  }
 
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     const el = scrollRef.current
-    if (!el) return
+    // touch keeps its native drag-to-scroll (with the browser's own momentum) untouched -- this
+    // handler only takes over for mouse/pen, which have no momentum of their own to fling with
+    if (!el || event.pointerType === "touch") return
+    stopFling()
     dragOrigin.current = { pointerX: event.clientX, scrollLeft: el.scrollLeft }
+    velocitySamples.current = [
+      { time: event.timeStamp, scrollLeft: el.scrollLeft },
+    ]
     el.setPointerCapture(event.pointerId)
     setDragging(true)
   }
@@ -138,12 +177,60 @@ function PanoramaScroller({ panorama }: { panorama: MapPanorama }) {
     el.scrollLeft =
       dragOrigin.current.scrollLeft -
       (event.clientX - dragOrigin.current.pointerX)
+    velocitySamples.current.push({
+      time: event.timeStamp,
+      scrollLeft: el.scrollLeft,
+    })
+    // only the last ~50ms matters for "how fast was the flick at the very end" -- older samples
+    // would just average in a slower drag from earlier in the same gesture
+    const cutoff = event.timeStamp - 50
+    while (
+      velocitySamples.current.length > 1 &&
+      velocitySamples.current[0].time < cutoff
+    )
+      velocitySamples.current.shift()
+  }
+
+  // scrollLeft's own clamping at the native scroll bounds means this never needs to know how
+  // wide the image is -- setting it past either edge is a no-op, which is exactly "stop the fling"
+  function runFling(velocityPxPerMs: number) {
+    const el = scrollRef.current
+    if (!el) return
+    if (Math.abs(velocityPxPerMs) < FLING_STOP_VELOCITY_PX_MS) {
+      flingFrame.current = null
+      return
+    }
+    const before = el.scrollLeft
+    el.scrollLeft += velocityPxPerMs * 16
+    // hit an edge -- native clamping left scrollLeft where it was, so there's nothing left to fling
+    if (el.scrollLeft === before) {
+      flingFrame.current = null
+      return
+    }
+    flingFrame.current = requestAnimationFrame(() =>
+      runFling(velocityPxPerMs * FLING_FRICTION_PER_FRAME),
+    )
   }
 
   function endDrag(event: ReactPointerEvent<HTMLDivElement>) {
-    scrollRef.current?.releasePointerCapture(event.pointerId)
+    if (!dragOrigin.current) return
     dragOrigin.current = null
     setDragging(false)
+    // best-effort -- a pointer whose capture already lapsed (e.g. it left the window) throws
+    // here, and that's fine to ignore, but only after the state above is already updated and
+    // nothing below still depends on it running
+    try {
+      scrollRef.current?.releasePointerCapture(event.pointerId)
+    } catch {}
+
+    const samples = velocitySamples.current
+    const first = samples[0]
+    const last = samples.at(-1)
+    if (first && last && last.time > first.time) {
+      const velocity =
+        (last.scrollLeft - first.scrollLeft) / (last.time - first.time)
+      runFling(velocity)
+    }
   }
 
   return (
@@ -158,6 +245,10 @@ function PanoramaScroller({ panorama }: { panorama: MapPanorama }) {
         onPointerMove={handlePointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
+        onDoubleClick={() => {
+          triggerHaptic()
+          setZoomed((current) => !current)
+        }}
         className={cn(
           "absolute inset-0 flex touch-pan-x items-center overflow-x-auto overflow-y-hidden select-none",
           dragging ? "cursor-grabbing" : "cursor-grab",
@@ -168,7 +259,8 @@ function PanoramaScroller({ panorama }: { panorama: MapPanorama }) {
           src={panorama.url}
           alt={panorama.caption ?? ""}
           draggable={false}
-          className="h-full max-w-none shrink-0"
+          style={{ height: zoomed ? `${ZOOMED_HEIGHT_PERCENT}%` : "100%" }}
+          className="max-w-none shrink-0 transition-[height] duration-300 ease-out"
         />
       </div>
       <div className="pointer-events-none absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-black/70 to-transparent" />

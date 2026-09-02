@@ -61,6 +61,10 @@ export function watchPositionAcrossTabs(
   const channel = new BroadcastChannel(CHANNEL_NAME)
   const abortController = new AbortController()
   let watchId: number | null = null
+  // clearWatch/channel.close() don't cancel a geolocation callback that the browser already
+  // queued right before cleanup ran -- it still fires afterward, and posting into an already-
+  // closed channel throws. Checked before every post rather than trusted to run in time
+  let stopped = false
 
   channel.onmessage = (event: MessageEvent<ChannelMessage>) => {
     if (event.data.kind === "position") onPosition(event.data)
@@ -71,6 +75,7 @@ export function watchPositionAcrossTabs(
     .request(LOCK_NAME, { signal: abortController.signal }, () => {
       watchId = navigator.geolocation.watchPosition(
         (position) => {
+          if (stopped) return
           const latLong = toLatLong(position)
           onPosition(latLong)
           channel.postMessage({
@@ -79,6 +84,7 @@ export function watchPositionAcrossTabs(
           } satisfies ChannelMessage)
         },
         (error) => {
+          if (stopped) return
           const reason = toErrorReason(error)
           onError(reason)
           channel.postMessage({
@@ -104,6 +110,7 @@ export function watchPositionAcrossTabs(
   function handleResume() {
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        if (stopped) return
         const latLong = toLatLong(position)
         onPosition(latLong)
         channel.postMessage({
@@ -118,6 +125,7 @@ export function watchPositionAcrossTabs(
   document.addEventListener("resume", handleResume)
 
   return () => {
+    stopped = true
     document.removeEventListener("resume", handleResume)
     abortController.abort()
     if (watchId !== null) navigator.geolocation.clearWatch(watchId)
