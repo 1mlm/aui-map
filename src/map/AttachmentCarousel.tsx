@@ -9,7 +9,12 @@ import { DateCell } from "@/components/table/CustomTableCell"
 import { ICONS } from "@/icons"
 import { Dialog, DialogContent, DialogTitle } from "@/shadcn/ui/dialog"
 import { cn } from "@/shadcn/utils"
-import { iconForMimeType, isImageMimeType, isVideoMimeType } from "@/utils/mimeType"
+import { cloudinaryOptimized, cloudinaryThumbnail } from "@/utils/cloudinaryUrl"
+import {
+  iconForMimeType,
+  isImageMimeType,
+  isVideoMimeType,
+} from "@/utils/mimeType"
 import { HIDE_SCROLLBAR } from "@/utils/styles"
 import type { MapItemAttachment } from "./types"
 
@@ -17,14 +22,31 @@ const SWIPE_THRESHOLD_PX = 80
 
 function StripTile({ attachment }: { attachment: MapItemAttachment }) {
   if (isImageMimeType(attachment.mimeType)) {
-    return <Image src={attachment.url} alt="" fill sizes="64px" className="object-cover" />
+    return (
+      <Image
+        src={cloudinaryThumbnail(attachment.url, 64)}
+        alt=""
+        fill
+        sizes="64px"
+        className="object-cover"
+      />
+    )
   }
 
   if (isVideoMimeType(attachment.mimeType)) {
     return (
       <>
-        <video src={attachment.url} muted playsInline preload="metadata" className="size-full object-cover" />
-        <Icon icon={ICONS.video} className="absolute inset-0 m-auto size-5 text-white drop-shadow-md" />
+        <video
+          src={attachment.url}
+          muted
+          playsInline
+          preload="metadata"
+          className="size-full object-cover"
+        />
+        <Icon
+          icon={ICONS.video}
+          className="absolute inset-0 m-auto size-5 text-white drop-shadow-md"
+        />
       </>
     )
   }
@@ -103,7 +125,9 @@ function CarouselAttachment({
         className="flex flex-col items-center gap-3 px-6 text-white"
       >
         <Icon icon={iconForMimeType(attachment.mimeType)} className="size-16" />
-        <span className="max-w-xs truncate text-center text-sm">{attachment.fileName ?? "File"}</span>
+        <span className="max-w-xs truncate text-center text-sm">
+          {attachment.fileName ?? "File"}
+        </span>
         <a
           href={attachment.url}
           download={attachment.fileName ?? undefined}
@@ -121,7 +145,7 @@ function CarouselAttachment({
   return (
     // biome-ignore lint/performance/noImgElement: needs motion's drag gesture, which next/image doesn't compose with
     <motion.img
-      src={attachment.url}
+      src={cloudinaryOptimized(attachment.url)}
       alt=""
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -150,10 +174,16 @@ export function AttachmentCarousel({
   const [index, setIndex] = useState(startIndex)
   const hasMultiple = attachments.length > 1
   const { caption, postedAt } = attachments[index]
-  const step = (by: number) => setIndex((i) => (i + by + attachments.length) % attachments.length)
+  const step = (by: number) =>
+    setIndex((i) => (i + by + attachments.length) % attachments.length)
 
   const stepButtons = [
-    { icon: ICONS.carouselPrev, by: -1, label: "Previous photo", side: "left-4" },
+    {
+      icon: ICONS.carouselPrev,
+      by: -1,
+      label: "Previous photo",
+      side: "left-4",
+    },
     { icon: ICONS.carouselNext, by: 1, label: "Next photo", side: "right-4" },
   ]
 
@@ -200,7 +230,10 @@ export function AttachmentCarousel({
               {attachments.map((attachment, i) => (
                 <span
                   key={attachment.id}
-                  className={cn("size-1.5 rounded-full", i === index ? "bg-white" : "bg-white/30")}
+                  className={cn(
+                    "size-1.5 rounded-full",
+                    i === index ? "bg-white" : "bg-white/30",
+                  )}
                 />
               ))}
             </div>

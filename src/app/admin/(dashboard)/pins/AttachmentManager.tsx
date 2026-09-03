@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from "@/shadcn/ui/dialog"
 import { Input } from "@/shadcn/ui/input"
+import { cloudinaryThumbnail } from "@/utils/cloudinaryUrl"
 import { uploadFile } from "@/utils/cloudinaryUpload"
 import { formatRelativeDate } from "@/utils/date"
 import { extractErrorMessage } from "@/utils/error"
@@ -55,7 +56,7 @@ function AttachmentThumbnail({ attachment }: { attachment: AttachmentRow }) {
   if (isImageMimeType(attachment.mimeType)) {
     return (
       <Image
-        src={attachment.url}
+        src={cloudinaryThumbnail(attachment.url, 80)}
         alt={attachment.caption ?? ""}
         fill
         sizes="80px"
