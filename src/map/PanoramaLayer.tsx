@@ -1,6 +1,11 @@
 "use client"
 
-import { type MotionValue, motion, useTransform } from "motion/react"
+import {
+  type MotionValue,
+  motion,
+  useMotionValueEvent,
+  useTransform,
+} from "motion/react"
 import Image from "next/image"
 import {
   type PointerEvent as ReactPointerEvent,
@@ -50,6 +55,18 @@ export function PanoramaLayer({
   const counterScale = useTransform(viewportScale, (scale) => 1 / scale)
   const open = panoramas.find((panorama) => panorama.uuid === openUuid) ?? null
 
+  // thumbnails stay unmounted (not just invisible) until zoom has actually crossed into the
+  // fade-in range -- an <Image> fetches the moment it mounts regardless of its own opacity, so
+  // gating on opacity alone would still pull every panorama's thumbnail on every page load, even
+  // for the ones nobody's zoomed anywhere near
+  const [thumbnailsVisible, setThumbnailsVisible] = useState(
+    () => viewportScale.get() > PANORAMA_FADE_START_SCALE,
+  )
+  useMotionValueEvent(viewportScale, "change", (scale) => {
+    const next = scale > PANORAMA_FADE_START_SCALE
+    setThumbnailsVisible((current) => (current === next ? current : next))
+  })
+
   return (
     <>
       {panoramas.map((panorama) => (
@@ -75,13 +92,15 @@ export function PanoramaLayer({
           {/* the thumbnail must never be the thing a tap lands on, or a panorama sitting over a
               pin would swallow taps meant for it — the button itself is the target */}
           <div className="relative size-full overflow-hidden rounded-full corner-squircle border-2 border-white">
-            <Image
-              src={panorama.thumbnailUrl}
-              alt=""
-              fill
-              sizes="34px"
-              className="pointer-events-none object-cover"
-            />
+            {thumbnailsVisible && (
+              <Image
+                src={panorama.thumbnailUrl}
+                alt=""
+                fill
+                sizes="34px"
+                className="pointer-events-none object-cover"
+              />
+            )}
           </div>
           {/* a plain round thumbnail reads as just another pin from a distance — this badge is
               what actually says "this one is a panorama" */}
