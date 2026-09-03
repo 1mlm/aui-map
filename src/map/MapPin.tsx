@@ -83,7 +83,7 @@ export const DEFAULT_PIN_SIZE_TUNING: PinSizeTuning = {
   labelFontFamily: "sans",
   labelStrokeWidth: 3.2,
   labelGapPx: 4,
-  pinOpacity: 0.65,
+  pinOpacity: 0.9,
   pinStrokeWidth: 0.75,
   innerIconFraction: 0.42,
   innerIconStrokeWidth: 2.4,
