@@ -31,12 +31,14 @@ export async function createPanorama({
   longitude,
   caption,
   heading,
+  spherical,
 }: {
   rawUrl: string
   latitude: number
   longitude: number
   caption: string | null
   heading: number | null
+  spherical: boolean
 }) {
   await requireAuth()
 
@@ -64,6 +66,7 @@ export async function createPanorama({
       longitude,
       caption,
       heading,
+      spherical,
     },
   })
 

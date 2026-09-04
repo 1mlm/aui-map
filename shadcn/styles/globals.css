@@ -237,26 +237,28 @@
   animation: wiggle 0.5s ease-in-out;
 }
 
-/* flags the Contribute button as newly-fixed/worth trying — a violet breathing glow plus a
-   slightly heavier ring, until MapControls.tsx's own "seen" flag turns it off for good on
-   first click. Scale stays tiny so it reads as "alive", not as an error/urgent state */
-.animate-pulse-violet {
-  border: 2px solid oklch(0.6 0.24 302 / 0.8);
+/* flags a control as worth trying right now — a breathing glow in the app's own primary color
+   plus a slightly heavier ring, until whatever it's flagging (Contribute's "seen" flag, an
+   ungranted location) clears for good. Scale stays tiny so it reads as "alive", not urgent/error.
+   color-mix off var(--primary), not a hardcoded hue, so this stays on-brand through both light
+   and dark and needs no separate value if the theme's primary ever changes */
+.animate-pulse-attention {
+  border: 2px solid color-mix(in oklch, var(--primary) 80%, transparent);
 }
 @media (prefers-reduced-motion: no-preference) {
-  @keyframes pulse-violet {
+  @keyframes pulse-attention {
     0%,
     100% {
       transform: scale(1);
-      box-shadow: 0 0 0 0 oklch(0.6 0.24 302 / 0.5);
+      box-shadow: 0 0 0 0 color-mix(in oklch, var(--primary) 50%, transparent);
     }
     50% {
       transform: scale(1.06);
-      box-shadow: 0 0 0 6px oklch(0.6 0.24 302 / 0);
+      box-shadow: 0 0 0 6px color-mix(in oklch, var(--primary) 0%, transparent);
     }
   }
-  .animate-pulse-violet {
-    animation: pulse-violet 1.8s ease-in-out infinite;
+  .animate-pulse-attention {
+    animation: pulse-attention 1.8s ease-in-out infinite;
   }
 }
 

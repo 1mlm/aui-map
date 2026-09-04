@@ -4,11 +4,12 @@ import { track } from "@vercel/analytics"
 import { AnimatePresence } from "motion/react"
 import dynamic from "next/dynamic"
 import { useEffect, useRef, useState } from "react"
+import { latLongToPosition } from "./geo"
 import { LocateFloatingButton } from "./LocateFloatingButton"
 import { MapBrand } from "./MapBrand"
 import { MapCanvas, type MapCanvasHandle } from "./MapCanvas"
 import { MapControls } from "./MapControls"
-import { NoticeDialog } from "./MapCredit"
+import { MapCredit, NoticeDialog } from "./MapCredit"
 import { MapDetailPanel, UNDOCKED_PANEL_WIDTH } from "./MapDetailPanel"
 import { DEFAULT_PIN_SIZE_TUNING, type PinSizeTuning } from "./MapPin"
 import { MapFilterBar } from "./MapTagFilter"
@@ -73,11 +74,22 @@ export function MapExperience({
 
   // requests location if it isn't already, and — unlike the passive first-fix auto-center —
   // always jumps the view back regardless of whether the user's already panned elsewhere,
-  // since clicking the button is unambiguous intent to recenter
+  // since clicking the button is unambiguous intent to recenter. Also asks for orientation in
+  // the same tap so a first-time grant is one click instead of two -- must come before any
+  // `await` in this function, iOS only honors DeviceOrientationEvent.requestPermission() while
+  // still inside the click's own gesture (same rule PanoramaCapture's handleStart follows)
   function handleLocate() {
+    compass.requestPermission()
     location.requestLocation()
     if (location.position) mapCanvasRef.current?.centerOn(location.position)
   }
+
+  // nothing left to grant once both are settled -- gone for good until the next full page load.
+  // Computed here (not inside LocateFloatingButton) so AnimatePresence below can actually see it
+  // go from false to true and animate the button out, instead of the button unmounting itself
+  // mid-render with no transition to play
+  const locateButtonDone =
+    location.status === "granted" && compass.permission !== "idle"
 
   // a real shake is the same "get me back to where I am" intent as tapping the locate button —
   // handy one-handed outdoors, where reaching for a tiny on-screen button while walking is
@@ -144,6 +156,7 @@ export function MapExperience({
       else next.add(tagId)
       return next
     })
+  const clearTags = () => setActiveTagIds(new Set())
 
   // finds missing pins/aliases from real usage: a search term matching nothing anywhere on the
   // map (checked against the whole map, not visibleItems, so an active tag filter can't produce
@@ -163,23 +176,31 @@ export function MapExperience({
   }, [search, effectiveItems])
 
   // once a search narrows the map down to a single pin there's nothing left to browse, so open
-  // it straight away instead of making the last click a separate step
+  // it straight away and jump the map there too -- instead of making "which one did I mean" or
+  // "where actually is that" separate steps once typing has already said so unambiguously
   useEffect(() => {
     if (!search.trim()) return
     if (visibleItems.length !== 1) return
     const [onlyMatch] = visibleItems
-    if (onlyMatch.id !== selectedId) setSelectedId(onlyMatch.id)
+    if (onlyMatch.id === selectedId) return
+    setSelectedId(onlyMatch.id)
+    mapCanvasRef.current?.centerOn(
+      latLongToPosition(onlyMatch.latitude, onlyMatch.longitude),
+    )
   }, [search, visibleItems, selectedId, setSelectedId])
 
   return (
-    <div className="h-dvh w-dvw bg-background sm:p-3">
+    // the mobile bottom-12 reservation is exactly what MapCredit's fuser patches need below the
+    // shell to grow out of -- same bg-background on both, so the pill and the strip it sits in
+    // read as one continuous shape rather than a bar dropped on top of a gap
+    <div className="relative h-dvh w-dvw bg-background pb-12 sm:p-3">
       {/* the shell's shadow is dark-mode only: the gutter around it and the corner fusers inside it
           are both bg-background, so in light mode the only thing separating them was this shadow
           spilling outward and greying the gutter to ~250 against the fusers' 255, which read as a
           seam exactly where the chrome is supposed to look fused into the frame */}
       <div
         ref={shellRef}
-        className="map-shell relative h-full w-full overflow-hidden bg-background sm:rounded-[3rem] sm:corner-squircle dark:sm:shadow-2xl"
+        className="map-shell relative h-full w-full overflow-hidden rounded-b-[2rem] corner-b-superellipse/1.2 bg-background sm:rounded-[3rem] sm:corner-squircle dark:sm:shadow-2xl"
       >
         <MapCanvas
           ref={mapCanvasRef}
@@ -206,12 +227,17 @@ export function MapExperience({
           onRequestCompass={compass.requestPermission}
           {...{ search, contributePins }}
         />
-        <LocateFloatingButton
-          locationStatus={location.status}
-          compassPermission={compass.permission}
-          onLocate={handleLocate}
-          onRequestCompass={compass.requestPermission}
-        />
+        <AnimatePresence>
+          {!locateButtonDone && (
+            <LocateFloatingButton
+              key="locate"
+              locationStatus={location.status}
+              compassPermission={compass.permission}
+              onLocate={handleLocate}
+              onRequestCompass={compass.requestPermission}
+            />
+          )}
+        </AnimatePresence>
 
         <AnimatePresence>
           {selected && (
@@ -229,10 +255,17 @@ export function MapExperience({
           }
           tags={effectiveTags}
           onToggle={toggleTag}
+          onClearAll={clearTags}
           onHoverTag={setHoveredTagId}
           {...{ activeTagIds, hoveredTagId }}
         />
         <NoticeDialog open={noticeOpen} onOpenChange={setNoticeOpen} />
+      </div>
+
+      {/* lives in the pb-12 strip below the shell, not inside it. Mobile's whole substitute for
+          the desktop bar's About button -- opens the same NoticeDialog */}
+      <div className="sm:hidden">
+        <MapCredit onOpenCredits={() => setNoticeOpen(true)} />
       </div>
 
       {LEVA_PLAYGROUND_ENABLED && process.env.NODE_ENV === "development" && (

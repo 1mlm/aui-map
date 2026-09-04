@@ -14,6 +14,9 @@ export type ContributionInput = {
   message?: string | null
   title?: string | null
   coord?: { latitude: number; longitude: number } | null
+  // true when a PANORAMA came from the in-app spherical capture flow rather than a plain
+  // uploaded file, see Submission.spherical
+  spherical?: boolean
 }
 
 const KIND_SUBJECT: Record<SubmissionKind, string> = {
@@ -49,6 +52,7 @@ export async function submitContribution(input: ContributionInput) {
       title: input.title ?? null,
       latitude: input.coord?.latitude ?? null,
       longitude: input.coord?.longitude ?? null,
+      spherical: input.spherical ?? false,
     },
   })
 

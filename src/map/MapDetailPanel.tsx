@@ -489,7 +489,9 @@ function CoordinatesLine({
         type="button"
         onClick={() => copy(coordinates)}
         aria-label="Copy coordinates"
-        className="rounded-full corner-squircle p-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-foreground/10 focus-visible:opacity-100"
+        // touch devices have no hover state to reveal this on, so it has to default visible
+        // there instead of staying permanently invisible -- same pattern as DateCell's own icon
+        className="rounded-full corner-squircle p-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-foreground/10 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
       >
         <Icon icon={copied ? ICONS.copied : ICONS.copy} className="size-3.5" />
       </button>

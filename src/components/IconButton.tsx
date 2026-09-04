@@ -9,8 +9,9 @@ const toneClasses = {
   // sits on the app's own background, so it tints with the theme instead of forcing white
   subtle:
     "bg-foreground/10 text-foreground/70 hover:bg-foreground/15 hover:text-foreground",
-  // sits directly on the map, where it needs its own backdrop to stay legible
-  floating: "bg-black/60 text-white backdrop-blur-sm hover:bg-black/70",
+  // sits directly on the map, where it needs its own backdrop to stay legible against whatever
+  // busy satellite imagery happens to be underneath -- opaque enough to actually stand out there
+  floating: "bg-black/70 text-white backdrop-blur-sm hover:bg-black/80",
   // the control is doing something right now — a search is typed, filters are on
   primary: "bg-primary text-primary-foreground hover:bg-primary/85",
 } as const
@@ -30,7 +31,11 @@ export function IconButton({
   // beside the glyph instead, reading as an ordinary labelled button — used where there's enough
   // width (the desktop control bar) that stacking would waste it
   layout = "stack",
+  // corner-shape utility class from @toolwind/corner-shape — squircle everywhere by default,
+  // overridable per-button (e.g. a superellipse for a button that wants a rounder, less-squared feel)
+  shape = "corner-squircle",
   iconClassName,
+  labelClassName,
   className,
   onClick,
   ...props
@@ -42,13 +47,16 @@ export function IconButton({
   tone?: keyof typeof toneClasses
   size?: keyof typeof sizeClasses
   layout?: "stack" | "inline"
+  shape?: string
   iconClassName?: string
+  labelClassName?: string
 }) {
   return (
     <button
       type="button"
       className={cn(
-        "flex items-center justify-center rounded-full corner-squircle transition-colors",
+        "flex items-center justify-center rounded-full transition-colors",
+        shape,
         toneClasses[tone],
         label
           ? layout === "inline"
@@ -69,6 +77,7 @@ export function IconButton({
           className={cn(
             "font-medium whitespace-nowrap",
             layout === "inline" ? "text-sm" : "text-[0.65rem] leading-none",
+            labelClassName,
           )}
         >
           {label}

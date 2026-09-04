@@ -56,12 +56,14 @@ export type MapItem = {
   updatedAt: Date
 }
 
-// a wide flat photo placed at a coordinate, with no owning pin — see Panorama in the schema
+// a photo placed at a coordinate, with no owning pin, see Panorama in the schema. Either a wide
+// flat photo or a full equirectangular sphere, per `spherical`
 export type MapPanorama = {
   uuid: string
   url: string
   thumbnailUrl: string
   caption: string | null
+  spherical: boolean
   latitude: number
   longitude: number
 }

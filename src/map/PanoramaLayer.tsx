@@ -13,13 +13,14 @@ import {
   useRef,
   useState,
 } from "react"
-import { IconButton } from "@/components/IconButton"
 import { Icon } from "@/components/Icon"
+import { IconButton } from "@/components/IconButton"
 import { ICONS } from "@/icons"
 import { Dialog, DialogContent, DialogTitle } from "@/shadcn/ui/dialog"
 import { cn } from "@/shadcn/utils"
 import { triggerHaptic } from "@/utils/haptics"
 import { latLongToPosition, positionToStyle } from "./geo"
+import { SphereViewer } from "./panoramaCapture/SphereViewer"
 import type { MapPanorama } from "./types"
 
 // panoramas are scenery, not destinations, so they stay out of the way until someone has zoomed
@@ -124,7 +125,15 @@ export function PanoramaLayer({
           <DialogTitle className="sr-only">
             {open?.caption ?? "Panorama"}
           </DialogTitle>
-          {open && <PanoramaScroller panorama={open} />}
+          {open &&
+            (open.spherical ? (
+              <SphereViewer
+                key={open.uuid}
+                image={{ kind: "url", url: open.url }}
+              />
+            ) : (
+              <PanoramaScroller panorama={open} />
+            ))}
 
           <IconButton
             icon={ICONS.close}

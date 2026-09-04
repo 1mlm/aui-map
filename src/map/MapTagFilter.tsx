@@ -15,12 +15,18 @@ export type FilterProps = {
   tags: MapItemTag[]
   activeTagIds: Set<string>
   onToggle: (tagId: string) => void
+  onClearAll: () => void
   hoveredTagId: string | null
   onHoverTag: (tagId: string | null) => void
 }
 
 // active tags pull to the front so what's on is readable without scanning the whole set
-export function TagPills({ tags, activeTagIds, onToggle, onHoverTag }: FilterProps) {
+export function TagPills({
+  tags,
+  activeTagIds,
+  onToggle,
+  onHoverTag,
+}: FilterProps) {
   const activeTags = tags.filter((tag) => activeTagIds.has(tag.id))
   const inactiveTags = tags.filter((tag) => !activeTagIds.has(tag.id))
 
@@ -36,7 +42,10 @@ export function TagPills({ tags, activeTagIds, onToggle, onHoverTag }: FilterPro
         />
       ))}
       {activeTags.length > 0 && inactiveTags.length > 0 && (
-        <motion.div layout className="mx-1 h-4 w-px shrink-0 self-center bg-foreground/15" />
+        <motion.div
+          layout
+          className="mx-1 h-4 w-px shrink-0 self-center bg-foreground/15"
+        />
       )}
       {inactiveTags.map((tag) => (
         <TagPill
@@ -60,11 +69,20 @@ export function tagChipClassName(active: boolean, className?: string) {
   )
 }
 
-export function TagChipIcon({ tag, active }: { tag: MapItemTag; active: boolean }) {
+export function TagChipIcon({
+  tag,
+  active,
+}: {
+  tag: MapItemTag
+  active: boolean
+}) {
   return (
     <Icon
       icon={tag.icon}
-      className={cn("size-3.5", active && "drop-shadow-[0_2px_3px_rgba(0,0,0,0.4)]")}
+      className={cn(
+        "size-3.5",
+        active && "drop-shadow-[0_2px_3px_rgba(0,0,0,0.4)]",
+      )}
     />
   )
 }
@@ -93,7 +111,10 @@ function TagPill({
       onHoverEnd={() => onHover(false)}
       data-active={active}
       style={tagColorStyle(tag.color, active)}
-      className={tagChipClassName(active, "transition-[opacity,filter] hover:opacity-80")}
+      className={tagChipClassName(
+        active,
+        "transition-[opacity,filter] hover:opacity-80",
+      )}
     >
       <TagChipIcon {...{ tag, active }} />
       {tag.label}
@@ -152,17 +173,41 @@ function useScrollFadeMask() {
   return { stripRef, maskImage: scrollFadeMask(overflow.left, overflow.right) }
 }
 
-// mobile: a plain full-width strip, bordered off from the map above it rather than docked as an
-// inset pill -- a phone doesn't have side margin to spare for the full bar's fuser patches
+// mobile: a floating inset pill over the map itself rather than a full-width strip below it --
+// half-transparent so there's still map showing through behind the chips, matching the locate
+// button's own floating-over-the-map treatment instead of reading as a separate docked toolbar
 function CompactFilterBar(props: FilterProps) {
   const { stripRef, maskImage } = useScrollFadeMask()
+  const { activeTagIds, onClearAll } = props
 
   return (
-    <div className="map-filter-bar-compact pointer-events-auto absolute inset-x-0 bottom-0 flex items-center gap-2 border-t bg-background/90 px-3 py-2.5 backdrop-blur-md">
-      <Icon icon={ICONS.filter} aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+    <div className="map-filter-bar-compact pointer-events-auto absolute inset-x-3 bottom-3 flex items-center gap-2 rounded-full corner-superellipse/1.2 bg-background/70 px-3.5 py-2.5 shadow-lg drop-shadow-black/40 backdrop-blur-md">
+      {/* sits outside the scrolling strip below it -- inside, it'd scroll away with the chips it's
+          meant to always be reachable from */}
+      {activeTagIds.size > 0 && (
+        <button
+          type="button"
+          onClick={() => {
+            triggerHaptic()
+            onClearAll()
+          }}
+          className="absolute -top-3 left-2 flex shrink-0 items-center gap-1 rounded-full corner-superellipse/1.2 bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground shadow-md"
+        >
+          <Icon icon={ICONS.reopen} className="size-3" />
+          Clear filter
+        </button>
+      )}
+      <Icon
+        icon={ICONS.filter}
+        aria-hidden
+        className="size-4 shrink-0 text-muted-foreground"
+      />
       <div
         ref={stripRef}
-        className={cn("flex gap-1.5 overflow-x-auto scroll-smooth", HIDE_SCROLLBAR)}
+        className={cn(
+          "flex gap-1.5 overflow-x-auto scroll-smooth",
+          HIDE_SCROLLBAR,
+        )}
         style={{ maskImage }}
       >
         <TagPills {...props} />
@@ -190,15 +235,18 @@ function FullFilterBar({
         className="gap-3"
         style={{ maxWidth: `calc(100% - ${FILTER_BAR_SIDE_INSET})` }}
       >
-        {/* named, not just a glyph — the row is only obviously a set of categories once it says so */}
-        <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground">
-          <Icon icon={ICONS.filter} aria-hidden className="size-4" />
-          Categories
-        </span>
+        <Icon
+          icon={ICONS.filter}
+          aria-hidden
+          className="size-4 shrink-0 text-muted-foreground"
+        />
 
         <div
           ref={stripRef}
-          className={cn("flex gap-1.5 overflow-x-auto scroll-smooth", HIDE_SCROLLBAR)}
+          className={cn(
+            "flex gap-1.5 overflow-x-auto scroll-smooth",
+            HIDE_SCROLLBAR,
+          )}
           style={{ maskImage }}
         >
           <TagPills {...props} />

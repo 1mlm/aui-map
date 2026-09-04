@@ -24,8 +24,8 @@ import {
   screenPointToPosition,
 } from "./geo"
 import { MapPin, PIN_TIP_FRACTION, type PinSizeTuning } from "./MapPin"
-import { PanoramaLayer } from "./PanoramaLayer"
 import { OffCampusIndicator } from "./OffCampusIndicator"
+import { PanoramaLayer } from "./PanoramaLayer"
 import type { CrayonTuning } from "./tagColor"
 import type { MapItem, MapPanorama } from "./types"
 import { type UserLocation, UserLocationMarker } from "./UserLocationMarker"
@@ -266,7 +266,10 @@ export function MapCanvas({
                 style={{ backgroundImage: `url(${MAP_IMAGE_PLACEHOLDER})` }}
               />
               {/* unoptimized on purpose: the optimizer would hand back a copy sized to the viewport,
-              which is exactly the detail zooming needs. This file is already a tuned webp */}
+              which is exactly the detail zooming needs. This file is already a tuned webp.
+              Stays invisible until fully decoded (crossfading with the blurred placeholder above)
+              -- otherwise the browser paints whatever's streamed in so far on a slow connection,
+              which for a big image shows as scanline-y decode garbage instead of a clean reveal */}
               <Image
                 src="/auimap-1312.webp"
                 alt="Campus map"
@@ -275,7 +278,10 @@ export function MapCanvas({
                 unoptimized
                 draggable={false}
                 onLoad={() => setMapImageLoaded(true)}
-                className="pointer-events-none"
+                className={cn(
+                  "pointer-events-none transition-opacity duration-500",
+                  mapImageLoaded ? "opacity-100" : "opacity-0",
+                )}
               />
               <UserLocationMarker
                 position={userPosition}

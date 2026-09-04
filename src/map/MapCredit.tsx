@@ -201,22 +201,37 @@ export function NoticeDialog({
   )
 }
 
-// purely decorative (see CreditTag's href-less branch above) — the "About this project" button
-// in the map controls opens NoticeDialog, which is where "Provide feedback" actually lives now
-export function MapCredit() {
+// mobile's whole stand-in for the desktop bar's "About" button -- there's no room to spare for a
+// second control down here, and the credit line already reads as tappable once the info glyph
+// sits next to it, so the entire strip opens NoticeDialog rather than adding its own button
+export function MapCredit({ onOpenCredits }: { onOpenCredits: () => void }) {
   return (
-    <SquircleFuserContainer
-      align="bottom-center"
-      superClassName="map-credit absolute bottom-0 left-1/2 -translate-x-1/2"
+    // display:contents keeps this purely a click/keyboard handler -- SquircleFuserContainer's own
+    // absolute positioning still applies exactly as if this button weren't in the tree at all
+    <button
+      type="button"
+      className="contents"
+      onClick={onOpenCredits}
+      aria-label="About this project"
     >
-      <span className="flex items-center gap-1.5 text-sm">
-        Made with ❤️ by
-        <CreditTag
-          label={AUTHOR.name}
-          avatarUrl={AUTHOR.avatarUrl}
-          rotation={TAG_ROTATIONS[1]}
-        />
-      </span>
-    </SquircleFuserContainer>
+      <SquircleFuserContainer
+        align="bottom-center"
+        superClassName="map-credit absolute bottom-0 left-1/2 -translate-x-1/2"
+        className="py-2.5 transition-colors hover:bg-foreground/5 active:bg-foreground/10"
+      >
+        <span className="flex items-center gap-1.5 text-sm">
+          <Icon
+            icon={ICONS.notice}
+            className="size-[0.9em] shrink-0 text-muted-foreground"
+          />
+          Made with ❤️ by
+          <CreditTag
+            label={AUTHOR.name}
+            avatarUrl={AUTHOR.avatarUrl}
+            rotation={TAG_ROTATIONS[1]}
+          />
+        </span>
+      </SquircleFuserContainer>
+    </button>
   )
 }

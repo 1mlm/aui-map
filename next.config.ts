@@ -3,6 +3,10 @@ import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  // lets cloudflared/ngrok tunnel domains, and a phone on the same LAN via next dev's own
+  // printed "Network:" address, request dev-only assets -- otherwise Next silently blocks them
+  // and the page loads unhydrated (looks static, no clicks/drag/zoom work)
+  allowedDevOrigins: ["*.trycloudflare.com", "10.126.107.65"],
   // default 1mb is too small for a photo straight off a phone camera
   experimental: {
     serverActions: {
@@ -17,11 +21,14 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
+    // dev-only (including tunnel testing) skips the immutable cache: a bad transfer over a
+    // flaky connection -- one truncated/corrupted response -- would otherwise get locked into
+    // the browser's cache forever, since `immutable` means it's never even revalidated on a
+    // normal reload. In production the file at this path genuinely never changes (a new image
+    // gets a new filename instead), so caching it indefinitely is safe there
+    if (process.env.NODE_ENV !== "production") return []
     return [
       {
-        // the campus map background never changes at this path — a new image gets a new
-        // filename instead — so it's safe to tell browsers to keep it indefinitely rather than
-        // revalidating on every visit
         source: "/auimap-1312.webp",
         headers: [
           {

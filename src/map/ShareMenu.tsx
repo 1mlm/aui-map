@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 import { Icon } from "@/components/Icon"
+import { IconButton } from "@/components/IconButton"
 import { ICONS } from "@/icons"
-import { Button } from "@/shadcn/ui/button"
 import {
   Dialog,
   DialogContent,
@@ -133,7 +133,7 @@ export function ShareMenu({
     {
       id: "qrcode",
       icon: ICONS.qrCode,
-      label: "Generate QRCode",
+      label: "QRCode",
       onSelect: handleOpenQrCode,
     },
     {
@@ -168,7 +168,11 @@ export function ShareMenu({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           {shareActions.map(({ id, icon, label, onSelect }) => (
-            <DropdownMenuItem key={id} className="cursor-pointer" {...{ onSelect }}>
+            <DropdownMenuItem
+              key={id}
+              className="cursor-pointer"
+              {...{ onSelect }}
+            >
               <Icon {...{ icon }} />
               {label}
             </DropdownMenuItem>
@@ -192,41 +196,31 @@ export function ShareMenu({
               <span className="max-w-64 text-center text-xs break-all text-muted-foreground">
                 {getPinLink()}
               </span>
-              <div className="flex w-full gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1 rounded-full corner-squircle"
+              {/* icon-only -- three labelled buttons never fit this dialog's width (it shrinks to
+                  the QR image's own size), they just overflowed and clipped */}
+              <div className="flex gap-3">
+                <IconButton
+                  icon={imageFeedback === "copied" ? ICONS.copied : ICONS.copy}
+                  label="Copy image"
+                  tone="subtle"
                   onClick={handleCopyImage}
-                >
-                  <Icon
-                    icon={
-                      imageFeedback === "copied" ? ICONS.copied : ICONS.copy
-                    }
-                  />
-                  Copy Image
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1 rounded-full corner-squircle"
+                />
+                <IconButton
+                  icon={
+                    imageFeedback === "downloaded"
+                      ? ICONS.copied
+                      : ICONS.download
+                  }
+                  label="Download"
+                  tone="subtle"
                   onClick={handleDownload}
-                >
-                  <Icon
-                    icon={
-                      imageFeedback === "downloaded"
-                        ? ICONS.copied
-                        : ICONS.download
-                    }
-                  />
-                  Download
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1 rounded-full corner-squircle"
+                />
+                <IconButton
+                  icon={ICONS.share}
+                  label="Share"
+                  tone="subtle"
                   onClick={handleShareImage}
-                >
-                  <Icon icon={ICONS.share} />
-                  Share
-                </Button>
+                />
               </div>
             </>
           )}

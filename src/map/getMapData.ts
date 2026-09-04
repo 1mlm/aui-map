@@ -11,7 +11,10 @@ export async function getMapData(): Promise<{
 }> {
   const [pins, tagRows, panoramas] = await Promise.all([
     prisma.pin.findMany({
-      include: { tag: true, attachments: { orderBy: [{ isThumbnail: "desc" }, { order: "asc" }] } },
+      include: {
+        tag: true,
+        attachments: { orderBy: [{ isThumbnail: "desc" }, { order: "asc" }] },
+      },
       orderBy: { title: "asc" },
     }),
     prisma.tag.findMany(),
@@ -21,18 +24,25 @@ export async function getMapData(): Promise<{
         url: true,
         thumbnailUrl: true,
         caption: true,
+        spherical: true,
         latitude: true,
         longitude: true,
       },
     }),
   ])
 
-  const tagById = new Map(tagRows.map((tag) => [tag.id, tagRowToMapItemTag(tag)]))
-  const items = pins.map((pin) => pinRowToMapItem(pin, tagById.get(pin.tagId) ?? tagRowToMapItemTag(pin.tag)))
+  const tagById = new Map(
+    tagRows.map((tag) => [tag.id, tagRowToMapItemTag(tag)]),
+  )
+  const items = pins.map((pin) =>
+    pinRowToMapItem(pin, tagById.get(pin.tagId) ?? tagRowToMapItemTag(pin.tag)),
+  )
 
   // the filter bar only offers tags actually in use, same as the old MAP_FILTER_TAGS
   const usedTagIds = new Set(items.map((item) => item.tag.id))
-  const tags = tagRows.filter((tag) => usedTagIds.has(tag.id)).map(tagRowToMapItemTag)
+  const tags = tagRows
+    .filter((tag) => usedTagIds.has(tag.id))
+    .map(tagRowToMapItemTag)
 
   return { items, tags, panoramas }
 }

@@ -11,6 +11,7 @@ export default async function AdminPanoramasPage() {
       url: true,
       thumbnailUrl: true,
       caption: true,
+      spherical: true,
       latitude: true,
       longitude: true,
     },

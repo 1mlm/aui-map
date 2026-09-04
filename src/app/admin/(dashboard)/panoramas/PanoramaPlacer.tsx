@@ -66,6 +66,7 @@ export function PanoramaPlacer({ panoramas }: { panoramas: MapPanorama[] }) {
         longitude: draft.longitude,
         caption: caption.trim() || null,
         heading: null,
+        spherical: false,
       })
       setError(result.error)
       if (!result.error) {

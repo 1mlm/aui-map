@@ -1,5 +1,6 @@
 "use client"
 
+import { motion } from "motion/react"
 import { IconButton } from "@/components/IconButton"
 import { ICONS } from "@/icons"
 import { cn } from "@/shadcn/utils"
@@ -27,34 +28,41 @@ export function LocateFloatingButton({
     locationStatus === "granted" && compassPermission === "idle"
   const isBusy =
     locationStatus === "requesting" || compassPermission === "requesting"
-  // nothing left to grant -- gone for good until the next full page load
-  const isDone = locationStatus === "granted" && compassPermission !== "idle"
 
-  if (isDone) return null
+  const label = needsCompassTap ? "Get direction" : "Find Me"
+  // same "come tap me" cue as the Contribute button's first-ever-seen pulse, but not a one-time
+  // thing here -- location not being on yet is itself the condition, every time, until it is
+  const wantsAttention = !isBusy && locationStatus !== "granted"
 
   return (
-    <div className="map-locate-floating pointer-events-auto absolute right-4 bottom-20">
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.7 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.7 }}
+      transition={{ type: "spring", stiffness: 400, damping: 28 }}
+      className="map-locate-floating pointer-events-auto absolute right-4 bottom-20"
+    >
       <IconButton
         icon={
           isBusy
             ? ICONS.loading
             : needsCompassTap
-              ? ICONS.heading
+              ? ICONS.direction
               : ICONS.locate
         }
+        label={label}
         tone="floating"
-        size="lg"
-        aria-label={
-          needsCompassTap ? "Enable compass orientation" : "Find my location"
-        }
-        iconClassName={isBusy ? "animate-spin" : undefined}
+        shape="corner-superellipse/1.2"
+        iconClassName={cn("text-[1.75rem]", isBusy && "animate-spin")}
+        labelClassName="text-[0.7rem] text-white/85"
         disabled={isBusy}
         className={cn(
-          "drop-shadow-lg drop-shadow-black/40",
-          needsCompassTap && "animate-pulse-violet",
+          "size-20 gap-1 drop-shadow-lg drop-shadow-black/40",
+          (wantsAttention || needsCompassTap) && "animate-pulse-attention",
         )}
         onClick={needsCompassTap ? onRequestCompass : onLocate}
       />
-    </div>
+    </motion.div>
   )
 }

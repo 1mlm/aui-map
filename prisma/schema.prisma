@@ -111,6 +111,9 @@ model Submission {
   latitude    Float?
   longitude   Float?
   title       String?
+  // true when the PANORAMA came from the in-app spherical capture flow rather than a plain
+  // uploaded file, carried through to Panorama.spherical on approve
+  spherical   Boolean          @default(false)
   status      SubmissionStatus @default(PENDING)
   submittedAt DateTime         @default(now())
   reviewedAt  DateTime?
@@ -173,9 +176,10 @@ model Suggestion {
   resolved    Boolean  @default(false)
 }
 
-// a wide flat photo of campus placed at a coordinate, deliberately not attached to a Pin —
-// panoramas are about the space between buildings, so forcing an owner pin would misfile them.
-// Flat, not 360, so there's no viewer dependency: it's a horizontally scrollable image
+// a photo of campus placed at a coordinate, deliberately not attached to a Pin — panoramas are
+// about the space between buildings, so forcing an owner pin would misfile them. Either a wide
+// flat photo (scrolled horizontally, no viewer dependency) or a full spherical capture (an
+// equirectangular image, rendered inside a sphere), see `spherical`
 model Panorama {
   uuid      String   @id @default(uuid())
   url       String
@@ -185,6 +189,9 @@ model Panorama {
   // which way the camera was facing, in degrees clockwise from north. Flat panoramas don't need
   // it to render — it's stored because it's impossible to recover later if it isn't captured now
   heading   Float?
+  // true when `url` is a full equirectangular sphere from the in-app capture flow, rendered with
+  // PanoramaCapture's SphereViewer instead of PanoramaLayer's flat scroller
+  spherical Boolean  @default(false)
   latitude  Float
   longitude Float
   createdAt DateTime @default(now())

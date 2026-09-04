@@ -14,7 +14,7 @@ export async function approveSubmission(submissionId: string) {
   const submission = await prisma.submission.findUniqueOrThrow({
     where: { id: submissionId },
   })
-  const { kind, pinId, fileUrl, latitude, longitude } = submission
+  const { kind, pinId, fileUrl, latitude, longitude, spherical } = submission
 
   if (
     kind === "PANORAMA" &&
@@ -28,6 +28,7 @@ export async function approveSubmission(submissionId: string) {
       longitude,
       caption: submission.caption,
       heading: null,
+      spherical,
     })
     await prisma.submission.update({
       where: { id: submissionId },

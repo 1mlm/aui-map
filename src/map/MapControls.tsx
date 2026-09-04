@@ -1,11 +1,13 @@
 "use client"
 
 import { type ReactNode, useEffect, useRef, useState } from "react"
+import { Icon } from "@/components/Icon"
 import { IconButton } from "@/components/IconButton"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/Tooltip"
 import { ICONS } from "@/icons"
 import { Dialog, DialogContent, DialogTitle } from "@/shadcn/ui/dialog"
+import { InputGroupButton } from "@/shadcn/ui/input-group"
 import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover"
 import { cn } from "@/shadcn/utils"
 import { ContributeMenu, type ContributePin } from "./ContributeMenu"
@@ -24,10 +26,6 @@ const OFF_CAMPUS_TEXT = "You're not on campus 💀??"
 // how long the imprecise-fix tooltip stays forced open once a vague fix lands, before it goes
 // back to normal hover-only behavior
 const LOCATE_HINT_VISIBLE_MS = 10_000
-// flips the Contribute button's pulse off for good, for anyone who's ever clicked it — set on
-// first click, checked on mount, never cleared
-const CONTRIBUTE_SEEN_KEY = "aui-map:contribute-seen"
-
 type MapControl = {
   id: string
   icon: (typeof ICONS)[keyof typeof ICONS]
@@ -68,16 +66,7 @@ export function MapControls({
   // portal-rendered modal regardless of which of the two (compact/full) trigger buttons opened
   // it, not a separate instance anchored to each
   const [contributeOpen, setContributeOpen] = useState(false)
-  // starts false on the server so hydration always matches, then flips true on mount if this
-  // browser hasn't clicked Contribute yet -- the pulse announcing the fix is worth a one-frame
-  // delay rather than risking a hydration mismatch against localStorage
-  const [contributeUnseen, setContributeUnseen] = useState(false)
-  useEffect(() => {
-    if (!localStorage.getItem(CONTRIBUTE_SEEN_KEY)) setContributeUnseen(true)
-  }, [])
   function openContribute() {
-    localStorage.setItem(CONTRIBUTE_SEEN_KEY, "1")
-    setContributeUnseen(false)
     setContributeOpen(true)
   }
   const { search } = props
@@ -150,7 +139,7 @@ export function MapControls({
       iconClassName: isBusy ? "animate-spin" : undefined,
       className: cn(
         isOffCampus && "motion-safe:animate-wiggle",
-        needsCompassTap && "animate-pulse-violet",
+        needsCompassTap && "animate-pulse-attention",
       ),
       tooltip: locateTooltip,
       onClick: needsCompassTap ? onRequestCompass : onLocate,
@@ -159,11 +148,13 @@ export function MapControls({
       id: "contribute",
       icon: ICONS.contributeMenu,
       label: "Contribute",
-      className: contributeUnseen ? "animate-pulse-violet" : undefined,
       onClick: openContribute,
     },
     {
       id: "about",
+      // mobile's own About lives in the credit strip fused to the bottom of the screen now
+      // (MapCredit, in MapExperience) -- no room to spare for a second entry point up here too
+      fullOnly: true,
       icon: ICONS.notice,
       label: "About",
       onClick: onOpenNotice,
@@ -231,8 +222,28 @@ export function MapControls({
   // flashing the wrong one while JS boots up
   return (
     <>
-      <div className="map-controls-compact pointer-events-auto absolute top-4 left-1/2 flex -translate-x-1/2 items-center justify-center gap-1.5 rounded-3xl corner-squircle bg-background/90 px-3 py-2 drop-shadow-lg drop-shadow-black/40 backdrop-blur-md">
-        {renderControls(true)}
+      {/* mobile: just the searchbar (full width, a real always-there input, not a button that
+          opens one) with Contribute docked at its own right edge -- one translucent pill, not
+          two pieces of chrome side by side. Locate has its own floating button, About lives in
+          the credit strip fused to the bottom of the screen (MapCredit, in MapExperience). Same
+          inset-3 margin the filter pill and its credit strip use, so the chrome reads as one
+          consistent floating language top to bottom */}
+      <div className="map-controls-compact pointer-events-auto absolute inset-x-3 top-3">
+        <SearchField
+          big
+          {...props}
+          trailing={
+            <InputGroupButton
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Contribute"
+              className="size-9 rounded-full corner-superellipse/1.2!"
+              onClick={openContribute}
+            >
+              <Icon icon={ICONS.contributeMenu} className="size-5" />
+            </InputGroupButton>
+          }
+        />
       </div>
 
       <SquircleFuserContainer

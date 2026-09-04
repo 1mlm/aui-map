@@ -118,7 +118,11 @@ export function SquircleFuserContainer({
   return (
     <div
       className={cn(
-        "relative w-fit drop-shadow-lg drop-shadow-black/40",
+        // w-max (max-content), not w-fit (fit-content) -- an absolutely positioned element with
+        // left:50% and no `right` gets its fit-content availability computed against only the
+        // remaining half of its containing block, so fit-content silently wraps wide content that
+        // was never actually out of room. max-content sizes to true content width regardless
+        "relative w-max drop-shadow-lg drop-shadow-black/40",
         cornerNudgeByAlign[align],
         superClassName,
       )}
