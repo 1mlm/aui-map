@@ -173,17 +173,20 @@ function useScrollFadeMask() {
   return { stripRef, maskImage: scrollFadeMask(overflow.left, overflow.right) }
 }
 
-// mobile: a floating inset pill over the map itself rather than a full-width strip below it --
-// half-transparent so there's still map showing through behind the chips, matching the locate
-// button's own floating-over-the-map treatment instead of reading as a separate docked toolbar
+// mobile: a floating inset pill over the map itself, docked right under the searchbar/install
+// row rather than a full-width strip -- half-transparent so there's still map showing through
+// behind the chips, matching the rest of the floating-over-the-map chrome instead of reading as a
+// separate docked toolbar. top offset is search row's own top-3 + its h-12 height + this row's gap
 function CompactFilterBar(props: FilterProps) {
   const { stripRef, maskImage } = useScrollFadeMask()
   const { activeTagIds, onClearAll } = props
 
   return (
-    <div className="map-filter-bar-compact pointer-events-auto absolute inset-x-3 bottom-3 flex items-center gap-2 rounded-full corner-superellipse/1.2 bg-background/70 px-3.5 py-2.5 shadow-lg drop-shadow-black/40 backdrop-blur-md">
-      {/* sits outside the scrolling strip below it -- inside, it'd scroll away with the chips it's
-          meant to always be reachable from */}
+    <div className="map-filter-bar-compact pointer-events-auto absolute inset-x-3 top-[4.25rem] flex items-center gap-2 rounded-full corner-superellipse/1.2 bg-background/70 px-3.5 py-2.5 shadow-lg drop-shadow-black/40 backdrop-blur-md">
+      {/* sits outside the scrolling strip -- inside, it'd scroll away with the chips it's meant to
+          always be reachable from. Hangs off the bottom edge, not the top: the top edge butts
+          right up against the searchbar row above it, with no room to spare for anything sticking
+          up past it, while the map below is wide open */}
       {activeTagIds.size > 0 && (
         <button
           type="button"
@@ -191,7 +194,7 @@ function CompactFilterBar(props: FilterProps) {
             triggerHaptic()
             onClearAll()
           }}
-          className="absolute -top-3 left-2 flex shrink-0 items-center gap-1 rounded-full corner-superellipse/1.2 bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground shadow-md"
+          className="absolute -bottom-3 left-2 flex shrink-0 items-center gap-1 rounded-full corner-superellipse/1.2 bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground shadow-md"
         >
           <Icon icon={ICONS.reopen} className="size-3" />
           Clear filter

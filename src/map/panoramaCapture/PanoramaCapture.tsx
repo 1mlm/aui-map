@@ -8,21 +8,9 @@ import { Button } from "@/shadcn/ui/button"
 import { cn } from "@/shadcn/utils"
 import { triggerConfetti } from "@/utils/confetti"
 import { triggerHaptic } from "@/utils/haptics"
-import {
-  quaternionToYawPitch,
-  tanHalfFov,
-  worldDirectionToLocalNdc,
-  wrapDeltaDeg,
-  yawPitchToDirection,
-} from "./equirect"
+import { useDragScroll } from "@/utils/useDragScroll"
+import { quaternionToYawPitch, wrapDeltaDeg } from "./equirect"
 import { OrientationTracker, requestOrientationPermission } from "./orientation"
-import { SphereViewer } from "./SphereViewer"
-import {
-  angularDistanceDeg,
-  buildCaptureTargets,
-  coveredTargetIds,
-  nearestUncoveredTarget,
-} from "./sphereGrid"
 import { PanoramaStitcher } from "./stitch"
 
 // torch is real and widely supported (Android Chrome) but not part of the DOM lib's official
@@ -31,31 +19,25 @@ import { PanoramaStitcher } from "./stitch"
 type TorchCapabilities = MediaTrackCapabilities & { torch?: boolean }
 type TorchConstraintSet = MediaTrackConstraintSet & { torch?: boolean }
 
-// how close the reticle has to sit on a target before a shot fires on its own -- tighter than
-// CAPTURE_TOLERANCE_DEG (which decides what a shot *counts as covering* after the fact), so
-// lining up on a target reliably takes one auto-capture, not three
-const AUTO_CAPTURE_TOLERANCE_DEG = 10
-// once lined up, how long to hold still before the shot actually fires -- long enough to let the
-// phone settle after the turn that got it there, short enough not to feel like a wait
-const AUTO_CAPTURE_DWELL_MS = 3000
+// how much the frame captured for one photo overlaps the previous one -- the camera's own FOV is
+// ~66° wide, so an 8° step keeps roughly 58° of overlap between neighbors, generous room for the
+// stitcher's local alignment search to actually find a matching seam
+const SAMPLE_STEP_DEG = 8
+// captured frames get downscaled to this before stitching -- full camera resolution buys nothing
+// once frames overlap this much (they're already oversampled relative to the final panorama) and
+// costs real GPU/CPU time on every one of the ~30-45 frames a full sweep captures
+const WORKING_LONG_EDGE_PX = 960
+// how fast the phone can be turning when a sample is due before it's skipped for that tick --
+// tried again next frame once (hopefully) slower, rather than adding a blurry frame
+const MOTION_BLUR_MAX_DEG_PER_SEC = 90
+// keep the phone roughly level -- past this the captured band drifts noticeably off the horizon
+const LEVEL_TOLERANCE_DEG = 18
 const NO_SENSOR_TIMEOUT_MS = 3000
-const SHUTTER_FLASH_MS = 150
-// how fast the phone can be turning at the instant a shot fires before it counts as unusably
-// blurry -- guessed, tune against a real phone: raise it if clean-looking shots keep getting
-// rejected, lower it if visibly blurry ones keep sneaking through
-const MOTION_BLUR_MAX_DEG_PER_SEC = 60
-
-const TARGETS = buildCaptureTargets()
-// the two poles are optional (see sphereGrid.ts) -- "ready to finish" is judged against the ring
-// targets alone, so a capture that never looked straight up or down doesn't get stuck at 96%
-const RING_TARGETS = TARGETS.filter((target) => !target.id.startsWith("pole/"))
-// below this, Done stays a soft "finish anyway" rather than a confident "you're set" -- high
-// enough that finishing early actually means a visibly gappy sphere, not just a formality
-const READY_RING_COVERAGE_RATIO = 0.8
-
-function countCoveredRingTargets(coveredIds: ReadonlySet<string>) {
-  return RING_TARGETS.filter((target) => coveredIds.has(target.id)).length
-}
+// a sweep this close to a full 360° loop finishes itself -- doesn't have to be exactly 360 since
+// the loop's start and end frames already overlap generously by the time it gets here
+const AUTO_FINISH_SWEPT_DEG = 350
+// finishing early (the manual Finish button) still needs *something* worth stitching
+const MIN_FINISH_SWEPT_DEG = 40
 
 type Step =
   | { kind: "start" }
@@ -68,11 +50,42 @@ function captureStillFrame(
   video: HTMLVideoElement,
   scratch: HTMLCanvasElement,
 ) {
-  scratch.width = video.videoWidth
-  scratch.height = video.videoHeight
+  const longEdge = Math.max(video.videoWidth, video.videoHeight)
+  const scale = Math.min(1, WORKING_LONG_EDGE_PX / longEdge)
+  scratch.width = Math.round(video.videoWidth * scale)
+  scratch.height = Math.round(video.videoHeight * scale)
   const ctx = scratch.getContext("2d")
   if (!ctx) return
-  ctx.drawImage(video, 0, 0)
+  ctx.drawImage(video, 0, 0, scratch.width, scratch.height)
+}
+
+// the confirm step's own preview -- a plain horizontally-scrollable, drag-and-flingable strip
+// showing the stitched canvas at full resolution, the same viewer PanoramaLayer uses for a saved
+// flat panorama (see useDragScroll). No 360 library, nothing to load: it's already just a wide
+// image by the time capture finishes
+function FlatPreview({ canvas }: { canvas: HTMLCanvasElement }) {
+  const { ref: scrollRef, dragging, handlers } = useDragScroll<HTMLDivElement>()
+  const hostRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const host = hostRef.current
+    if (!host) return
+    canvas.className = "block h-full w-auto max-w-none"
+    host.replaceChildren(canvas)
+  }, [canvas])
+
+  return (
+    <div
+      ref={scrollRef}
+      {...handlers}
+      className={cn(
+        "absolute inset-0 flex touch-pan-x items-center overflow-x-auto overflow-y-hidden select-none",
+        dragging ? "cursor-grabbing" : "cursor-grab",
+      )}
+    >
+      <div ref={hostRef} className="h-full shrink-0" />
+    </div>
+  )
 }
 
 export function PanoramaCapture({
@@ -83,46 +96,33 @@ export function PanoramaCapture({
   onCancel: () => void
 }) {
   const [step, setStep] = useState<Step>({ kind: "start" })
-  // the covered-target ids themselves live in a ref (coveredIdsRef below) since capture is a
-  // per-frame hot path -- this number exists only to force a re-render when it changes, the
-  // actual count is always read fresh off the ref
+  // the stitcher's own sweptDeg is a live number read off a ref-held instance, not React state --
+  // this exists purely to force a re-render when it (and the frame count) changes, the actual
+  // values are always read fresh
   const [, forceCoverageUpdate] = useState(0)
   const [noSensor, setNoSensor] = useState(false)
-  // whether this device/browser's camera track exposes a torch at all (iOS Safari never does) --
-  // the toggle only ever renders once this is confirmed true, rather than showing a button that'd
-  // just fail silently
   const [torchSupported, setTorchSupported] = useState(false)
   const [torchOn, setTorchOn] = useState(false)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const scratchCanvasRef = useRef<HTMLCanvasElement>(null)
-  const previewContainerRef = useRef<HTMLDivElement>(null)
-  const reticleRef = useRef<HTMLDivElement>(null)
-  const dwellRingRef = useRef<HTMLDivElement>(null)
-  const guideDotRef = useRef<HTMLDivElement>(null)
-  const arrowRef = useRef<HTMLDivElement>(null)
+  const previewStripRef = useRef<HTMLDivElement>(null)
+  const levelLineRef = useRef<HTMLDivElement>(null)
   const statusTextRef = useRef<HTMLDivElement>(null)
-  const flashRef = useRef<HTMLDivElement>(null)
+  const progressFillRef = useRef<HTMLDivElement>(null)
+  const progressTextRef = useRef<HTMLDivElement>(null)
 
   const streamRef = useRef<MediaStream | null>(null)
   const trackerRef = useRef<OrientationTracker | null>(null)
   const stitcherRef = useRef<PanoramaStitcher | null>(null)
-  const coveredIdsRef = useRef<Set<string>>(new Set())
-  // targets that got a shot but it came out too blurry to keep (see MOTION_BLUR_MAX_DEG_PER_SEC)
-  // -- deliberately kept out of coveredIdsRef so the guide naturally sends the phone back there,
-  // this just remembers to show that spot as "needs a retake" red rather than "never visited" white
-  const flaggedIdsRef = useRef<Set<string>>(new Set())
-  // when the reticle first lined up on the current target, so the dwell ring knows how far through
-  // its hold it is -- null whenever not currently lined up on anything
-  const lineUpStartedAtRef = useRef<number | null>(null)
+  const frameCountRef = useRef(0)
+  // the yaw the last sample was taken at -- null means no sample yet, the very next reading
+  // always samples regardless of how far it's turned to get there
+  const lastSampledYawDegRef = useRef<number | null>(null)
   const rafRef = useRef<number | null>(null)
-  // bumped on every handleStart -- keys the confirm step's SphereViewer so a retry gets a fresh
+  // bumped on every handleStart -- keys the confirm step's preview so a retry gets a fresh
   // WebGL context instead of reusing one pointed at a stitcher that's already been disposed
   const sessionIdRef = useRef(0)
-  // edge-detectors so a haptic/confetti fires once when a state first becomes true, not on every
-  // animation frame it stays true
-  const wasLinedUpRef = useRef(false)
-  const wasReadyRef = useRef(false)
 
   function stopSensors() {
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
@@ -134,7 +134,7 @@ export function PanoramaCapture({
   }
 
   // this is a plain fixed overlay, not a Dialog, so nothing else locks the page underneath it --
-  // without this a drag on the reticle can scroll the map behind the black screen
+  // without this a drag on the preview can scroll the map behind the black screen
   useEffect(() => {
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = "hidden"
@@ -152,9 +152,9 @@ export function PanoramaCapture({
     }
   }, [])
 
-  // the <video> only mounts once `step` becomes "capturing", so handleStart (which runs earlier,
-  // while the stream is still being requested) can't hand the stream to a ref that doesn't exist
-  // yet -- this attaches it once the element is actually there
+  // the <video> only mounts once `step` becomes "capturing" (which handleStart, running earlier
+  // while the stream is still being requested, can't reach yet) -- this attaches it once the
+  // element is actually there
   useEffect(() => {
     if (step.kind !== "capturing") return
     const video = videoRef.current
@@ -164,189 +164,63 @@ export function PanoramaCapture({
     video.play().catch(() => {})
   }, [step])
 
-  function flashShutter(color: "white" | "red" = "white") {
-    const flash = flashRef.current
-    if (!flash) return
-    flash.style.backgroundColor = color === "red" ? "#f87171" : "#ffffff"
-    flash.style.opacity = "1"
-    setTimeout(() => {
-      flash.style.opacity = "0"
-    }, SHUTTER_FLASH_MS)
-  }
-
-  function doCapture() {
+  function runCaptureLoop() {
+    const facing = trackerRef.current?.current
     const video = videoRef.current
-    const scratch = scratchCanvasRef.current
     const stitcher = stitcherRef.current
-    const facing = trackerRef.current?.current
-    if (!video || !scratch || !stitcher || !facing) return
+    const scratch = scratchCanvasRef.current
 
-    const facingYawPitch = quaternionToYawPitch(facing.quaternion)
-    const affectedTargetIds = coveredTargetIds(facingYawPitch, TARGETS)
-
-    // the phone was still turning too fast right as this fired -- it would just add a blurry
-    // smear to the sphere, so it's rejected outright rather than accumulated. The affected spots
-    // stay (or become) flagged red instead of covered, so the guide sends the phone straight back
-    if (facing.angularVelocityDegPerSec > MOTION_BLUR_MAX_DEG_PER_SEC) {
-      for (const id of affectedTargetIds) flaggedIdsRef.current.add(id)
-      flashShutter("red")
-      triggerHaptic("error")
-      lineUpStartedAtRef.current = null
-      forceCoverageUpdate((n) => n + 1)
-      return
-    }
-
-    captureStillFrame(video, scratch)
-    stitcher.accumulate(scratch, facing.quaternion)
-    flashShutter()
-    // a sharp, single-click feel -- reads as a shutter, not a generic tap
-    triggerHaptic("rigid")
-
-    for (const id of affectedTargetIds) {
-      coveredIdsRef.current.add(id)
-      flaggedIdsRef.current.delete(id)
-    }
-    lineUpStartedAtRef.current = null
-    forceCoverageUpdate((n) => n + 1)
-
-    const isReady =
-      countCoveredRingTargets(coveredIdsRef.current) >=
-      Math.ceil(RING_TARGETS.length * READY_RING_COVERAGE_RATIO)
-    if (isReady && !wasReadyRef.current) {
-      wasReadyRef.current = true
-      // haptic only, no confetti here -- the camera's still fullscreen and mid-rotation, and
-      // confetti painting over the viewfinder would obscure whatever's left to aim at. The visual
-      // celebration is saved for handleConfirm, once the screen's actually static
-      triggerHaptic("success")
-    }
-  }
-
-  function runGuideLoop() {
-    const facing = trackerRef.current?.current
-    const video = videoRef.current
-    if (facing && video) {
-      // the no-sensor timeout (below, in handleStart) only ever checks once, 3s in -- if
-      // orientation data was just a little slow to start (a common real-device hiccup right after
-      // the permission prompt), that one check latches noSensor true forever, even once readings
-      // are clearly flowing. This is the only place that can see "actually, it's working now" and
-      // undo it -- otherwise the manual shutter stays wrongly disabled for the rest of the session
+    if (facing && video && stitcher && scratch) {
+      // see doCapture's sibling comment in the old discrete-target flow -- the no-sensor timeout
+      // only ever checks once, 3s in, and this is the only place that can see readings are
+      // actually flowing now and undo it
       if (noSensor) setNoSensor(false)
 
-      const facingYawPitch = quaternionToYawPitch(facing.quaternion)
-      const nearest = nearestUncoveredTarget(
-        facingYawPitch,
-        TARGETS,
-        coveredIdsRef.current,
-      )
+      const { yawDeg, pitchDeg } = quaternionToYawPitch(facing.quaternion)
+      const isLevel = Math.abs(pitchDeg) <= LEVEL_TOLERANCE_DEG
+      const isTurningTooFast =
+        facing.angularVelocityDegPerSec > MOTION_BLUR_MAX_DEG_PER_SEC
 
-      if (nearest) {
-        const distanceToNearestDeg = angularDistanceDeg(facingYawPitch, nearest)
-        const linedUp = distanceToNearestDeg < AUTO_CAPTURE_TOLERANCE_DEG
-        const isRetake = flaggedIdsRef.current.has(nearest.id)
-        const activeColor = isRetake ? "#f87171" : "#4ade80"
+      if (levelLineRef.current) {
+        const tiltPx = Math.max(-40, Math.min(40, pitchDeg * 2))
+        levelLineRef.current.style.transform = `translateY(${tiltPx}px)`
+        levelLineRef.current.style.backgroundColor = isLevel
+          ? "#4ade80"
+          : "#ffffff"
+      }
+      if (statusTextRef.current)
+        statusTextRef.current.textContent = isTurningTooFast
+          ? "Slow down a little"
+          : !isLevel
+            ? "Keep the phone level"
+            : "Slowly turn all the way around"
 
-        // same field of view the stitcher actually samples with (see equirect.ts) -- so the dot
-        // lands exactly where the target really is in the video frame, not an approximation
-        const { tanHalfFovX, tanHalfFovY } = tanHalfFov(
-          video.videoWidth || 1,
-          video.videoHeight || 1,
-        )
-        const targetDirection = yawPitchToDirection(
-          nearest.yawDeg,
-          nearest.pitchDeg,
-        )
-        const ndc = worldDirectionToLocalNdc(targetDirection, facing.quaternion)
-        const onScreen =
-          ndc !== null &&
-          Math.abs(ndc.x) <= tanHalfFovX &&
-          Math.abs(ndc.y) <= tanHalfFovY
+      const dueForSample =
+        lastSampledYawDegRef.current === null ||
+        Math.abs(wrapDeltaDeg(yawDeg - lastSampledYawDegRef.current)) >=
+          SAMPLE_STEP_DEG
 
-        if (onScreen && guideDotRef.current) {
-          const leftPercent = 50 + 50 * (ndc.x / tanHalfFovX)
-          const topPercent = 50 - 50 * (ndc.y / tanHalfFovY)
-          guideDotRef.current.style.left = `${leftPercent}%`
-          guideDotRef.current.style.top = `${topPercent}%`
-          guideDotRef.current.style.opacity = "1"
-          guideDotRef.current.style.backgroundColor = linedUp
-            ? activeColor
-            : isRetake
-              ? "#fca5a5"
-              : "#ffffff"
-          guideDotRef.current.style.transform = `translate(-50%, -50%) scale(${linedUp ? 1.3 : 1})`
-        } else if (guideDotRef.current) {
-          guideDotRef.current.style.opacity = "0"
-        }
+      if (dueForSample && !isTurningTooFast) {
+        lastSampledYawDegRef.current = yawDeg
+        captureStillFrame(video, scratch)
+        stitcher.addFrame(scratch, facing.quaternion, yawDeg)
+        frameCountRef.current += 1
+        triggerHaptic("light")
+        forceCoverageUpdate((n) => n + 1)
+      }
 
-        // the target's fallen out of the camera's frame entirely -- a dot clamped to a fixed
-        // radius would just sit pinned at the edge here, no matter how much further off it
-        // actually is, and stop giving any useful feedback. A big arrow that keeps pointing the
-        // real direction (however far) reads as responsive the whole way there instead
-        if (arrowRef.current) {
-          if (onScreen) {
-            arrowRef.current.style.opacity = "0"
-          } else {
-            const yawDiff = wrapDeltaDeg(nearest.yawDeg - facingYawPitch.yawDeg)
-            const pitchDiff = nearest.pitchDeg - facingYawPitch.pitchDeg
-            const angleDeg = Math.atan2(yawDiff, pitchDiff) * (180 / Math.PI)
-            arrowRef.current.style.transform = `rotate(${angleDeg}deg)`
-            arrowRef.current.style.opacity = "1"
-            arrowRef.current.style.color = isRetake ? "#f87171" : "#ffffff"
-          }
-        }
+      const sweptPercent = Math.min(100, (stitcher.sweptDeg / 360) * 100)
+      if (progressFillRef.current)
+        progressFillRef.current.style.width = `${sweptPercent}%`
+      if (progressTextRef.current)
+        progressTextRef.current.textContent = `${Math.round(sweptPercent)}%`
 
-        if (reticleRef.current)
-          reticleRef.current.style.borderColor = linedUp
-            ? activeColor
-            : isRetake
-              ? "rgba(248,113,113,0.8)"
-              : "rgba(255,255,255,0.7)"
-
-        // holding lined-up long enough is what actually fires the shot (see below) -- this ring
-        // sweeps clockwise around the crosshair over that same hold so the wait has something to
-        // watch instead of just... waiting, unsure if it's even registering the alignment
-        const dwellElapsedMs = linedUp
-          ? performance.now() -
-            (lineUpStartedAtRef.current ?? performance.now())
-          : 0
-        const dwellPercent = Math.min(
-          100,
-          (dwellElapsedMs / AUTO_CAPTURE_DWELL_MS) * 100,
-        )
-        if (dwellRingRef.current) {
-          dwellRingRef.current.style.opacity = linedUp ? "1" : "0"
-          dwellRingRef.current.style.background = `conic-gradient(${activeColor} ${dwellPercent}%, rgba(255,255,255,0.25) ${dwellPercent}%)`
-        }
-
-        if (statusTextRef.current)
-          statusTextRef.current.textContent = linedUp
-            ? "Hold still…"
-            : isRetake
-              ? "Retake, that one was blurry"
-              : onScreen
-                ? "Center the dot"
-                : "Turn toward the arrow"
-
-        if (linedUp) {
-          // a light tick right as the reticle locks on, so aiming feels responsive even in the
-          // brief window before the dwell timer starts counting down
-          if (!wasLinedUpRef.current) triggerHaptic("light")
-          lineUpStartedAtRef.current ??= performance.now()
-          if (dwellElapsedMs >= AUTO_CAPTURE_DWELL_MS) doCapture()
-        } else {
-          lineUpStartedAtRef.current = null
-        }
-        wasLinedUpRef.current = linedUp
-      } else {
-        if (guideDotRef.current) guideDotRef.current.style.opacity = "0"
-        if (arrowRef.current) arrowRef.current.style.opacity = "0"
-        if (dwellRingRef.current) dwellRingRef.current.style.opacity = "0"
-        if (reticleRef.current) reticleRef.current.style.borderColor = "#4ade80"
-        if (statusTextRef.current)
-          statusTextRef.current.textContent = "Full coverage, nice"
-        lineUpStartedAtRef.current = null
+      if (stitcher.sweptDeg >= AUTO_FINISH_SWEPT_DEG) {
+        handleFinishCapturing()
+        return
       }
     }
-    rafRef.current = requestAnimationFrame(runGuideLoop)
+    rafRef.current = requestAnimationFrame(runCaptureLoop)
   }
 
   async function handleStart() {
@@ -360,17 +234,17 @@ export function PanoramaCapture({
       setStep({
         kind: "error",
         message:
-          "Motion access is needed to line up the sphere. Enable it for this site in Settings and try again.",
+          "Motion access is needed to follow along as you turn. Enable it for this site in Settings and try again.",
       })
       return
     }
 
     try {
       streamRef.current = await navigator.mediaDevices.getUserMedia({
-        // 1920 was overkill: a 66°-wide capture only ever lands on a ~560px-wide slice of the
-        // 3072px-wide equirect canvas, so anything past that is decoded and drawn every frame for
-        // nothing -- 1280 is still comfortably oversampled and noticeably lighter on the phone
-        video: { facingMode: "environment", width: { ideal: 1280 } },
+        video: {
+          facingMode: "environment",
+          width: { ideal: WORKING_LONG_EDGE_PX },
+        },
         audio: false,
       })
     } catch {
@@ -390,19 +264,11 @@ export function PanoramaCapture({
     setTorchOn(false)
 
     stitcherRef.current?.dispose()
-    stitcherRef.current = new PanoramaStitcher()
+    stitcherRef.current = null
     sessionIdRef.current += 1
-    if (previewContainerRef.current) {
-      previewContainerRef.current.replaceChildren(stitcherRef.current.canvas)
-      stitcherRef.current.canvas.className =
-        "size-full rounded-xl corner-squircle object-cover"
-    }
-    coveredIdsRef.current = new Set()
-    flaggedIdsRef.current = new Set()
+    frameCountRef.current = 0
+    lastSampledYawDegRef.current = null
     forceCoverageUpdate(0)
-    lineUpStartedAtRef.current = null
-    wasLinedUpRef.current = false
-    wasReadyRef.current = false
 
     const tracker = new OrientationTracker()
     tracker.start()
@@ -418,15 +284,44 @@ export function PanoramaCapture({
     }, NO_SENSOR_TIMEOUT_MS)
 
     setStep({ kind: "capturing" })
-    rafRef.current = requestAnimationFrame(runGuideLoop)
   }
 
+  // the stitcher needs the video's real frame size to know its own pixel density -- can't be
+  // constructed until the <video> element has actually decoded a frame and reports it, which is
+  // why this waits for `capturing` rather than happening in handleStart alongside everything else
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runCaptureLoop only reads refs, identity doesn't matter
+  useEffect(() => {
+    if (step.kind !== "capturing") return
+    const video = videoRef.current
+    if (!video) return
+
+    function startOnceReady() {
+      if (!video || video.videoWidth === 0) return
+      stitcherRef.current = new PanoramaStitcher(
+        video.videoWidth,
+        video.videoHeight,
+      )
+      if (previewStripRef.current) {
+        previewStripRef.current.replaceChildren(stitcherRef.current.canvas)
+        stitcherRef.current.canvas.className = "h-full w-full object-cover"
+      }
+      rafRef.current = requestAnimationFrame(runCaptureLoop)
+    }
+
+    if (video.videoWidth > 0) startOnceReady()
+    else {
+      video.addEventListener("loadedmetadata", startOnceReady, { once: true })
+      return () => video.removeEventListener("loadedmetadata", startOnceReady)
+    }
+  }, [step])
+
   function handleFinishCapturing() {
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+    rafRef.current = null
     triggerHaptic("medium")
     stopSensors()
-    // the live thumbnail's been rendering cheap and small this whole time (see stitch.ts) -- bring
-    // it back up to full resolution now, once, since this same canvas is what the confirm step's
-    // SphereViewer actually displays
+    // the live strip's been rendering cheap and small this whole time -- bring it back up to
+    // full resolution now, once, since this same canvas is what the confirm step's preview shows
     stitcherRef.current?.renderFullPreview()
     setStep({ kind: "confirming" })
   }
@@ -475,15 +370,8 @@ export function PanoramaCapture({
     }
   }
 
-  // the ring is what actually gates "done" (poles are optional, see RING_TARGETS above) -- shown
-  // to the user as the one coverage number so what they see matches what unlocks the button
-  const coveredRingCount = countCoveredRingTargets(coveredIdsRef.current)
-  const coveragePercent = Math.round(
-    (coveredRingCount / RING_TARGETS.length) * 100,
-  )
-  const isReadyToFinish =
-    coveredRingCount >=
-    Math.ceil(RING_TARGETS.length * READY_RING_COVERAGE_RATIO)
+  const sweptDeg = stitcherRef.current?.sweptDeg ?? 0
+  const canFinishEarly = sweptDeg >= MIN_FINISH_SWEPT_DEG
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black">
@@ -493,13 +381,11 @@ export function PanoramaCapture({
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center text-white">
           <Icon icon={ICONS.contributePanorama} className="size-10" />
           <div className="flex flex-col gap-1.5">
-            <p className="text-base font-medium">
-              Capture a spherical panorama
-            </p>
+            <p className="text-base font-medium">Capture a panorama</p>
             <p className="max-w-xs text-sm text-white/70">
               {step.kind === "error"
                 ? step.message
-                : "Turn slowly to fill every direction: up, down, and all the way around. A dot marks the next spot to aim at, or an arrow points the way once it's out of frame."}
+                : "Hold the phone level and slowly turn all the way around. It stitches itself as you go -- no need to stop and aim at anything."}
             </p>
           </div>
           <Button
@@ -534,78 +420,26 @@ export function PanoramaCapture({
           />
           <canvas ref={scratchCanvasRef} className="hidden" />
 
-          {/* a brief white flash on every shutter fire, the same visual beat any camera app
-              gives a capture -- opacity is toggled directly (not React state) so it can hit every
-              frame the auto-capture loop wants without fighting re-renders */}
+          {/* a level line, not a reticle -- there's no single point to aim at any more, just
+              "keep the phone roughly horizontal while you turn". Tracks pitch directly, turns
+              green once level */}
           <div
-            ref={flashRef}
-            className="pointer-events-none absolute inset-0 bg-white opacity-0 transition-opacity duration-150"
+            ref={levelLineRef}
+            className="pointer-events-none absolute top-1/2 right-8 left-8 h-0.5 bg-white opacity-80 shadow-[0_0_6px_rgba(0,0,0,0.6)] transition-colors"
           />
-
-          {/* sweeps clockwise over the 3s hold once lined up, so the wait before a shot actually
-              fires has something to watch -- a ring rather than a bar since it wraps the crosshair
-              it's timing. The "hole" in the middle is a mask, not a second element */}
-          <div
-            ref={dwellRingRef}
-            style={{
-              maskImage:
-                "radial-gradient(farthest-side, transparent calc(100% - 3px), black calc(100% - 3px))",
-              WebkitMaskImage:
-                "radial-gradient(farthest-side, transparent calc(100% - 3px), black calc(100% - 3px))",
-            }}
-            className="pointer-events-none absolute top-1/2 left-1/2 size-11 -translate-x-1/2 -translate-y-1/2 rounded-full opacity-0 transition-opacity"
-          />
-
-          {/* fixed crosshair, always exactly where the camera is currently pointed -- recolors
-              green (or red, mid-retake) the instant the roaming target dot lines up with it */}
-          <div
-            ref={reticleRef}
-            style={{ borderColor: "rgba(255,255,255,0.7)" }}
-            className="pointer-events-none absolute top-1/2 left-1/2 size-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 transition-colors"
-          />
-
-          {/* the next uncovered spot on the sphere, projected onto the video frame with the same
-              field of view the stitcher samples with -- sits exactly where that direction really
-              is in frame, not an approximation clamped to a fixed radius */}
-          <div
-            ref={guideDotRef}
-            style={{
-              left: "50%",
-              top: "50%",
-              transform: "translate(-50%, -50%)",
-            }}
-            className="pointer-events-none absolute size-5 rounded-full opacity-0 shadow-[0_0_10px_rgba(0,0,0,0.7)] transition-opacity"
-          />
-
-          {/* takes over once the next target is out of frame entirely -- a dot clamped at a fixed
-              radius would just sit pinned at the edge no matter how far off the real target still
-              is, and stop feeling responsive. This keeps pointing the real direction the whole way */}
-          <div
-            ref={arrowRef}
-            className="pointer-events-none absolute top-1/2 left-1/2 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center opacity-0 transition-opacity"
-          >
-            <Icon
-              icon={ICONS.turnArrow}
-              className="size-14 text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.7)]"
-            />
-          </div>
 
           <div
             ref={statusTextRef}
             className="pointer-events-none absolute top-16 left-1/2 -translate-x-1/2 rounded-full corner-squircle bg-black/60 px-4 py-1.5 text-center text-sm font-medium text-white backdrop-blur-sm"
           >
-            Point your camera around
+            Slowly turn all the way around
           </div>
 
           {noSensor && (
             <div className="absolute top-4 right-4 left-4 rounded-xl corner-squircle bg-black/70 p-3 text-center text-xs text-white backdrop-blur-sm">
-              No motion sensor found. This needs a phone to aim the shots.
+              No motion sensor found. This needs a phone to follow the turn.
             </div>
           )}
-
-          <div className="absolute top-4 left-4 size-28 overflow-hidden rounded-xl corner-squircle border border-white/30 shadow-lg">
-            <div ref={previewContainerRef} className="size-full" />
-          </div>
 
           <IconButton
             icon={ICONS.close}
@@ -629,73 +463,54 @@ export function PanoramaCapture({
             />
           )}
 
-          <div className="absolute right-0 bottom-0 left-0 flex flex-col items-center gap-2 bg-gradient-to-t from-black/70 to-transparent p-6">
-            <div className="flex w-full max-w-64 items-center gap-2">
+          {/* the live stitched result so far, as a real (if narrow) strip of the actual
+              panorama -- not a mysterious square thumbnail off to the side. It's what's actually
+              happening, shown as it happens */}
+          <div className="absolute right-0 bottom-20 left-0 flex flex-col items-center gap-2 px-4">
+            <div className="h-16 w-full max-w-md overflow-hidden rounded-xl corner-squircle border border-white/30 shadow-lg">
+              <div ref={previewStripRef} className="size-full bg-black/40" />
+            </div>
+            <div className="flex w-full max-w-md items-center gap-2">
               <div className="h-1.5 flex-1 overflow-hidden rounded-full corner-squircle bg-white/20">
                 <div
-                  className={cn(
-                    "h-full rounded-full corner-squircle transition-[width,background-color]",
-                    isReadyToFinish ? "bg-green-400" : "bg-white/80",
-                  )}
-                  style={{ width: `${Math.min(100, coveragePercent)}%` }}
+                  ref={progressFillRef}
+                  className="h-full rounded-full corner-squircle bg-green-400 transition-[width]"
+                  style={{ width: "0%" }}
                 />
               </div>
-              <span className="w-9 text-right text-xs tabular-nums text-white/70">
-                {coveragePercent}%
-              </span>
-            </div>
-            <div className="flex items-center gap-4">
-              <button
-                type="button"
-                onClick={doCapture}
-                disabled={noSensor}
-                aria-label="Capture"
-                className={cn(
-                  "flex size-16 items-center justify-center rounded-full corner-squircle border-4 border-white bg-white/20",
-                  noSensor && "opacity-40",
-                )}
+              <div
+                ref={progressTextRef}
+                className="w-9 text-right text-xs tabular-nums text-white/70"
               >
-                <Icon icon={ICONS.shutter} className="size-6 text-white" />
-              </button>
-              <IconButton
-                icon={ICONS.success}
-                tone={isReadyToFinish ? "primary" : "subtle"}
-                shape="corner-superellipse/1.2"
-                aria-label={isReadyToFinish ? "Done" : "Finish anyway"}
-                className={cn(
-                  "size-14",
-                  coveredRingCount === 0 && "opacity-50",
-                )}
-                iconClassName="text-xl"
-                disabled={coveredRingCount === 0}
-                onClick={handleFinishCapturing}
-              />
+                0%
+              </div>
             </div>
+          </div>
+
+          <div className="absolute right-0 bottom-0 left-0 flex items-center justify-center gap-4 bg-gradient-to-t from-black/70 to-transparent p-6">
+            <IconButton
+              icon={ICONS.success}
+              tone={canFinishEarly ? "primary" : "subtle"}
+              shape="corner-superellipse/1.2"
+              aria-label="Finish now"
+              className={cn("size-14", !canFinishEarly && "opacity-50")}
+              iconClassName="text-xl"
+              disabled={!canFinishEarly}
+              onClick={handleFinishCapturing}
+            />
           </div>
         </div>
       )}
 
       {step.kind === "confirming" && stitcherRef.current && (
-        <div className="relative flex-1">
-          <SphereViewer
+        <div className="relative flex-1 bg-neutral-900">
+          <FlatPreview
             key={sessionIdRef.current}
-            image={{ kind: "canvas", canvas: stitcherRef.current.canvas }}
+            canvas={stitcherRef.current.canvas}
           />
-          <div className="pointer-events-none absolute top-6 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1.5">
+          <div className="pointer-events-none absolute top-6 left-1/2 -translate-x-1/2">
             <div className="rounded-full corner-squircle bg-black/60 px-4 py-2 text-center text-sm text-white backdrop-blur-sm">
               Drag to look around
-            </div>
-            <div
-              className={cn(
-                "rounded-full corner-squircle px-3 py-1 text-xs font-medium backdrop-blur-sm",
-                isReadyToFinish
-                  ? "bg-green-400/20 text-green-300"
-                  : "bg-amber-400/20 text-amber-300",
-              )}
-            >
-              {isReadyToFinish
-                ? "Full coverage"
-                : `${coveragePercent}% covered, some spots have gaps`}
             </div>
           </div>
           <div className="absolute right-0 bottom-0 left-0 flex items-center justify-center gap-4 bg-gradient-to-t from-black/70 to-transparent p-6">

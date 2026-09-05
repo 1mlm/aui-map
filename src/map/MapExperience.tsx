@@ -213,6 +213,13 @@ export function MapExperience({
           {...{ selectedId, hoveredTagId, tuning, sizeTuning, panoramas }}
         />
 
+        {/* softens the map's own imagery into the shell's background right where it meets the
+            credit strip below, instead of the photo just cutting off hard at the rounded corner.
+            bg-background-based gradient (not a hardcoded black) so it fades to whichever the
+            current color-scheme actually is. Desktop's bottom edge is already the fused filter
+            bar chrome, not bare map, so this is mobile-only */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-background sm:hidden" />
+
         <MapBrand />
         <NetworkStatusBanner />
 

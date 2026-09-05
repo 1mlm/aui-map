@@ -171,9 +171,11 @@ function ContributionForm({
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  // true once `file` came out of the in-app spherical capture flow rather than a plain upload --
-  // carried through to Submission.spherical so the viewer knows which one it's looking at
-  const [spherical, setSpherical] = useState(false)
+  // true once `file` came out of the in-app capture flow rather than a plain upload -- purely a
+  // UI distinction (whether "Retake" reopens the capture flow or "Change" reopens the file
+  // picker), not carried through to the submission: the capture flow's output is a flat
+  // panorama like any uploaded photo, not a special format the viewer needs to know about
+  const [capturedInApp, setCapturedInApp] = useState(false)
   const [capturing, setCapturing] = useState(false)
 
   // a one-shot fix, not useUserLocation's continuous watch -- this just fills in one field once,
@@ -207,12 +209,12 @@ function ContributionForm({
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     setFile(event.target.files?.[0] ?? null)
-    setSpherical(false)
+    setCapturedInApp(false)
   }
 
   function handlePanoramaCaptured(capturedFile: File) {
     setFile(capturedFile)
-    setSpherical(true)
+    setCapturedInApp(true)
     setCapturing(false)
   }
 
@@ -258,7 +260,6 @@ function ContributionForm({
             title: title.trim() || null,
             message: message.trim() || null,
             coord,
-            spherical: type.id === "panorama" ? spherical : undefined,
           })
         }
         triggerHaptic("success")
@@ -306,34 +307,25 @@ function ContributionForm({
 
       {fields.includes("file") &&
         (file ? (
-          spherical ? (
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center gap-2 rounded-xl corner-squircle border border-border p-3 text-muted-foreground">
-                <Icon icon={ICONS.contributePanorama} className="shrink-0" />
-                <span className="text-sm">Spherical panorama captured</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setCapturing(true)}
-                className="flex items-center justify-between gap-2 rounded-full corner-squircle px-1 py-1 text-xs text-muted-foreground hover:text-foreground"
-              >
-                <span>Look around what you captured</span>
-                <span className="shrink-0 font-medium">Retake</span>
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-1.5">
-              <FilePreview {...{ file }} />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center justify-between gap-2 rounded-full corner-squircle px-1 py-1 text-xs text-muted-foreground hover:text-foreground"
-              >
-                <span className="truncate">{file.name}</span>
-                <span className="shrink-0 font-medium">Change</span>
-              </button>
-            </div>
-          )
+          <div className="flex flex-col gap-1.5">
+            <FilePreview {...{ file }} />
+            <button
+              type="button"
+              onClick={() =>
+                capturedInApp
+                  ? setCapturing(true)
+                  : fileInputRef.current?.click()
+              }
+              className="flex items-center justify-between gap-2 rounded-full corner-squircle px-1 py-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <span className="truncate">
+                {capturedInApp ? "Panorama captured" : file.name}
+              </span>
+              <span className="shrink-0 font-medium">
+                {capturedInApp ? "Retake" : "Change"}
+              </span>
+            </button>
+          </div>
         ) : type.id === "panorama" ? (
           <div className="flex flex-col items-center gap-2 rounded-xl corner-squircle border border-dashed border-border py-6">
             <button

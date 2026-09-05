@@ -1,11 +1,10 @@
 import type { Quaternion } from "three"
 import { Vector3 } from "three"
 
-// the one direction<->angle convention shared by every piece of the capture flow: the sphere grid
-// (which target am I closest to), the reticle (which way should I turn), and the stitch shader
-// (where in the equirectangular canvas does this ray land). stitch.ts's GLSL re-derives the same
-// formula by hand (uniforms can't share a function with the CPU side) -- keep the two in sync if
-// this ever changes
+// the one direction<->angle convention shared by the capture flow: reading the phone's current
+// facing direction (quaternionToYawPitch) and the stitch shader (where on the panorama canvas
+// does this ray land). stitch.ts's GLSL re-derives the yaw/pitch formula by hand (uniforms can't
+// share a function with the CPU side) -- keep the two in sync if this ever changes
 const DEG2RAD = Math.PI / 180
 const RAD2DEG = 180 / Math.PI
 
@@ -13,10 +12,7 @@ const RAD2DEG = 180 / Math.PI
 // main lenses land somewhere around 60-70° horizontal. It's applied to whichever pixel dimension
 // of the captured frame is longer, so it works whether getUserMedia hands back portrait or
 // landscape buffers; the other dimension's FOV falls out of the frame's actual aspect ratio.
-// tune this against a real phone if seams look consistently too tight or too loose. Shared with
-// the live capture reticle (PanoramaCapture.tsx) so the on-screen guide agrees with what the
-// stitcher actually samples -- two separate guesses at the same physical quantity would mean the
-// reticle points somewhere the accumulated photo doesn't actually cover
+// tune this against a real phone if the panorama's seams look consistently too tight or too loose
 export const CAMERA_LONG_EDGE_FOV_DEG = 66
 
 export function tanHalfFov(widthPx: number, heightPx: number) {
@@ -38,17 +34,7 @@ export function wrapDeltaDeg(deltaDeg: number): number {
   return ((((deltaDeg + 180) % 360) + 360) % 360) - 180
 }
 
-export function yawPitchToDirection(yawDeg: number, pitchDeg: number): Vector3 {
-  const yaw = yawDeg * DEG2RAD
-  const pitch = pitchDeg * DEG2RAD
-  return new Vector3(
-    Math.cos(pitch) * Math.cos(yaw),
-    Math.sin(pitch),
-    Math.cos(pitch) * Math.sin(yaw),
-  )
-}
-
-export function directionToYawPitch(direction: Vector3): {
+function directionToYawPitch(direction: Vector3): {
   yawDeg: number
   pitchDeg: number
 } {
@@ -66,20 +52,4 @@ export function quaternionToYawPitch(quaternion: Quaternion): {
 } {
   const forward = new Vector3(0, 0, -1).applyQuaternion(quaternion)
   return directionToYawPitch(forward)
-}
-
-// where a world-space direction actually lands in the current camera's view, in the same
-// normalized device coordinates the accumulate shader projects into (before dividing by
-// tanHalfFov) -- null once the direction is more than 90° off-axis, since a perspective camera
-// can't represent that as a screen point at all. Used to place the live capture reticle exactly
-// where an uncovered target really is in the video frame, instead of an arbitrary clamped offset
-export function worldDirectionToLocalNdc(
-  worldDirection: Vector3,
-  quaternion: Quaternion,
-): { x: number; y: number } | null {
-  const local = worldDirection
-    .clone()
-    .applyQuaternion(quaternion.clone().invert())
-  if (local.z >= 0) return null
-  return { x: local.x / -local.z, y: local.y / -local.z }
 }

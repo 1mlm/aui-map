@@ -1,5 +1,6 @@
 "use client"
 
+import { AnimatePresence } from "motion/react"
 import { type ReactNode, useEffect, useRef, useState } from "react"
 import { Icon } from "@/components/Icon"
 import { IconButton } from "@/components/IconButton"
@@ -11,8 +12,10 @@ import { InputGroupButton } from "@/shadcn/ui/input-group"
 import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover"
 import { cn } from "@/shadcn/utils"
 import { ContributeMenu, type ContributePin } from "./ContributeMenu"
+import { InstallPromptButton } from "./InstallPromptButton"
 import { SearchField, type SearchProps } from "./MapSearch"
 import type { CompassPermission } from "./useCompassHeading"
+import { useInstallPrompt } from "./useInstallPrompt"
 import { type LocationStatus, VAGUE_ACCURACY_METERS } from "./useUserLocation"
 
 const LOCATE_LABEL: Record<LocationStatus, string> = {
@@ -70,6 +73,7 @@ export function MapControls({
     setContributeOpen(true)
   }
   const { search } = props
+  const { canInstall, promptInstall } = useInstallPrompt()
   const fixIsVague =
     locationStatus === "granted" &&
     accuracy !== null &&
@@ -150,6 +154,19 @@ export function MapControls({
       label: "Contribute",
       onClick: openContribute,
     },
+    ...(canInstall
+      ? [
+          {
+            id: "install",
+            // compact already gets its own bespoke button next to the searchbar
+            fullOnly: true,
+            icon: ICONS.download,
+            label: "Install",
+            className: "animate-pulse-attention",
+            onClick: promptInstall,
+          } satisfies MapControl,
+        ]
+      : []),
     {
       id: "about",
       // mobile's own About lives in the credit strip fused to the bottom of the screen now
@@ -222,13 +239,14 @@ export function MapControls({
   // flashing the wrong one while JS boots up
   return (
     <>
-      {/* mobile: just the searchbar (full width, a real always-there input, not a button that
-          opens one) with Contribute docked at its own right edge -- one translucent pill, not
-          two pieces of chrome side by side. Locate has its own floating button, About lives in
-          the credit strip fused to the bottom of the screen (MapCredit, in MapExperience). Same
-          inset-3 margin the filter pill and its credit strip use, so the chrome reads as one
-          consistent floating language top to bottom */}
-      <div className="map-controls-compact pointer-events-auto absolute inset-x-3 top-3">
+      {/* mobile: the searchbar (full width, a real always-there input, not a button that opens
+          one) with Contribute docked at its own right edge inside the same translucent pill,
+          plus Install as its own separate floating button when the browser says the app is
+          installable. Locate has its own floating button, About lives in the credit strip fused
+          to the bottom of the screen (MapCredit, in MapExperience). Same inset-3 margin the
+          filter row and credit strip use, so the chrome reads as one consistent floating
+          language top to bottom */}
+      <div className="map-controls-compact pointer-events-auto absolute inset-x-3 top-3 flex items-center gap-2">
         <SearchField
           big
           {...props}
@@ -244,6 +262,11 @@ export function MapControls({
             </InputGroupButton>
           }
         />
+        <AnimatePresence>
+          {canInstall && (
+            <InstallPromptButton key="install" onInstall={promptInstall} />
+          )}
+        </AnimatePresence>
       </div>
 
       <SquircleFuserContainer
