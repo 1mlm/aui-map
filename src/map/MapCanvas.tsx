@@ -1,6 +1,6 @@
 "use client"
 
-import { motion, useMotionValueEvent } from "motion/react"
+import { motion, useMotionValueEvent, useTransform } from "motion/react"
 import Image from "next/image"
 import { useEffect, useImperativeHandle, useRef, useState } from "react"
 import { Icon } from "@/components/Icon"
@@ -23,13 +23,18 @@ import {
   positionToStyle,
   screenPointToPosition,
 } from "./geo"
-import { MapPin, PIN_TIP_FRACTION, type PinSizeTuning } from "./MapPin"
+import {
+  DEFAULT_PIN_SIZE_TUNING,
+  MapPin,
+  PIN_TIP_FRACTION,
+  type PinSizeTuning,
+} from "./MapPin"
 import { OffCampusIndicator } from "./OffCampusIndicator"
 import { PanoramaLayer } from "./PanoramaLayer"
 import type { CrayonTuning } from "./tagColor"
 import type { MapItem, MapPanorama } from "./types"
 import { type UserLocation, UserLocationMarker } from "./UserLocationMarker"
-import { useMapPanZoom } from "./useMapPanZoom"
+import { pinCounterScale, useMapPanZoom } from "./useMapPanZoom"
 
 const SURVEYED_COORD_TOAST_MS = 3000
 const COPIED_FEEDBACK_MS = 1500
@@ -130,7 +135,7 @@ export function MapCanvas({
   compassHeading,
   hoveredTagId,
   tuning,
-  sizeTuning,
+  sizeTuning = DEFAULT_PIN_SIZE_TUNING,
   panoramas,
   ref,
 }: {
@@ -156,6 +161,21 @@ export function MapCanvas({
   const [contextMenuPosition, setContextMenuPosition] =
     useState<NormalizedPosition | null>(null)
   const [mapImageLoaded, setMapImageLoaded] = useState(false)
+
+  // growthExponent and labelShowScale are the same for every pin (only ever overridden app-wide
+  // by the dev-only PinTuningPlayground, never per-item), so these are computed once here and
+  // handed down to every MapPin instead of each of the ~60 pins subscribing to viewportScale and
+  // redoing the identical computation on every zoom frame
+  const pinCounterScaleValue = useTransform(panZoom.scale, (scale) =>
+    pinCounterScale(scale, sizeTuning.growthExponent),
+  )
+  const [showPinLabels, setShowPinLabels] = useState(
+    () => panZoom.scale.get() > sizeTuning.labelShowScale,
+  )
+  useMotionValueEvent(panZoom.scale, "change", (scale) => {
+    const next = scale > sizeTuning.labelShowScale
+    setShowPinLabels((current) => (current === next ? current : next))
+  })
 
   useImperativeHandle(ref, () => ({ centerOn: panZoom.centerOn }), [
     panZoom.centerOn,
@@ -295,7 +315,8 @@ export function MapCanvas({
                 <MapPin
                   key={item.id}
                   selected={item.id === selectedId}
-                  viewportScale={panZoom.scale}
+                  counterScale={pinCounterScaleValue}
+                  showLabel={showPinLabels}
                   onSelect={() =>
                     onSelect(item.id === selectedId ? null : item.id)
                   }

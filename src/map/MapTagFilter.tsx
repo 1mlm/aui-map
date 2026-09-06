@@ -182,7 +182,7 @@ function CompactFilterBar(props: FilterProps) {
   const { activeTagIds, onClearAll } = props
 
   return (
-    <div className="map-filter-bar-compact pointer-events-auto absolute inset-x-3 top-[4.25rem] flex items-center gap-2 rounded-full corner-superellipse/1.2 bg-background/70 px-3.5 py-2.5 shadow-lg drop-shadow-black/40 backdrop-blur-md">
+    <div className="map-filter-bar-compact map-live-blur pointer-events-auto absolute inset-x-3 top-[4.25rem] flex items-center gap-2 rounded-full corner-superellipse/1.2 bg-background/70 px-3.5 py-2.5 shadow-lg drop-shadow-black/40 backdrop-blur-md">
       {/* sits outside the scrolling strip -- inside, it'd scroll away with the chips it's meant to
           always be reachable from. Hangs off the bottom edge, not the top: the top edge butts
           right up against the searchbar row above it, with no room to spare for anything sticking

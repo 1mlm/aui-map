@@ -1,12 +1,13 @@
 "use client"
 
-import { useMotionValue } from "motion/react"
+import { useMotionValue, useTransform } from "motion/react"
 import Image from "next/image"
 import { useEffect, useRef, useState } from "react"
 import { latLongToPosition, parseCoordinates, positionToStyle } from "@/map/geo"
-import { MapPin } from "@/map/MapPin"
+import { DEFAULT_PIN_SIZE_TUNING, MapPin } from "@/map/MapPin"
 import { MAP_ITEMS, MAP_TAGS } from "@/map/data"
 import type { MapItem } from "@/map/types"
+import { pinCounterScale } from "@/map/useMapPanZoom"
 
 // throwaway route for checking that a pin's drawn point actually sits on its coordinate. Delete
 // it whenever. The two entries below are the only coordinates that were surveyed by hand, so
@@ -55,6 +56,8 @@ export default function PinDebugPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [errors, setErrors] = useState<string[]>([])
   const viewportScale = useMotionValue(scale)
+  const counterScale = useTransform(viewportScale, (s) => pinCounterScale(s))
+  const showLabel = scale > DEFAULT_PIN_SIZE_TUNING.labelShowScale
   const boxRef = useRef<HTMLDivElement>(null)
 
   viewportScale.set(scale)
@@ -148,7 +151,7 @@ export default function PinDebugPage() {
                   }
                   previewing={false}
                   matchesPreview={false}
-                  {...{ item, viewportScale }}
+                  {...{ item, counterScale, showLabel }}
                 />
               </div>
             </div>

@@ -46,7 +46,7 @@ export function SearchField({
       <InputGroup
         className={cn(
           big
-            ? "h-12 rounded-full corner-superellipse/1.2! border-none bg-background/70 shadow-lg drop-shadow-black/40 backdrop-blur-md dark:bg-background/70"
+            ? "map-live-blur h-12 rounded-full corner-superellipse/1.2! border-none bg-background/70 shadow-lg drop-shadow-black/40 backdrop-blur-md dark:bg-background/70"
             : "rounded-[calc(var(--radius-3xl)-0.75rem)] corner-squircle!",
           className,
         )}

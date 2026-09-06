@@ -1,11 +1,6 @@
 "use client"
 
-import {
-  type MotionValue,
-  motion,
-  useMotionValueEvent,
-  useTransform,
-} from "motion/react"
+import { type MotionValue, motion } from "motion/react"
 import { useState } from "react"
 import { Icon } from "@/components/Icon"
 import { ICONS } from "@/icons"
@@ -19,7 +14,7 @@ import {
   tagPinOutlineColor,
 } from "./tagColor"
 import type { MapItem } from "./types"
-import { DEFAULT_PIN_GROWTH_EXPONENT, pinCounterScale } from "./useMapPanZoom"
+import { DEFAULT_PIN_GROWTH_EXPONENT } from "./useMapPanZoom"
 
 // Location02Icon's teardrop bottoms out at y=22 of its 24-unit viewBox, not at the very bottom of
 // the box — so the pin is pulled up by that fraction rather than a flat -100%, and every scale on
@@ -91,21 +86,6 @@ export const DEFAULT_PIN_SIZE_TUNING: PinSizeTuning = {
 
 const LABEL_MONO_FONT_STACK =
   "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
-// a hard geometric stroke (-webkit-text-stroke) reads harsh at any real thickness — its miter
-// joins turn sharp letter corners into a blocky mess. Stacking many small blurred shadows in a
-// ring instead reads as a soft, even halo — always all the way around the glyph, never just a
-// drop shadow at the bottom
-const LABEL_OUTLINE_DIRECTIONS = 16
-function labelOutlineShadow(radius: number) {
-  if (radius <= 0) return undefined
-  const blur = radius * 0.5
-  return Array.from({ length: LABEL_OUTLINE_DIRECTIONS }, (_, i) => {
-    const angle = (i / LABEL_OUTLINE_DIRECTIONS) * Math.PI * 2
-    const x = (Math.cos(angle) * radius).toFixed(2)
-    const y = (Math.sin(angle) * radius).toFixed(2)
-    return `${x}px ${y}px ${blur.toFixed(2)}px black`
-  }).join(", ")
-}
 
 // stays the same for a given pin every time, so the tilt reads as each pin's own personality
 // rather than jittering on every re-render — a real Math.random() would do the latter
@@ -120,7 +100,8 @@ function tiltForPin(id: string) {
 export function MapPin({
   item,
   selected,
-  viewportScale,
+  counterScale,
+  showLabel,
   onSelect,
   previewing,
   matchesPreview,
@@ -129,7 +110,12 @@ export function MapPin({
 }: {
   item: MapItem
   selected: boolean
-  viewportScale: MotionValue<number>
+  // shared across every pin (growthExponent/labelShowScale aren't per-item), so MapCanvas
+  // computes these once from its own viewportScale and hands them down — computing the same
+  // useTransform/useMotionValueEvent pair separately in each of the ~60 pins redid identical
+  // work on every zoom frame for no reason
+  counterScale: MotionValue<number>
+  showLabel: boolean
   onSelect: () => void
   // hovering a tag in the filter list previews it: pins outside it fade out, pins inside it
   // wiggle a little so the preview doesn't just look like a fade someone forgot to finish
@@ -141,19 +127,6 @@ export function MapPin({
   sizeTuning?: PinSizeTuning
 }) {
   const position = latLongToPosition(item.latitude, item.longitude)
-  const counterScale = useTransform(viewportScale, (scale) =>
-    pinCounterScale(scale, sizeTuning.growthExponent),
-  )
-  // real state, not a motion value driving opacity directly — this only actually changes on the
-  // rare frame that crosses the threshold, not every frame, and a plain boolean is all a name
-  // label showing or not showing needs
-  const [showLabel, setShowLabel] = useState(
-    () => viewportScale.get() > sizeTuning.labelShowScale,
-  )
-  useMotionValueEvent(viewportScale, "change", (scale) => {
-    const next = scale > sizeTuning.labelShowScale
-    setShowLabel((current) => (current === next ? current : next))
-  })
   const fill = tagPinFillColor(item.tag.color, tuning)
   const outline = tagPinOutlineColor(item.tag.color)
   const tilt = tiltForPin(item.id)
@@ -330,7 +303,11 @@ export function MapPin({
                 ? LABEL_MONO_FONT_STACK
                 : undefined,
             color: tagLabelTextColor(item.tag.color),
-            textShadow: labelOutlineShadow(sizeTuning.labelStrokeWidth),
+            paintOrder: "stroke fill",
+            WebkitTextStroke:
+              sizeTuning.labelStrokeWidth > 0
+                ? `${sizeTuning.labelStrokeWidth}px black`
+                : undefined,
           }}
         >
           {item.shortestName}
