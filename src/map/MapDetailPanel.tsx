@@ -36,8 +36,10 @@ const DRAG_DISMISS_THRESHOLD_PX = 100
 
 // the side panel's width when it docks to the right edge. Shared because the bottom filter bar
 // has to shrink out from under it — a bar that keeps centering on the whole shell ends up with
-// half of itself, and one of its fuser patches, hidden behind the panel
-export const UNDOCKED_PANEL_WIDTH = "20rem"
+// half of itself, and one of its fuser patches, hidden behind the panel. The px twin feeds the
+// keyboard-focus reveal's inset, which needs a number the pan math can add
+export const UNDOCKED_PANEL_WIDTH_PX = 320
+export const UNDOCKED_PANEL_WIDTH = `${UNDOCKED_PANEL_WIDTH_PX / 16}rem`
 
 export function MapDetailPanel({
   item,

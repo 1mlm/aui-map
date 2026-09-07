@@ -18,6 +18,7 @@ import { triggerHaptic } from "@/utils/haptics"
 import { useCopyFeedback } from "@/utils/useCopyFeedback"
 import {
   formatCoordinates,
+  latLongToPosition,
   type NormalizedPosition,
   positionToLatLong,
   positionToStyle,
@@ -137,6 +138,7 @@ export function MapCanvas({
   tuning,
   sizeTuning = DEFAULT_PIN_SIZE_TUNING,
   panoramas,
+  revealInsetRightPx = 0,
   ref,
 }: {
   items: MapItem[]
@@ -152,6 +154,9 @@ export function MapCanvas({
   // only ever overridden by the dev-only PinTuningPlayground — real visitors always get the default
   sizeTuning?: PinSizeTuning
   panoramas: MapPanorama[]
+  // width of chrome covering the map's right edge (the undocked detail panel) that a
+  // keyboard-focus reveal must pan clear of — 0 when nothing covers it
+  revealInsetRightPx?: number
   ref?: React.Ref<MapCanvasHandle>
 }) {
   const panZoom = useMapPanZoom()
@@ -319,6 +324,12 @@ export function MapCanvas({
                   showLabel={showPinLabels}
                   onSelect={() =>
                     onSelect(item.id === selectedId ? null : item.id)
+                  }
+                  onKeyboardFocus={() =>
+                    panZoom.revealPoint(
+                      latLongToPosition(item.latitude, item.longitude),
+                      revealInsetRightPx,
+                    )
                   }
                   previewing={hoveredTagId !== null}
                   matchesPreview={item.tag.id === hoveredTagId}

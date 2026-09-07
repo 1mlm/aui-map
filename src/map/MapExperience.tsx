@@ -10,7 +10,7 @@ import { MapBrand } from "./MapBrand"
 import { MapCanvas, type MapCanvasHandle } from "./MapCanvas"
 import { MapControls } from "./MapControls"
 import { MapCredit, NoticeDialog } from "./MapCredit"
-import { MapDetailPanel, UNDOCKED_PANEL_WIDTH } from "./MapDetailPanel"
+import { MapDetailPanel, UNDOCKED_PANEL_WIDTH, UNDOCKED_PANEL_WIDTH_PX } from "./MapDetailPanel"
 import { DEFAULT_PIN_SIZE_TUNING, type PinSizeTuning } from "./MapPin"
 import { MapFilterBar } from "./MapTagFilter"
 import { NetworkStatusBanner } from "./NetworkStatusBanner"
@@ -210,6 +210,11 @@ export function MapExperience({
           userAccuracy={location.accuracy}
           offCampusPosition={location.isOffCampus ? location.rawPosition : null}
           compassHeading={compass.heading}
+          // a keyboard-focused pin must reveal clear of the undocked panel, not just inside the
+          // viewport — otherwise it can land hidden behind it
+          revealInsetRightPx={
+            selected && !space.docksPanel ? UNDOCKED_PANEL_WIDTH_PX : 0
+          }
           {...{ selectedId, hoveredTagId, tuning, sizeTuning, panoramas }}
         />
 

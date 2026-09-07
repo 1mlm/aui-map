@@ -41,6 +41,34 @@ export function panCenteredOn(
   return { x: -scale * (nx - 0.5) * side, y: -scale * (ny - 0.5) * side }
 }
 
+// the pan that brings normalized point (nx, ny) just inside the viewport with `margin` px to
+// spare on every edge — the minimal shift from `pan` that does so, or `pan` itself when the
+// point already sits inside, so a keyboard-focused pin keeps its surroundings rather than
+// being yanked to the center. insetRight carves the undocked detail panel's width out of the
+// reveal area, so a focused pin can't land hidden behind it. Overhang clamping stays with the
+// caller: at the map's resting zoom one axis has no panning room at all, and this must not
+// pretend otherwise
+export function panToReveal(
+  nx: number,
+  ny: number,
+  scale: number,
+  rect: DOMRect,
+  pan: Pan,
+  margin: number,
+  insetRight: number,
+): Pan {
+  const side = Math.max(rect.width, rect.height)
+  // where the point sits on screen right now — the same layout math panCenteredOn inverts:
+  // viewport center + scaled offset-from-image-center + pan
+  const sx = rect.width / 2 + scale * (nx - 0.5) * side + pan.x
+  const sy = rect.height / 2 + scale * (ny - 0.5) * side + pan.y
+  const maxX = rect.width - margin - insetRight
+  const maxY = rect.height - margin
+  const dx = sx < margin ? margin - sx : sx > maxX ? maxX - sx : 0
+  const dy = sy < margin ? margin - sy : sy > maxY ? maxY - sy : 0
+  return { x: pan.x + dx, y: pan.y + dy }
+}
+
 // the pan that keeps `origin` (a screen point) over the same spot on the map while scale changes
 // from `fromScale` to `toScale` — what makes the cursor or pinch centre feel anchored
 export function panAnchoredAt(

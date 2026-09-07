@@ -1,7 +1,7 @@
 "use client"
 
 import { type MotionValue, motion } from "motion/react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Icon } from "@/components/Icon"
 import { ICONS } from "@/icons"
 import { triggerHaptic } from "@/utils/haptics"
@@ -103,6 +103,7 @@ export function MapPin({
   counterScale,
   showLabel,
   onSelect,
+  onKeyboardFocus,
   previewing,
   matchesPreview,
   tuning = DEFAULT_CRAYON_TUNING,
@@ -117,6 +118,10 @@ export function MapPin({
   counterScale: MotionValue<number>
   showLabel: boolean
   onSelect: () => void
+  // fires alongside the keyboard-focus glow (same :focus-visible gate) so MapCanvas can pan
+  // the map just far enough to bring this pin into view — without it, focus on a pin the
+  // current pan leaves off-screen is just a glow somewhere the user can't see
+  onKeyboardFocus?: () => void
   // hovering a tag in the filter list previews it: pins outside it fade out, pins inside it
   // wiggle a little so the preview doesn't just look like a fade someone forgot to finish
   previewing: boolean
@@ -145,6 +150,14 @@ export function MapPin({
       ? tilt
       : 0
   const sizeScale = item.tag.sizeScale
+
+  // selecting a keyboard-focused pin opens the detail panel over the map's right edge, which
+  // can cover the very pin that owns focus — re-reveal it clear of the panel once it opens.
+  // MapCanvas hands down a fresh callback each render, so this refires then too; revealPoint
+  // pans nothing when the pin already sits clear, so that costs nothing
+  useEffect(() => {
+    if (selected && keyboardFocused) onKeyboardFocus?.()
+  }, [selected, keyboardFocused, onKeyboardFocus])
 
   return (
     // Two nested scales on purpose: the outer one is owned by the map's zoom motion value, the
@@ -196,8 +209,9 @@ export function MapPin({
           onSelect()
         }}
         onFocus={(e) => {
-          if (e.currentTarget.matches(":focus-visible"))
-            setKeyboardFocused(true)
+          if (!e.currentTarget.matches(":focus-visible")) return
+          setKeyboardFocused(true)
+          onKeyboardFocus?.()
         }}
         onBlur={() => setKeyboardFocused(false)}
         aria-label={item.title}

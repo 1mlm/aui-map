@@ -11,6 +11,7 @@ import {
   panAnchoredAt,
   panCenteredOn,
   type Point,
+  panToReveal,
 } from "./panZoomMath"
 
 // the image sits in a square box already sized to cover the viewport, so 1 is the smallest
@@ -34,6 +35,10 @@ const PIN_REFERENCE_SCALE = 4
 export const DEFAULT_PIN_GROWTH_EXPONENT = 0.1
 const DOUBLE_TAP_MAX_DELAY_MS = 300
 const DOUBLE_TAP_MAX_DISTANCE_PX = 24
+// room to keep between a keyboard-focused pin and the viewport edge when the map pans to
+// reveal it — enough for the pin's head above its tip anchor and its zoomed-in label to the
+// right, without shoving focused pins to the center
+const REVEAL_MARGIN_PX = 64
 // a touch that starts on a pin is held as a tap candidate rather than a pan (see
 // handlePointerDown) so a real tap still selects it -- but pins are dense and this hit slop is
 // generous, so a finger meaning to drag the map often lands on one first. Once it moves past this
@@ -204,6 +209,30 @@ export function useMapPanZoom() {
     animate(y, pan.y, LOCATE_TRANSITION)
   }
 
+  // the minimal pan that brings a normalized map point into view. Keyboard focus on a pin
+  // the current pan leaves off-screen otherwise gives nothing but its glow to find — the
+  // map doesn't follow focus at all. Applied instantly rather than animated so the reveal
+  // and the focus land in the same frame, like the native page jump to a focused control.
+  // insetRightPx keeps the reveal clear of the undocked detail panel
+  function revealPoint([nx, ny]: [number, number], insetRightPx = 0) {
+    if (!rect.current) return
+    setPan(
+      clampPanToOverhang(
+        panToReveal(
+          nx,
+          ny,
+          scale.get(),
+          rect.current,
+          getPan(),
+          REVEAL_MARGIN_PX,
+          insetRightPx,
+        ),
+        scale.get(),
+        rect.current,
+      ),
+    )
+  }
+
   function toggleZoom(origin: Point) {
     const isZoomedIn = scale.get() > MIN_SCALE + 0.1
     zoomTo(isZoomedIn ? MIN_SCALE : DOUBLE_TAP_SCALE, origin, {
@@ -226,6 +255,22 @@ export function useMapPanZoom() {
     observer.observe(el)
     return () => observer.disconnect()
   }, [scale])
+
+  // this container must never be scrolled: the pan math anchors every gesture against its
+  // never-rescrolled rect, so a stray scrollTop/scrollLeft (find-in-page, an extension,
+  // browser focus behavior that differs from Chromium's) would shift the painted map out
+  // from under the x/y motion values below and desync every gesture after it. Anything
+  // that still lands resets the instant it appears
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const lock = () => {
+      el.scrollTop = 0
+      el.scrollLeft = 0
+    }
+    el.addEventListener("scroll", lock)
+    return () => el.removeEventListener("scroll", lock)
+  }, [])
 
   // native listener: React's synthetic wheel handler is passive, so preventDefault() inside a
   // JSX onWheel prop silently fails and the page scrolls along with the zoom
@@ -403,6 +448,7 @@ export function useMapPanZoom() {
     hitLimit,
     hasInteracted,
     centerOn,
+    revealPoint,
     getLastPointerClientPosition: () => lastPointerClientPosition.current,
     gestureHandlers: {
       onPointerDown: handlePointerDown,
