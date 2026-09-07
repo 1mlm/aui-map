@@ -16,6 +16,7 @@ import {
 } from "@/shadcn/ui/dropdown-menu"
 import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover"
 import { cn } from "@/shadcn/utils"
+import { cloudinaryOptimized } from "@/utils/cloudinaryUrl"
 import { triggerHaptic } from "@/utils/haptics"
 import { isImageMimeType } from "@/utils/mimeType"
 import { useCopyFeedback } from "@/utils/useCopyFeedback"
@@ -282,7 +283,11 @@ function HeroHeading({
       )}
     >
       <Image
-        src={attachment.url}
+        // same free q_auto/f_auto swap the carousel's full view already makes — the hero is the
+        // most-opened image on the map and was the only one still pulling the original file.
+        // No resize/crop here: the box is cover-fit, and geometry changes are the thumbnail
+        // helper's job
+        src={cloudinaryOptimized(attachment.url)}
         alt=""
         fill
         sizes="320px"
