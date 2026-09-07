@@ -49,9 +49,13 @@ export function MapDetailPanel({
   // narrow layouts have no room for a side panel, so it becomes a bottom sheet instead
   docked?: boolean
 }) {
-  const hero = item.attachments.find((attachment) =>
+  // the hero is the first image, which isn't necessarily attachments[0] — a video or pdf can
+  // hold the top slot in the gallery order, and tapping the photo has to open the photo it
+  // shows, not whatever was ordered before it
+  const heroIndex = item.attachments.findIndex((attachment) =>
     isImageMimeType(attachment.mimeType),
   )
+  const hero = heroIndex === -1 ? null : item.attachments[heroIndex]
   // both fully specify x/y/opacity, even though only one axis actually differs between docked
   // and undocked — deep-linking straight to a pin mounts this before useAvailableSpace's real
   // measurement lands, so `docked` (and this shape) can flip between mount and the next render.
@@ -189,7 +193,7 @@ export function MapDetailPanel({
             aliases={item.aliases}
             attachment={hero}
             {...{ docked }}
-            onOpen={() => setOpenAttachmentIndex(0)}
+            onOpen={() => setOpenAttachmentIndex(heroIndex)}
           />
         ) : (
           <PlainHeading title={item.title} aliases={item.aliases} />
