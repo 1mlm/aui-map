@@ -115,6 +115,7 @@ export const ICONS = {
   direction: AcuteIcon,
   offline: WifiOff01Icon,
   slowConnection: WifiLowSignalIcon,
+  back: ArrowLeft01Icon,
 
   // suggestions & contribute
   suggestions: BulbIcon,

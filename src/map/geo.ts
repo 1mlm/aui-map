@@ -95,6 +95,17 @@ export function metersToNormalizedRadius(meters: number) {
   return { rx: meters / widthMeters, ry: meters / heightMeters }
 }
 
+// the real-world size of MAP_BOUNDING_BOX, in meters — the 3D map (src/map3d) uses this to place
+// things in true-to-scale world units instead of inventing a second, unrelated unit system
+export const MAP_METERS_SIZE = (() => {
+  const { topLat, bottomLat, leftLong, rightLong } = MAP_BOUNDING_BOX
+  const centerLat = (topLat + bottomLat) / 2
+  return {
+    widthMeters: (rightLong - leftLong) * metersPerDegreeLongitudeAt(centerLat),
+    heightMeters: (topLat - bottomLat) * METERS_PER_DEGREE_LATITUDE,
+  }
+})()
+
 export function isWithinCampusBounds(latitude: number, longitude: number) {
   const { topLat, bottomLat, leftLong, rightLong } = MAP_BOUNDING_BOX
   return (

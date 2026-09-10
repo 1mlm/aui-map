@@ -1,0 +1,49 @@
+// real elevation for the campus and a margin around it, fetched once from the Open-Elevation API
+// (SRTM-based, free, no key) as a grid over EXPANSION * MAP_METERS_SIZE and baked to
+// elevationGrid.json as meters relative to the grid's own mean — see the fetch script this was
+// generated from, noted in the 3D map backlog entry. Both the ground mesh (Terrain.tsx) and
+// anything placed on it (Building.tsx) read height from this same function, so buildings sit
+// flush with the ground instead of floating or clipping into it.
+import { MAP_METERS_SIZE } from "@/map/geo"
+import elevationGrid from "./elevationGrid.json"
+
+// how far past the campus bounding box the grid (and the ground mesh) extends on every side
+export const TERRAIN_EXPANSION = 1.6
+
+const { rows, cols, heights } = elevationGrid
+
+function sampleGridHeight(row: number, col: number) {
+  const clampedRow = Math.min(rows - 1, Math.max(0, row))
+  const clampedCol = Math.min(cols - 1, Math.max(0, col))
+  return heights[clampedRow * cols + clampedCol]
+}
+
+export function getTerrainHeightAt(x: number, z: number): number {
+  const worldWidth = MAP_METERS_SIZE.widthMeters * TERRAIN_EXPANSION
+  const worldHeight = MAP_METERS_SIZE.heightMeters * TERRAIN_EXPANSION
+  const u = x / worldWidth + 0.5
+  const v = z / worldHeight + 0.5
+  const colF = u * (cols - 1)
+  const rowF = v * (rows - 1)
+  const row0 = Math.floor(rowF)
+  const col0 = Math.floor(colF)
+  const rowFraction = rowF - row0
+  const colFraction = colF - col0
+
+  // bilinear interpolation between the 4 grid points surrounding (x, z)
+  const top = lerp(
+    sampleGridHeight(row0, col0),
+    sampleGridHeight(row0, col0 + 1),
+    colFraction,
+  )
+  const bottom = lerp(
+    sampleGridHeight(row0 + 1, col0),
+    sampleGridHeight(row0 + 1, col0 + 1),
+    colFraction,
+  )
+  return lerp(top, bottom, rowFraction)
+}
+
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * t
+}
