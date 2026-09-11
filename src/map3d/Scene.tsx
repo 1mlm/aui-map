@@ -1,10 +1,11 @@
 "use client"
 
 import { OrbitControls, PerspectiveCamera } from "@react-three/drei"
-import { useMemo } from "react"
+import { Suspense, useMemo } from "react"
 import { latLongToPosition } from "@/map/geo"
 import type { MapItem } from "@/map/types"
 import { Building } from "./Building"
+import { ReferenceOverlay } from "./ReferenceOverlay"
 import { Terrain } from "./Terrain"
 import { getWorldBounds, positionToWorldPoint } from "./worldSpace"
 
@@ -16,7 +17,13 @@ const FRAMING_PADDING_METERS = 60
 
 // a fixed-ish overhead-angled camera (city-builder game framing) rather than free orbit — full
 // orbit lets you flip upside down under the terrain, which reads as broken rather than 3D
-export function Scene({ items }: { items: MapItem[] }) {
+export function Scene({
+  items,
+  showReference,
+}: {
+  items: MapItem[]
+  showReference: boolean
+}) {
   const { center, cameraDistance } = useMemo(() => {
     const points = items.map((item) =>
       positionToWorldPoint(latLongToPosition(item.latitude, item.longitude)),
@@ -59,6 +66,11 @@ export function Scene({ items }: { items: MapItem[] }) {
       {items.map((item) => (
         <Building key={item.id} item={item} />
       ))}
+      {showReference && (
+        <Suspense fallback={null}>
+          <ReferenceOverlay />
+        </Suspense>
+      )}
       <PerspectiveCamera
         makeDefault
         fov={42}
