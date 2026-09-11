@@ -44,7 +44,7 @@ export function Scene({ items }: { items: MapItem[] }) {
         ]}
         intensity={1.1}
       />
-      <Terrain />
+      <Terrain items={items} />
       {items.map((item) => (
         <Building key={item.id} item={item} />
       ))}

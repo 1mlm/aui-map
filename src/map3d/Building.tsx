@@ -2,14 +2,11 @@
 
 import { useMemo } from "react"
 import * as THREE from "three"
-import { latLongToPosition } from "@/map/geo"
 import { tagPinFillColor } from "@/map/tagColor"
 import type { MapItem } from "@/map/types"
-import { getBuildingOverride } from "./buildingOverrides"
-import { getBuildingTemplate } from "./buildingTemplates"
-import { getTerrainHeightAt } from "./terrainHeight"
+import { getBuildingPlacement } from "./buildingPlacement"
 import { oklchToHex } from "./oklchToHex"
-import { positionToWorldPoint } from "./worldSpace"
+import { getTerrainHeightAt } from "./terrainHeight"
 
 // how much of a gable/domed building's total height is walls vs the roof/dome sitting on top
 const ROOF_HEIGHT_SHARE = 0.35
@@ -36,13 +33,7 @@ function buildGableRoofGeometry(
 }
 
 export function Building({ item }: { item: MapItem }) {
-  const template = {
-    ...getBuildingTemplate(item.tag.id),
-    ...getBuildingOverride(item.id),
-  }
-  const { x, z } = positionToWorldPoint(
-    latLongToPosition(item.latitude, item.longitude),
-  )
+  const { x, z, template } = getBuildingPlacement(item)
   const groundY = getTerrainHeightAt(x, z)
   // crayon-soft rather than the raw tag color (tagColor.ts) — full-saturation tailwind hues read
   // fine as tiny pins but look garish across a whole building; this is the same softened tone the

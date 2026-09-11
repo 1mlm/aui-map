@@ -41,7 +41,22 @@ export function getTerrainHeightAt(x: number, z: number): number {
     sampleGridHeight(row0 + 1, col0 + 1),
     colFraction,
   )
-  return lerp(top, bottom, rowFraction)
+  return lerp(top, bottom, rowFraction) + getDetailNoiseAt(x, z)
+}
+
+// the real grid is real, but its points are ~80m apart and bilinear-interpolated between them —
+// smooth in a way that reads as a fake, low-detail blob up close. This layers small, high-frequency
+// texture on top (a fraction of a meter, well under the grid's own resolution) so the ground
+// doesn't distort the real macro shape but stops looking dead-smooth
+const DETAIL_NOISE_AMPLITUDE_METERS = 0.4
+const DETAIL_NOISE_WAVELENGTH_METERS = 14
+
+function getDetailNoiseAt(x: number, z: number) {
+  return (
+    Math.sin(x / DETAIL_NOISE_WAVELENGTH_METERS + z * 0.7) *
+    Math.cos(z / DETAIL_NOISE_WAVELENGTH_METERS - x * 0.3) *
+    DETAIL_NOISE_AMPLITUDE_METERS
+  )
 }
 
 function lerp(a: number, b: number, t: number) {
