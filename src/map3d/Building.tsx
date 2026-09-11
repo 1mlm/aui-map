@@ -8,32 +8,28 @@ import { getBuildingPlacement } from "./buildingPlacement"
 import { oklchToHex } from "./oklchToHex"
 import { getTerrainHeightAt } from "./terrainHeight"
 
-// how much of a gable/domed building's total height is walls vs the roof/dome sitting on top
-const ROOF_HEIGHT_SHARE = 0.35
+// every building is the same height for now — real per-building height is future work (see the
+// 3D map backlog entry), the footprint *shape* is the real thing this pass gets right
+const UNIFORM_BUILDING_HEIGHT_METERS = 8
 
-// a gable roof's triangular cross-section, extruded along the building's depth
-function buildGableRoofGeometry(
-  width: number,
-  depth: number,
-  roofHeight: number,
-) {
-  const profile = new THREE.Shape()
-  profile.moveTo(-width / 2, 0)
-  profile.lineTo(width / 2, 0)
-  profile.lineTo(0, roofHeight)
-  profile.closePath()
-  const geometry = new THREE.ExtrudeGeometry(profile, {
-    depth,
+// parking lots and sports fields aren't buildings — they're ground, not a volume, so they still
+// get a real traced footprint but stay flat rather than extruding into dark 8m monoliths
+const GROUND_FEATURE_TAG_IDS = new Set(["parking", "sports"])
+const GROUND_FEATURE_HEIGHT_METERS = 0.3
+
+function buildExtrudeGeometry(footprint: [number, number][], height: number) {
+  const shape = new THREE.Shape()
+  shape.moveTo(footprint[0][0], footprint[0][1])
+  for (const [x, z] of footprint.slice(1)) shape.lineTo(x, z)
+  shape.closePath()
+  return new THREE.ExtrudeGeometry(shape, {
+    depth: height,
     bevelEnabled: false,
   })
-  // ExtrudeGeometry extrudes the profile from z=0 to z=depth rather than centering it, so the
-  // roof mesh has to be nudged back by half its own depth to sit centered like the box under it
-  geometry.translate(0, 0, -depth / 2)
-  return geometry
 }
 
 export function Building({ item }: { item: MapItem }) {
-  const { x, z, template } = getBuildingPlacement(item)
+  const { x, z, footprint } = getBuildingPlacement(item)
   const groundY = getTerrainHeightAt(x, z)
   // crayon-soft rather than the raw tag color (tagColor.ts) — full-saturation tailwind hues read
   // fine as tiny pins but look garish across a whole building; this is the same softened tone the
@@ -43,63 +39,21 @@ export function Building({ item }: { item: MapItem }) {
     () => oklchToHex(tagPinFillColor(item.tag.color)),
     [item.tag.color],
   )
-
-  const hasCapRoof = template.shape === "gable" || template.shape === "domed"
-  const wallHeight = hasCapRoof
-    ? template.heightMeters * (1 - ROOF_HEIGHT_SHARE)
-    : template.heightMeters
-  const capHeight = template.heightMeters * ROOF_HEIGHT_SHARE
-  const radius =
-    (template.footprintWidthMeters + template.footprintDepthMeters) / 4
-
-  const gableRoofGeometry = useMemo(
-    () =>
-      template.shape === "gable"
-        ? buildGableRoofGeometry(
-            template.footprintWidthMeters,
-            template.footprintDepthMeters,
-            capHeight,
-          )
-        : null,
-    [
-      template.shape,
-      template.footprintWidthMeters,
-      template.footprintDepthMeters,
-      capHeight,
-    ],
+  const height = GROUND_FEATURE_TAG_IDS.has(item.tag.id)
+    ? GROUND_FEATURE_HEIGHT_METERS
+    : UNIFORM_BUILDING_HEIGHT_METERS
+  const geometry = useMemo(
+    () => buildExtrudeGeometry(footprint, height),
+    [footprint, height],
   )
 
   return (
     <group position={[x, groundY, z]}>
-      {template.shape === "domed" ? (
-        <mesh position={[0, wallHeight / 2, 0]}>
-          <cylinderGeometry args={[radius, radius, wallHeight, 8]} />
-          <meshStandardMaterial color={wallColor} />
-        </mesh>
-      ) : (
-        <mesh position={[0, wallHeight / 2, 0]}>
-          <boxGeometry
-            args={[
-              template.footprintWidthMeters,
-              wallHeight,
-              template.footprintDepthMeters,
-            ]}
-          />
-          <meshStandardMaterial color={wallColor} />
-        </mesh>
-      )}
-
-      {template.shape === "domed" && (
-        <mesh position={[0, wallHeight + capHeight / 2, 0]}>
-          <coneGeometry args={[radius, capHeight, 8]} />
-          <meshStandardMaterial color={template.roofColor} />
-        </mesh>
-      )}
-      {gableRoofGeometry && (
-        <mesh position={[0, wallHeight, 0]} geometry={gableRoofGeometry}>
-          <meshStandardMaterial color={template.roofColor} />
-        </mesh>
-      )}
+      {/* the extruded shape's winding direction isn't guaranteed (footprints come from a
+          traced convex hull), so double-sided avoids the top cap silently culling itself away */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} geometry={geometry}>
+        <meshStandardMaterial color={wallColor} side={THREE.DoubleSide} />
+      </mesh>
     </group>
   )
 }

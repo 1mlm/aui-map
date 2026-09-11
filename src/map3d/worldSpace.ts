@@ -1,7 +1,7 @@
 // Converts the same normalized map position everything else in the app uses (see src/map/geo.ts)
-// into three.js world coordinates, in real meters — so a building's meter-based
-// height/footprint (buildingTemplates.ts) lines up with the ground it sits on without a second
-// unit system to keep in sync.
+// into three.js world coordinates, in real meters — so a building's meter-based footprint
+// (buildingFootprints.ts) lines up with the ground it sits on without a second unit system to
+// keep in sync.
 
 import { MAP_METERS_SIZE, type NormalizedPosition } from "@/map/geo"
 

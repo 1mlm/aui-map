@@ -35,7 +35,18 @@ export function Scene({ items }: { items: MapItem[] }) {
         attach="fog"
         args={[SKY_COLOR, cameraDistance, cameraDistance * 4]}
       />
-      <ambientLight intensity={0.65} />
+      {/* real building footprints (buildingFootprints.ts) face every which way, unlike the old
+          uniform axis-aligned boxes — a single key light left plenty of walls dark near-black.
+          Higher ambient + a soft fill light from the opposite side keeps every face readable */}
+      <ambientLight intensity={0.85} />
+      <directionalLight
+        position={[
+          center.x - cameraDistance * 0.5,
+          cameraDistance * 0.5,
+          center.z - cameraDistance * 0.3,
+        ]}
+        intensity={0.35}
+      />
       <directionalLight
         position={[
           center.x + cameraDistance * 0.5,

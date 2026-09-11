@@ -19,9 +19,8 @@ const PAD_BLEND_METERS = 6
 
 export function getBuildingPads(items: MapItem[]): TerrainPad[] {
   return items.map((item) => {
-    const { x, z, template } = getBuildingPlacement(item)
-    const radius =
-      Math.max(template.footprintWidthMeters, template.footprintDepthMeters) / 2
+    const { x, z, footprint } = getBuildingPlacement(item)
+    const radius = Math.max(...footprint.map(([px, pz]) => Math.hypot(px, pz)))
     return { x, z, radius, height: getTerrainHeightAt(x, z) }
   })
 }

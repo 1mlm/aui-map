@@ -10,6 +10,12 @@ import elevationGrid from "./elevationGrid.json"
 // how far past the campus bounding box the grid (and the ground mesh) extends on every side
 export const TERRAIN_EXPANSION = 1.6
 
+// real relief at true 1:1 scale (confirmed ~19m across the building cluster) is only a ~5% grade
+// — genuinely too subtle to read from an isometric camera. Exaggerating vertical scale is the
+// standard fix in terrain rendering generally, not a "fake it" move; every stylized/game terrain
+// view does this because true-scale relief looks flat from any reasonable viewing angle
+const VERTICAL_EXAGGERATION = 2.5
+
 const { rows, cols, heights } = elevationGrid
 
 function sampleGridHeight(row: number, col: number) {
@@ -41,7 +47,8 @@ export function getTerrainHeightAt(x: number, z: number): number {
     sampleGridHeight(row0 + 1, col0 + 1),
     colFraction,
   )
-  return lerp(top, bottom, rowFraction) + getDetailNoiseAt(x, z)
+  const realHeight = lerp(top, bottom, rowFraction) + getDetailNoiseAt(x, z)
+  return realHeight * VERTICAL_EXAGGERATION
 }
 
 // the real grid is real, but its points are ~80m apart and bilinear-interpolated between them —
