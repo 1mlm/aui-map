@@ -1,12 +1,12 @@
 "use client"
 
 import { OrbitControls, PerspectiveCamera } from "@react-three/drei"
-import { Suspense, useMemo } from "react"
+import { type Ref, Suspense, useMemo, useState } from "react"
 import { latLongToPosition } from "@/map/geo"
 import type { MapItem } from "@/map/types"
 import { Building } from "./Building"
 import { ReferenceOverlay } from "./ReferenceOverlay"
-import { Terrain } from "./Terrain"
+import { Terrain, type TerrainHandle } from "./Terrain"
 import { getWorldBounds, positionToWorldPoint } from "./worldSpace"
 
 const SKY_COLOR = "#bcd6ec"
@@ -20,10 +20,19 @@ const FRAMING_PADDING_METERS = 60
 export function Scene({
   items,
   showReference,
+  sculptable = false,
+  terrainRef,
 }: {
   items: MapItem[]
   showReference: boolean
+  sculptable?: boolean
+  terrainRef?: Ref<TerrainHandle>
 }) {
+  // OrbitControls listens on the canvas directly, underneath react-three-fiber's own event
+  // system -- a sculpt drag's stopPropagation() doesn't reach it, so a real orbit-drag-fights-
+  // sculpt-drag bug needs this explicit toggle instead
+  const [orbitEnabled, setOrbitEnabled] = useState(true)
+
   const { center, cameraDistance } = useMemo(() => {
     const points = items.map((item) =>
       positionToWorldPoint(latLongToPosition(item.latitude, item.longitude)),
@@ -62,7 +71,13 @@ export function Scene({
         ]}
         intensity={1.1}
       />
-      <Terrain items={items} />
+      <Terrain
+        items={items}
+        ref={terrainRef}
+        sculptable={sculptable}
+        onSculptStart={() => setOrbitEnabled(false)}
+        onSculptEnd={() => setOrbitEnabled(true)}
+      />
       {items.map((item) => (
         <Building key={item.id} item={item} />
       ))}
@@ -81,6 +96,7 @@ export function Scene({
         ]}
       />
       <OrbitControls
+        enabled={orbitEnabled}
         target={[center.x, 0, center.z]}
         minDistance={cameraDistance * 0.15}
         maxDistance={cameraDistance * 2.5}

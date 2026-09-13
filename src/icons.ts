@@ -27,6 +27,7 @@ import {
   Cursor02Icon,
   Delete02Icon,
   Download01Icon,
+  Drag01Icon,
   Edit02Icon,
   FavouriteIcon,
   File01Icon,
@@ -59,6 +60,7 @@ import {
   MoonIcon,
   MoreHorizontalIcon,
   Mosque01Icon,
+  MountainIcon,
   PaintBoardIcon,
   Pdf01Icon,
   PencilEdit02Icon,
@@ -116,6 +118,10 @@ export const ICONS = {
   offline: WifiOff01Icon,
   slowConnection: WifiLowSignalIcon,
   back: ArrowLeft01Icon,
+
+  // 3D map edit mode
+  sculptTerrain: MountainIcon,
+  editVertices: Drag01Icon,
 
   // suggestions & contribute
   suggestions: BulbIcon,
