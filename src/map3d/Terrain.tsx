@@ -4,7 +4,11 @@ import { useMemo } from "react"
 import * as THREE from "three"
 import { MAP_METERS_SIZE } from "@/map/geo"
 import type { MapItem } from "@/map/types"
-import { TERRAIN_EXPANSION } from "./terrainHeight"
+import {
+  TERRAIN_EXPANSION,
+  TERRAIN_GRID_COLS,
+  TERRAIN_GRID_ROWS,
+} from "./terrainHeight"
 import { getBuildingPads, getFlattenedTerrainHeightAt } from "./terrainPads"
 
 function displaceTerrain(
@@ -27,11 +31,17 @@ export function Terrain({ items }: { items: MapItem[] }) {
     // buildings sit on — matches the elevation grid's own extent (see terrainHeight.ts)
     const width = MAP_METERS_SIZE.widthMeters * TERRAIN_EXPANSION
     const depth = MAP_METERS_SIZE.heightMeters * TERRAIN_EXPANSION
-    // dense enough that the per-building flattened pads (terrainPads.ts) actually show up as flat
-    // patches instead of being averaged away between distant vertices
+    // segment counts are the grid's own resolution minus one -- must match exactly so each mesh
+    // vertex lines up 1:1 with a terrainHeightmap.json entry (see terrainHeight.ts), letting the
+    // sculpt tool write directly into the mesh's vertex grid with no resampling
     const pads = getBuildingPads(items)
     return displaceTerrain(
-      new THREE.PlaneGeometry(width, depth, 160, 160),
+      new THREE.PlaneGeometry(
+        width,
+        depth,
+        TERRAIN_GRID_COLS - 1,
+        TERRAIN_GRID_ROWS - 1,
+      ),
       pads,
     )
   }, [items])

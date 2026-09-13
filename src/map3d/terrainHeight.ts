@@ -1,27 +1,39 @@
-// real elevation for the campus and a margin around it, fetched once from the Open-Elevation API
-// (SRTM-based, free, no key) as a grid over EXPANSION * MAP_METERS_SIZE and baked to
-// elevationGrid.json as meters relative to the grid's own mean — see the fetch script this was
-// generated from, noted in the 3D map backlog entry. Both the ground mesh (Terrain.tsx) and
+// authored terrain height, read from terrainHeightmap.json -- a {rows, cols, heights} grid the
+// user sculpts by hand in the /3d edit mode (see the terrain-sculpt save route). Starts flat
+// (every height 0) so there's a blank plane to deform. Both the ground mesh (Terrain.tsx) and
 // anything placed on it (Building.tsx) read height from this same function, so buildings sit
-// flush with the ground instead of floating or clipping into it.
+// flush with the ground instead of floating or clipping.
+//
+// this used to sample real satellite relief (Open-Elevation/SRTM, baked to elevationGrid.json) --
+// that file is still on disk if a future pass wants to reintroduce real topography as a sculpting
+// starting point, it's just not the active data source right now.
 import { MAP_METERS_SIZE } from "@/map/geo"
-import elevationGrid from "./elevationGrid.json"
+import terrainHeightmap from "./terrainHeightmap.json"
 
 // how far past the campus bounding box the grid (and the ground mesh) extends on every side
 export const TERRAIN_EXPANSION = 1.6
 
-// real relief at true 1:1 scale (confirmed ~19m across the building cluster) is only a ~5% grade
-// — genuinely too subtle to read from an isometric camera. Exaggerating vertical scale is the
-// standard fix in terrain rendering generally, not a "fake it" move; every stylized/game terrain
-// view does this because true-scale relief looks flat from any reasonable viewing angle
-const VERTICAL_EXAGGERATION = 2.5
+// the grid's own resolution -- Terrain.tsx's PlaneGeometry segment count must match these minus
+// one exactly, so sculpting can write straight into the mesh's own vertex grid with no resampling
+export const TERRAIN_GRID_ROWS = terrainHeightmap.rows
+export const TERRAIN_GRID_COLS = terrainHeightmap.cols
 
-const { rows, cols, heights } = elevationGrid
+let heights: number[] = terrainHeightmap.heights
+
+// swaps the live grid in-place (used by the sculpt tool after an edit) without every caller
+// needing to re-import a fresh module instance
+export function setTerrainHeights(nextHeights: number[]) {
+  heights = nextHeights
+}
+
+export function getTerrainHeights(): readonly number[] {
+  return heights
+}
 
 function sampleGridHeight(row: number, col: number) {
-  const clampedRow = Math.min(rows - 1, Math.max(0, row))
-  const clampedCol = Math.min(cols - 1, Math.max(0, col))
-  return heights[clampedRow * cols + clampedCol]
+  const clampedRow = Math.min(TERRAIN_GRID_ROWS - 1, Math.max(0, row))
+  const clampedCol = Math.min(TERRAIN_GRID_COLS - 1, Math.max(0, col))
+  return heights[clampedRow * TERRAIN_GRID_COLS + clampedCol]
 }
 
 export function getTerrainHeightAt(x: number, z: number): number {
@@ -29,8 +41,8 @@ export function getTerrainHeightAt(x: number, z: number): number {
   const worldHeight = MAP_METERS_SIZE.heightMeters * TERRAIN_EXPANSION
   const u = x / worldWidth + 0.5
   const v = z / worldHeight + 0.5
-  const colF = u * (cols - 1)
-  const rowF = v * (rows - 1)
+  const colF = u * (TERRAIN_GRID_COLS - 1)
+  const rowF = v * (TERRAIN_GRID_ROWS - 1)
   const row0 = Math.floor(rowF)
   const col0 = Math.floor(colF)
   const rowFraction = rowF - row0
@@ -47,23 +59,29 @@ export function getTerrainHeightAt(x: number, z: number): number {
     sampleGridHeight(row0 + 1, col0 + 1),
     colFraction,
   )
-  const realHeight = lerp(top, bottom, rowFraction) + getDetailNoiseAt(x, z)
-  return realHeight * VERTICAL_EXAGGERATION
+  return lerp(top, bottom, rowFraction)
 }
 
-// the real grid is real, but its points are ~80m apart and bilinear-interpolated between them —
-// smooth in a way that reads as a fake, low-detail blob up close. This layers small, high-frequency
-// texture on top (a fraction of a meter, well under the grid's own resolution) so the ground
-// doesn't distort the real macro shape but stops looking dead-smooth
-const DETAIL_NOISE_AMPLITUDE_METERS = 0.4
-const DETAIL_NOISE_WAVELENGTH_METERS = 14
+// world (x, z) -> nearest grid (row, col), used by the sculpt brush to know which grid indices
+// fall under the cursor
+export function worldToGridIndex(x: number, z: number): { row: number; col: number } {
+  const worldWidth = MAP_METERS_SIZE.widthMeters * TERRAIN_EXPANSION
+  const worldHeight = MAP_METERS_SIZE.heightMeters * TERRAIN_EXPANSION
+  const u = x / worldWidth + 0.5
+  const v = z / worldHeight + 0.5
+  return {
+    row: Math.round(v * (TERRAIN_GRID_ROWS - 1)),
+    col: Math.round(u * (TERRAIN_GRID_COLS - 1)),
+  }
+}
 
-function getDetailNoiseAt(x: number, z: number) {
-  return (
-    Math.sin(x / DETAIL_NOISE_WAVELENGTH_METERS + z * 0.7) *
-    Math.cos(z / DETAIL_NOISE_WAVELENGTH_METERS - x * 0.3) *
-    DETAIL_NOISE_AMPLITUDE_METERS
-  )
+export function gridIndexToWorld(row: number, col: number): { x: number; z: number } {
+  const worldWidth = MAP_METERS_SIZE.widthMeters * TERRAIN_EXPANSION
+  const worldHeight = MAP_METERS_SIZE.heightMeters * TERRAIN_EXPANSION
+  return {
+    x: (col / (TERRAIN_GRID_COLS - 1) - 0.5) * worldWidth,
+    z: (row / (TERRAIN_GRID_ROWS - 1) - 0.5) * worldHeight,
+  }
 }
 
 function lerp(a: number, b: number, t: number) {
