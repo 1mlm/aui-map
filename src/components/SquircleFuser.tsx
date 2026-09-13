@@ -103,12 +103,17 @@ export function SquircleFuserContainer({
   children,
   superClassName,
   className,
+  interactiveClassName,
   style,
   align = "top-center",
   background = "bg-background",
 }: PropsWithChildren<{
   superClassName?: string
   className?: string
+  // background classes that react to hover/active/state (e.g. "hover:bg-foreground/5") -- these
+  // get applied to the pill AND its fuser patches, so a hover tint doesn't stop at the pill edge
+  // and leave the bridging corner slivers a visibly different color from the rest of the shape
+  interactiveClassName?: string
   align?: Align
   style?: CSSProperties
   background?: string
@@ -134,6 +139,7 @@ export function SquircleFuserContainer({
           background,
           layout.pill,
           className,
+          interactiveClassName,
         )}
       >
         {children}
@@ -142,7 +148,12 @@ export function SquircleFuserContainer({
       {layout.fusers.map(({ corner, at }) => (
         <SquircleFuser
           key={`${corner}-${at}`}
-          className={cn("absolute", at, fuserOverlapClass(at))}
+          className={cn(
+            "absolute",
+            at,
+            fuserOverlapClass(at),
+            interactiveClassName,
+          )}
           {...{ corner, background }}
         />
       ))}

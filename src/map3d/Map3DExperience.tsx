@@ -36,8 +36,9 @@ export function Map3DExperience({ items }: { items: MapItem[] }) {
           <SquircleFuserContainer
             align="top-right"
             superClassName="pointer-events-auto absolute top-0 right-0"
-            className={cn(
-              "gap-1.5 py-2 transition-colors hover:bg-foreground/5 active:bg-foreground/10",
+            className="gap-1.5 py-2"
+            interactiveClassName={cn(
+              "transition-colors hover:bg-foreground/5 active:bg-foreground/10",
               showReference && "bg-foreground/10",
             )}
           >

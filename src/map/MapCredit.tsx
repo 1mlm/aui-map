@@ -217,7 +217,8 @@ export function MapCredit({ onOpenCredits }: { onOpenCredits: () => void }) {
       <SquircleFuserContainer
         align="bottom-center"
         superClassName="map-credit absolute bottom-0 left-1/2 -translate-x-1/2"
-        className="py-2.5 transition-colors hover:bg-foreground/5 active:bg-foreground/10"
+        className="py-2.5"
+        interactiveClassName="transition-colors hover:bg-foreground/5 active:bg-foreground/10"
       >
         <span className="flex items-center gap-1.5 text-sm">
           <Icon
