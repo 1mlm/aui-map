@@ -1,14 +1,19 @@
+import { execFile } from "node:child_process"
 import { writeFile } from "node:fs/promises"
 import path from "node:path"
+import { promisify } from "node:util"
 import { NextResponse } from "next/server"
 
+const execFileAsync = promisify(execFile)
+
 // local authoring endpoint for the /3d map editor -- writes straight to the checked-in data files
-// so an edit (currently just the terrain sculpt tool; footprint/building editing will add more
-// targets here) lands as an ordinary source change you review and commit yourself. No auth, no
-// DB, because there's nothing to protect: this 403s outright once NODE_ENV is "production", so it
-// never exists as a live attack surface.
+// so an edit lands as an ordinary source change you review and commit yourself. No auth, no DB,
+// because there's nothing to protect: this 403s outright once NODE_ENV is "production", so it
+// never exists as a live attack surface. Never deletes a Pin row either way -- see
+// buildingFootprints.ts's `hidden` flag for why a pin-linked building can only ever be hidden.
 const SAVE_TARGETS = {
-  terrainHeightmap: "src/map3d/terrainHeightmap.json",
+  buildingFootprints: "src/map3d/buildingFootprints.json",
+  extraBuildings: "src/map3d/extraBuildings.json",
 } as const
 
 type SaveTarget = keyof typeof SAVE_TARGETS
@@ -30,7 +35,16 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "Unknown save target" }, { status: 400 })
 
   // target is one of the fixed keys above, never a request-supplied path
-  const filePath = path.join(process.cwd(), SAVE_TARGETS[body.target])
-  await writeFile(filePath, `${JSON.stringify(body.data, null, 2)}\n`)
+  const relativePath = SAVE_TARGETS[body.target]
+  const filePath = path.join(process.cwd(), relativePath)
+  // plain compact JSON first (matches how these files are originally generated, e.g.
+  // scripts/trace-building-footprints.ts), then biome formats it into the project's normal
+  // JSON style -- doing our own pretty-printing here would reformat every untouched entry too,
+  // turning a one-building edit into a multi-thousand-line diff
+  await writeFile(filePath, JSON.stringify(body.data))
+  await execFileAsync("npx", ["biome", "format", "--write", relativePath], {
+    cwd: process.cwd(),
+    shell: true,
+  })
   return NextResponse.json({ ok: true })
 }

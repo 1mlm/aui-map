@@ -7,18 +7,30 @@ import footprints from "./buildingFootprints.json"
 // used whenever a pin's roof couldn't be reliably traced (see the script's fallback count) — a
 // plain small square rather than trying to guess a better size per tag, per this round's "same
 // height, whatever, we'll add variation later" scope call
-const FALLBACK_FOOTPRINT: [number, number][] = [
+export const FALLBACK_FOOTPRINT: [number, number][] = [
   [-4, -4],
   [4, -4],
   [4, 4],
   [-4, 4],
 ]
 
-type FootprintEntry = { points: [number, number][]; fallback: boolean }
+export type FootprintEntry = {
+  points: [number, number][]
+  fallback: boolean
+  // set by the /3d "delete building" tool on a pin-linked building -- pins are real DB rows
+  // (shared dev/prod, see project_aui_map_infra) so deleting one from the 3D view can never mean
+  // deleting the pin. This just skips it at render time.
+  hidden?: boolean
+}
 
 export function getBuildingFootprint(pinId: string): [number, number][] {
   const entry = (footprints as unknown as Record<string, FootprintEntry>)[pinId]
   if (!entry || entry.fallback || entry.points.length < 3)
     return FALLBACK_FOOTPRINT
   return entry.points
+}
+
+export function isBuildingHidden(pinId: string): boolean {
+  const entry = (footprints as unknown as Record<string, FootprintEntry>)[pinId]
+  return entry?.hidden === true
 }

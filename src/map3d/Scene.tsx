@@ -1,12 +1,13 @@
 "use client"
 
 import { OrbitControls, PerspectiveCamera } from "@react-three/drei"
-import { type Ref, Suspense, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { latLongToPosition } from "@/map/geo"
 import type { MapItem } from "@/map/types"
-import { Building } from "./Building"
+import { Building, worldToFootprintPoint } from "./Building"
+import type { BuildingSpec } from "./buildingPlacement"
 import { ReferenceOverlay } from "./ReferenceOverlay"
-import { Terrain, type TerrainHandle } from "./Terrain"
+import { Terrain } from "./Terrain"
 import { getWorldBounds, positionToWorldPoint } from "./worldSpace"
 
 const SKY_COLOR = "#bcd6ec"
@@ -15,23 +16,61 @@ const SKY_COLOR = "#bcd6ec"
 // right at the frame's edge
 const FRAMING_PADDING_METERS = 60
 
+export type BuildingTool = "select" | "add" | "delete" | null
+
 // a fixed-ish overhead-angled camera (city-builder game framing) rather than free orbit — full
 // orbit lets you flip upside down under the terrain, which reads as broken rather than 3D
 export function Scene({
   items,
   showReference,
-  sculptable = false,
-  terrainRef,
+  buildings,
+  buildingTool,
+  selectedBuildingId,
+  onSelectBuilding,
+  onMoveVertex,
+  onAddVertex,
+  onRemoveVertex,
+  onDeleteBuilding,
+  onAddBuilding,
 }: {
   items: MapItem[]
   showReference: boolean
-  sculptable?: boolean
-  terrainRef?: Ref<TerrainHandle>
+  buildings: BuildingSpec[]
+  buildingTool: BuildingTool
+  selectedBuildingId: string | null
+  onSelectBuilding: (id: string | null) => void
+  onMoveVertex: (
+    buildingId: string,
+    vertexIndex: number,
+    point: [number, number],
+  ) => void
+  onAddVertex: (
+    buildingId: string,
+    afterIndex: number,
+    point: [number, number],
+  ) => void
+  onRemoveVertex: (buildingId: string, vertexIndex: number) => void
+  onDeleteBuilding: (spec: BuildingSpec) => void
+  onAddBuilding: (worldX: number, worldZ: number) => void
 }) {
   // OrbitControls listens on the canvas directly, underneath react-three-fiber's own event
-  // system -- a sculpt drag's stopPropagation() doesn't reach it, so a real orbit-drag-fights-
-  // sculpt-drag bug needs this explicit toggle instead
+  // system -- a vertex drag's stopPropagation() doesn't reach it, so a real orbit-fights-drag bug
+  // needs this explicit toggle instead
   const [orbitEnabled, setOrbitEnabled] = useState(true)
+  const draggingVertexRef = useRef<{
+    buildingId: string
+    vertexIndex: number
+  } | null>(null)
+
+  useEffect(() => {
+    function endDrag() {
+      if (!draggingVertexRef.current) return
+      draggingVertexRef.current = null
+      setOrbitEnabled(true)
+    }
+    window.addEventListener("pointerup", endDrag)
+    return () => window.removeEventListener("pointerup", endDrag)
+  }, [])
 
   const { center, cameraDistance } = useMemo(() => {
     const points = items.map((item) =>
@@ -72,15 +111,54 @@ export function Scene({
         intensity={1.1}
       />
       <Terrain
-        items={items}
-        ref={terrainRef}
-        sculptable={sculptable}
-        onSculptStart={() => setOrbitEnabled(false)}
-        onSculptEnd={() => setOrbitEnabled(true)}
+        buildings={buildings}
+        onGroundClick={
+          buildingTool === "add"
+            ? (worldX, worldZ) => onAddBuilding(worldX, worldZ)
+            : buildingTool === "select" && selectedBuildingId
+              ? () => onSelectBuilding(null)
+              : undefined
+        }
+        onGroundPointerMove={(worldX, worldZ) => {
+          const dragging = draggingVertexRef.current
+          if (!dragging) return
+          const spec = buildings.find((b) => b.id === dragging.buildingId)
+          if (!spec) return
+          onMoveVertex(
+            spec.id,
+            dragging.vertexIndex,
+            worldToFootprintPoint(spec, worldX, worldZ),
+          )
+        }}
       />
-      {items.map((item) => (
-        <Building key={item.id} item={item} />
-      ))}
+      {buildings
+        .filter((spec) => !spec.hidden)
+        .map((spec) => (
+          <Building
+            key={spec.id}
+            spec={spec}
+            editor={{
+              tool: buildingTool,
+              selectedId: selectedBuildingId,
+              draggingVertex: !orbitEnabled,
+              onSelect: onSelectBuilding,
+              onDelete: onDeleteBuilding,
+              onVertexPointerDown: (vertexSpec, vertexIndex, isAltClick) => {
+                if (isAltClick) {
+                  onRemoveVertex(vertexSpec.id, vertexIndex)
+                  return
+                }
+                draggingVertexRef.current = {
+                  buildingId: vertexSpec.id,
+                  vertexIndex,
+                }
+                setOrbitEnabled(false)
+              },
+              onAddVertex: (vertexSpec, afterIndex, point) =>
+                onAddVertex(vertexSpec.id, afterIndex, point),
+            }}
+          />
+        ))}
       {showReference && (
         <Suspense fallback={null}>
           <ReferenceOverlay />

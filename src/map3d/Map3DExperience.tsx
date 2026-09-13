@@ -8,39 +8,163 @@ import { ICONS } from "@/icons"
 import { MapBrand } from "@/map/MapBrand"
 import type { MapItem } from "@/map/types"
 import { cn } from "@/shadcn/utils"
-import { Scene } from "./Scene"
+import type { FootprintEntry } from "./buildingFootprints"
+import footprintsJson from "./buildingFootprints.json"
+import type { BuildingSpec } from "./buildingPlacement"
+import {
+  DEFAULT_NEW_BUILDING_COLOR,
+  DEFAULT_NEW_BUILDING_FOOTPRINT,
+  DEFAULT_NEW_BUILDING_HEIGHT,
+  pinToBuildingSpec,
+} from "./buildingPlacement"
+import {
+  buildingSpecToExtraRecord,
+  getExtraBuildingSpecs,
+} from "./extraBuildings"
 import { saveMap3dData } from "./saveMap3dData"
-import type { TerrainHandle } from "./Terrain"
-
-type EditTool = "reference" | "sculpt" | null
+import { type BuildingTool, Scene } from "./Scene"
 
 // same shell chrome as the 2D map (src/map/MapExperience.tsx) — the border + corner squircle
 // fusers are the one piece of desktop chrome this prototype explicitly keeps
 export function Map3DExperience({ items }: { items: MapItem[] }) {
-  const [activeTool, setActiveTool] = useState<EditTool>(null)
+  const [showReference, setShowReference] = useState(false)
+  const [buildingTool, setBuildingTool] = useState<BuildingTool>(null)
+  const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(
+    null,
+  )
+  const [buildings, setBuildings] = useState<BuildingSpec[]>(() => [
+    ...items.map(pinToBuildingSpec),
+    ...getExtraBuildingSpecs(),
+  ])
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const terrainRef = useRef<TerrainHandle>(null)
+  // which pin-linked buildings actually got edited this session -- Save only overwrites these
+  // entries in buildingFootprints.json, so a pin that was never touched keeps whatever it already
+  // had on disk (including "no entry at all", meaning it still uses the runtime fallback square)
+  // instead of every untouched pin getting a fabricated "real" entry written for it
+  const touchedPinIdsRef = useRef(new Set<string>())
 
-  async function handleSaveTerrain() {
-    if (!terrainRef.current) return
+  function updateBuilding(
+    id: string,
+    updater: (spec: BuildingSpec) => BuildingSpec,
+  ) {
+    setBuildings((current) =>
+      current.map((spec) => (spec.id === id ? updater(spec) : spec)),
+    )
+    setHasUnsavedChanges(true)
+  }
+
+  function toggleBuildingTool(tool: Exclude<BuildingTool, null>) {
+    setBuildingTool((current) => (current === tool ? null : tool))
+  }
+
+  function handleMoveVertex(
+    buildingId: string,
+    vertexIndex: number,
+    point: [number, number],
+  ) {
+    if (buildings.find((spec) => spec.id === buildingId)?.source === "pin")
+      touchedPinIdsRef.current.add(buildingId)
+    updateBuilding(buildingId, (spec) => ({
+      ...spec,
+      footprint: spec.footprint.map((existing, index) =>
+        index === vertexIndex ? point : existing,
+      ),
+    }))
+  }
+
+  function handleAddVertex(
+    buildingId: string,
+    afterIndex: number,
+    point: [number, number],
+  ) {
+    if (buildings.find((spec) => spec.id === buildingId)?.source === "pin")
+      touchedPinIdsRef.current.add(buildingId)
+    updateBuilding(buildingId, (spec) => {
+      const footprint = [...spec.footprint]
+      footprint.splice(afterIndex + 1, 0, point)
+      return { ...spec, footprint }
+    })
+  }
+
+  function handleRemoveVertex(buildingId: string, vertexIndex: number) {
+    if (buildings.find((spec) => spec.id === buildingId)?.source === "pin")
+      touchedPinIdsRef.current.add(buildingId)
+    updateBuilding(buildingId, (spec) =>
+      // a polygon needs at least 3 points -- silently refuse rather than leave a degenerate shape
+      spec.footprint.length <= 3
+        ? spec
+        : {
+            ...spec,
+            footprint: spec.footprint.filter(
+              (_, index) => index !== vertexIndex,
+            ),
+          },
+    )
+  }
+
+  function handleDeleteBuilding(spec: BuildingSpec) {
+    setSelectedBuildingId((current) => (current === spec.id ? null : current))
+    if (spec.source === "pin") {
+      touchedPinIdsRef.current.add(spec.id)
+      updateBuilding(spec.id, (current) => ({ ...current, hidden: true }))
+      return
+    }
+    setBuildings((current) => current.filter((b) => b.id !== spec.id))
+    setHasUnsavedChanges(true)
+  }
+
+  function handleAddBuilding(worldX: number, worldZ: number) {
+    const id = `extra-${crypto.randomUUID()}`
+    setBuildings((current) => [
+      ...current,
+      {
+        id,
+        source: "extra",
+        x: worldX,
+        z: worldZ,
+        footprint: DEFAULT_NEW_BUILDING_FOOTPRINT,
+        height: DEFAULT_NEW_BUILDING_HEIGHT,
+        wallColor: DEFAULT_NEW_BUILDING_COLOR,
+        hidden: false,
+      },
+    ])
+    setHasUnsavedChanges(true)
+    setSelectedBuildingId(id)
+    // switch straight to Select so the new building's corners are immediately draggable into
+    // place instead of leaving the user stuck in Add mode after placing it
+    setBuildingTool("select")
+  }
+
+  async function handleSave() {
     setIsSaving(true)
     try {
-      await saveMap3dData("terrainHeightmap", {
-        rows: 161,
-        cols: 161,
-        heights: terrainRef.current.getHeights(),
-      })
-      // terrainHeightmap.json is a static import (terrainHeight.ts) -- a full reload is the
-      // simplest way to get every consumer (the ground mesh, every building's groundY) back in
-      // sync with what just got written to disk
+      const originalFootprints = footprintsJson as unknown as Record<
+        string,
+        FootprintEntry
+      >
+      const mergedFootprints = { ...originalFootprints }
+      for (const pinId of touchedPinIdsRef.current) {
+        const spec = buildings.find((b) => b.id === pinId && b.source === "pin")
+        if (!spec) continue
+        mergedFootprints[pinId] = {
+          points: spec.footprint,
+          fallback: false,
+          hidden: spec.hidden || undefined,
+        }
+      }
+      const extraRecords = buildings
+        .filter((spec) => spec.source === "extra")
+        .map(buildingSpecToExtraRecord)
+
+      await saveMap3dData("buildingFootprints", mergedFootprints)
+      await saveMap3dData("extraBuildings", extraRecords)
+      // both files are static imports -- a full reload is the simplest way to get every consumer
+      // back in sync with what just got written to disk
       window.location.reload()
     } finally {
       setIsSaving(false)
     }
-  }
-
-  function toggleTool(tool: Exclude<EditTool, null>) {
-    setActiveTool((current) => (current === tool ? null : tool))
   }
 
   return (
@@ -49,9 +173,16 @@ export function Map3DExperience({ items }: { items: MapItem[] }) {
         <Canvas dpr={[1, 1.5]}>
           <Scene
             items={items}
-            showReference={activeTool === "reference"}
-            sculptable={activeTool === "sculpt"}
-            terrainRef={terrainRef}
+            showReference={showReference}
+            buildings={buildings}
+            buildingTool={buildingTool}
+            selectedBuildingId={selectedBuildingId}
+            onSelectBuilding={setSelectedBuildingId}
+            onMoveVertex={handleMoveVertex}
+            onAddVertex={handleAddVertex}
+            onRemoveVertex={handleRemoveVertex}
+            onDeleteBuilding={handleDeleteBuilding}
+            onAddBuilding={handleAddBuilding}
           />
         </Canvas>
 
@@ -62,34 +193,47 @@ export function Map3DExperience({ items }: { items: MapItem[] }) {
           superClassName="pointer-events-auto absolute top-0 right-0"
           className="gap-1"
         >
-          {activeTool === "sculpt" && (
+          {hasUnsavedChanges && (
             <IconButton
               icon={ICONS.save}
               label={isSaving ? "Saving…" : "Save"}
               layout="inline"
               tone="primary"
               disabled={isSaving}
-              onClick={handleSaveTerrain}
+              onClick={handleSave}
             />
           )}
-          {/* a plain button, not a Link — the earlier back-to-2D-map link wrapped an <a> in a
-              display:contents box, which left the browser's default link color/underline free to
-              bleed through onto the icon+text with nothing overriding it */}
           <IconButton
             icon={ICONS.edit}
-            label="Reference"
+            label="Map"
             layout="inline"
-            aria-label="Toggle the flat map as a tracing reference"
-            className={cn(activeTool === "reference" && "bg-foreground/10")}
-            onClick={() => toggleTool("reference")}
+            aria-label="Show or hide the flat map as a tracing reference on the ground"
+            className={cn(showReference && "bg-foreground/10")}
+            onClick={() => setShowReference((current) => !current)}
           />
           <IconButton
-            icon={ICONS.sculptTerrain}
-            label="Sculpt"
+            icon={ICONS.cursor}
+            label="Select"
             layout="inline"
-            aria-label="Sculpt the terrain -- drag to raise, shift-drag to lower"
-            className={cn(activeTool === "sculpt" && "bg-foreground/10")}
-            onClick={() => toggleTool("sculpt")}
+            aria-label="Select a building to drag its footprint points -- alt-click a point to remove it, click an edge's green dot to add one"
+            className={cn(buildingTool === "select" && "bg-foreground/10")}
+            onClick={() => toggleBuildingTool("select")}
+          />
+          <IconButton
+            icon={ICONS.add}
+            label="Add"
+            layout="inline"
+            aria-label="Click the ground to place a new building"
+            className={cn(buildingTool === "add" && "bg-foreground/10")}
+            onClick={() => toggleBuildingTool("add")}
+          />
+          <IconButton
+            icon={ICONS.delete}
+            label="Delete"
+            layout="inline"
+            aria-label="Click a building to remove it"
+            className={cn(buildingTool === "delete" && "bg-foreground/10")}
+            onClick={() => toggleBuildingTool("delete")}
           />
         </SquircleFuserContainer>
       </div>

@@ -1,7 +1,7 @@
 // posts an edit-mode change to the dev-only save route (src/app/api/dev/map3d/route.ts), which
 // writes it straight to the matching checked-in JSON file. Only ever succeeds in development --
 // see that route for why there's no auth here.
-export type Map3dSaveTarget = "terrainHeightmap"
+export type Map3dSaveTarget = "buildingFootprints" | "extraBuildings"
 
 export async function saveMap3dData(
   target: Map3dSaveTarget,

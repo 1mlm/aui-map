@@ -3,8 +3,6 @@
 // one side and gapping away from the other, which reads as broken rather than 3D. Each building
 // gets a locally flattened "pad" (like a real graded building lot) blended into the surrounding
 // slope instead of a hard step.
-import type { MapItem } from "@/map/types"
-import { getBuildingPlacement } from "./buildingPlacement"
 import { getTerrainHeightAt } from "./terrainHeight"
 
 export type TerrainPad = {
@@ -17,9 +15,10 @@ export type TerrainPad = {
 // how far past a building's own footprint the flattened pad blends back into the raw slope
 const PAD_BLEND_METERS = 6
 
-export function getBuildingPads(items: MapItem[]): TerrainPad[] {
-  return items.map((item) => {
-    const { x, z, footprint } = getBuildingPlacement(item)
+export function getBuildingPads(
+  buildings: { x: number; z: number; footprint: [number, number][] }[],
+): TerrainPad[] {
+  return buildings.map(({ x, z, footprint }) => {
     const radius = Math.max(...footprint.map(([px, pz]) => Math.hypot(px, pz)))
     return { x, z, radius, height: getTerrainHeightAt(x, z) }
   })
