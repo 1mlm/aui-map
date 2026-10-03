@@ -21,24 +21,15 @@ type MenuAction = {
 // the phone's whole overflow menu, every row hands off to its own drawer (or the browser's
 // install prompt) once this one has closed
 export function MobileMenu({
-  onContribute,
   onOpenAbout,
   onInstall,
 }: {
-  onContribute: () => void
   onOpenAbout: () => void
   onInstall?: () => void
 }) {
   const [isOpen, setIsOpen] = useState(false)
 
   const actions: MenuAction[] = [
-    {
-      id: "contribute",
-      icon: ICONS.contributeMenu,
-      label: "Contribute",
-      description: "add a place, photos or a fix",
-      onSelect: onContribute,
-    },
     ...(onInstall
       ? [
           {

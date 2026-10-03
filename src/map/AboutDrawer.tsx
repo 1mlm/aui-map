@@ -1,13 +1,10 @@
 "use client"
 
 import Image from "next/image"
-import { useEffect, useState } from "react"
 import { BottomDrawer } from "@/components/BottomDrawer"
 import { type HugeIcon, Icon } from "@/components/Icon"
 import { ICONS } from "@/icons"
 import { cn } from "@/shadcn/utils"
-import { SuggestionForm } from "./SuggestionForm"
-import { useSharedFeedbackDraft } from "./useSharedFeedbackDraft"
 
 const AUTHOR = {
   name: "Malik Lahlou",
@@ -120,17 +117,7 @@ export function AboutDrawer({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const [feedbackOpen, setFeedbackOpen] = useState(false)
-  const draft = useSharedFeedbackDraft()
-
-  // a share-target hand-off should land straight in the feedback form, already open and
-  // pre-filled, rather than making someone re-open the menu and retype what they just shared
-  useEffect(() => {
-    if (draft) setFeedbackOpen(true)
-  }, [draft])
-
   return (
-    <>
       <BottomDrawer
         {...{ open, onOpenChange }}
         title="About"
@@ -161,22 +148,5 @@ export function AboutDrawer({
           </p>
         </div>
       </BottomDrawer>
-
-      {/* no trigger button, reporting a bug and suggesting a feature are two cards in the
-          contribute drawer. This stays mounted only so an Android share-target hand-off still
-          has somewhere to land, prefilled, via the draft effect above */}
-      <BottomDrawer
-        open={feedbackOpen}
-        onOpenChange={setFeedbackOpen}
-        title="Send feedback"
-        description="Report a bug or suggest something."
-      >
-        <SuggestionForm
-          onSent={() => setFeedbackOpen(false)}
-          initialMessage={draft?.message}
-          initialAttachment={draft?.attachment ?? undefined}
-        />
-      </BottomDrawer>
-    </>
   )
 }

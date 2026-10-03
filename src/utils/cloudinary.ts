@@ -1,4 +1,4 @@
-import { v2 as cloudinary, type UploadApiResponse } from "cloudinary"
+import { v2 as cloudinary } from "cloudinary"
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -26,28 +26,6 @@ export function createUploadSignature() {
     cloudName: process.env.CLOUDINARY_CLOUD_NAME as string,
     folder: UPLOAD_FOLDER,
   }
-}
-
-// server-side upload for files already in hand (a share-target POST, or a derived webp buffer) —
-// nothing routes through the 4.5mb body limit here since the bytes never left the server
-export function uploadBuffer(
-  buffer: Buffer,
-  options: { publicId?: string } = {},
-): Promise<UploadApiResponse> {
-  return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        folder: UPLOAD_FOLDER,
-        public_id: options.publicId,
-        resource_type: "auto",
-      },
-      (error, result) => {
-        if (error || !result) reject(error ?? new Error("Upload failed."))
-        else resolve(result)
-      },
-    )
-    stream.end(buffer)
-  })
 }
 
 // a Cloudinary delivery url looks like .../<resource_type>/upload/v<version>/<public_id>.<ext> —

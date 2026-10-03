@@ -15,7 +15,7 @@ import { DEFAULT_PIN_SIZE_TUNING, type PinSizeTuning } from "./MapPin"
 import { MapFilterBar } from "./MapTagFilter"
 import { NetworkStatusBanner } from "./NetworkStatusBanner"
 import { DEFAULT_CRAYON_TUNING, type TagColorName } from "./tagColor"
-import type { MapItem, MapItemTag, MapPanorama } from "./types"
+import type { MapItem, MapItemTag } from "./types"
 import { useAvailableSpace } from "./useAvailableSpace"
 import { useCompassHeading } from "./useCompassHeading"
 import { useHashState } from "./useHashState"
@@ -59,11 +59,9 @@ const ZERO_RESULT_SEARCH_TRACK_DELAY_MS = 800
 export function MapExperience({
   items,
   tags,
-  panoramas,
 }: {
   items: MapItem[]
   tags: MapItemTag[]
-  panoramas: MapPanorama[]
 }) {
   const shellRef = useRef<HTMLDivElement>(null)
   const mapCanvasRef = useRef<MapCanvasHandle>(null)
@@ -77,7 +75,7 @@ export function MapExperience({
   // since clicking the button is unambiguous intent to recenter. Also asks for orientation in
   // the same tap so a first-time grant is one click instead of two -- must come before any
   // `await` in this function, iOS only honors DeviceOrientationEvent.requestPermission() while
-  // still inside the click's own gesture (same rule PanoramaCapture's handleStart follows)
+  // still inside the click's own gesture
   function handleLocate() {
     compass.requestPermission()
     location.requestLocation()
@@ -138,11 +136,6 @@ export function MapExperience({
   }))
 
   const selected = effectiveItems.find((item) => item.id === selectedId) ?? null
-  const contributePins = effectiveItems.map((item) => ({
-    id: item.id,
-    title: item.title,
-    icon: item.tag.icon,
-  }))
   const visibleItems = effectiveItems.filter(
     (item) =>
       matchesSearch(item, search) &&
@@ -207,7 +200,7 @@ export function MapExperience({
           userAccuracy={location.accuracy}
           offCampusPosition={location.isOffCampus ? location.rawPosition : null}
           compassHeading={compass.heading}
-          {...{ selectedId, hoveredTagId, tuning, sizeTuning, panoramas }}
+          {...{ selectedId, hoveredTagId, tuning, sizeTuning }}
         />
 
         <MapBrand />
@@ -222,7 +215,7 @@ export function MapExperience({
           onLocate={handleLocate}
           compassPermission={compass.permission}
           onRequestCompass={compass.requestPermission}
-          {...{ search, contributePins }}
+          {...{ search }}
         />
         <AnimatePresence>
           {!locateButtonDone && (

@@ -7,7 +7,6 @@ import { SquircleFuserContainer } from "@/components/SquircleFuser"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/Tooltip"
 import { ICONS } from "@/icons"
 import { cn } from "@/shadcn/utils"
-import { ContributeMenu, type ContributePin } from "./ContributeMenu"
 import { SearchField, type SearchProps } from "./MapSearch"
 import { MobileMenu } from "./MobileMenu"
 import type { CompassPermission } from "./useCompassHeading"
@@ -48,7 +47,6 @@ export function MapControls({
   onLocate,
   compassPermission,
   onRequestCompass,
-  contributePins,
   ...props
 }: SearchProps & {
   onOpenAbout: () => void
@@ -58,16 +56,11 @@ export function MapControls({
   onLocate: () => void
   compassPermission: CompassPermission
   onRequestCompass: () => void
-  contributePins: ContributePin[]
 }) {
   // a single shared boolean is enough here, unlike the popover-based controls -- a Dialog is one
   // portal-rendered modal regardless of which of the two (compact/full) trigger buttons opened
   // it, not a separate instance anchored to each
-  const [contributeOpen, setContributeOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
-  function openContribute() {
-    setContributeOpen(true)
-  }
   const { search } = props
   const { canInstall, promptInstall } = useInstallPrompt()
   const fixIsVague =
@@ -140,12 +133,6 @@ export function MapControls({
       ),
       tooltip: locateTooltip,
       onClick: needsCompassTap ? onRequestCompass : onLocate,
-    },
-    {
-      id: "contribute",
-      icon: ICONS.contributeMenu,
-      label: "Contribute",
-      onClick: openContribute,
     },
     ...(canInstall
       ? [
@@ -232,7 +219,6 @@ export function MapControls({
       <div className="map-controls-compact pointer-events-auto absolute inset-x-3 top-3 flex items-center gap-2">
         <SearchField big {...props} />
         <MobileMenu
-          onContribute={openContribute}
           onOpenAbout={onOpenAbout}
           onInstall={canInstall ? promptInstall : undefined}
         />
@@ -245,18 +231,6 @@ export function MapControls({
       >
         {renderControls(false)}
       </SquircleFuserContainer>
-
-      <BottomDrawer
-        open={contributeOpen}
-        onOpenChange={setContributeOpen}
-        title="Contribute"
-        description="I read everything before it goes on the map."
-      >
-        <ContributeMenu
-          items={contributePins}
-          onClose={() => setContributeOpen(false)}
-        />
-      </BottomDrawer>
 
       <BottomDrawer
         open={searchOpen}

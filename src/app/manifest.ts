@@ -35,19 +35,5 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: "maskable",
       },
     ],
-    // lets someone share a link or photo from another app straight into aui-map's feedback
-    // form instead of only being able to open the app and type from scratch — see
-    // src/app/share-target/route.ts for what actually happens with it
-    share_target: {
-      action: "/share-target",
-      method: "POST",
-      enctype: "multipart/form-data",
-      params: {
-        title: "title",
-        text: "text",
-        url: "url",
-        files: [{ name: "media", accept: ["image/*"] }],
-      },
-    },
   }
 }

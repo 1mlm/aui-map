@@ -30,8 +30,8 @@ export function LocateFloatingButton({
     locationStatus === "requesting" || compassPermission === "requesting"
 
   const label = needsCompassTap ? "Get direction" : "Find Me"
-  // same "come tap me" cue as the Contribute button's first-ever-seen pulse, but not a one-time
-  // thing here -- location not being on yet is itself the condition, every time, until it is
+  // location not being on yet is itself the condition for the "come tap me" pulse, every time,
+  // until it is
   const wantsAttention = !isBusy && locationStatus !== "granted"
 
   return (

@@ -58,8 +58,7 @@ function StripTile({ attachment }: { attachment: MapItemAttachment }) {
   )
 }
 
-// display only — contributing a file is one of the cards in ContributeDialog now, reached from
-// the panel's own Contribute button, so this no longer carries a dropper of its own
+// display only, files are added from the admin side
 export function AttachmentStrip({
   attachments,
   onOpen,

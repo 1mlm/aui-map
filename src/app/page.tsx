@@ -7,11 +7,11 @@ import { MapExperience } from "@/map/MapExperience"
 export const revalidate = 60
 
 export default async function Page() {
-  const { items, tags, panoramas } = await getMapData()
+  const { items, tags } = await getMapData()
 
   return (
     <Suspense>
-      <MapExperience {...{ items, tags, panoramas }} />
+      <MapExperience {...{ items, tags }} />
     </Suspense>
   )
 }

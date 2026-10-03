@@ -38,7 +38,6 @@
     "react": "19.3.0",
     "react-day-picker": "^10.0.1",
     "react-dom": "19.3.0",
-    "resend": "^6.25.0",
     "serwist": "^9.5.12",
     "shadcn": "^4.21.0",
     "sharp": "^0.35.4",

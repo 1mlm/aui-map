@@ -6,15 +6,13 @@ import { requireAuth } from "@/utils/requireAuth"
 export default async function AdminLayout({ children }: PropsWithChildren) {
   await requireAuth()
 
-  const [pins, tags, submissions, suggestions] = await Promise.all([
+  const [pins, tags] = await Promise.all([
     prisma.pin.count(),
     prisma.tag.count(),
-    prisma.submission.count({ where: { status: "PENDING" } }),
-    prisma.suggestion.count({ where: { resolved: false } }),
   ])
 
   return (
-    <AppShell counts={{ pins, tags, submissions, suggestions }}>
+    <AppShell counts={{ pins, tags }}>
       {children}
     </AppShell>
   )
