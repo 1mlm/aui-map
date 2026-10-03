@@ -20,12 +20,16 @@ export function SearchField({
   search,
   onSearchChange,
   big,
+  bar,
   className,
 }: SearchProps & {
   // the mobile compact bar's own always-visible searchbar, not a popover's -- bigger touch
   // target, no autofocus (it's mounted on first paint, not opened on demand), and translucent to
   // match the rest of the floating mobile chrome instead of a small boxed field
   big?: boolean
+  // desktop: sits in the top-right control bar, so it wears the same pill look as the buttons
+  // next to it instead of the boxed field
+  bar?: boolean
   className?: string
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -43,7 +47,9 @@ export function SearchField({
         className={cn(
           big
             ? "map-live-blur h-12 rounded-full corner-superellipse/1.2! border-none bg-background/70 shadow-lg drop-shadow-black/40 backdrop-blur-md dark:bg-background/70"
-            : "rounded-[calc(var(--radius-3xl)-0.75rem)] corner-squircle!",
+            : bar
+              ? "h-9 w-52 rounded-full corner-squircle! border-none bg-foreground/10 text-foreground/70 hover:bg-foreground/15 has-[[data-slot=input-group-control]:focus-visible]:bg-foreground/15 has-[[data-slot=input-group-control]:focus-visible]:ring-0 dark:bg-foreground/10"
+              : "rounded-[calc(var(--radius-3xl)-0.75rem)] corner-squircle!",
           className,
         )}
       >
@@ -59,13 +65,13 @@ export function SearchField({
         </InputGroupAddon>
         <InputGroupInput
           ref={inputRef}
-          autoFocus={!big}
+          autoFocus={!big && !bar}
           type="search"
           enterKeyHint="search"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="B34, B38, Library..."
-          className={big ? "text-base" : undefined}
+          className={big ? "text-base" : bar ? "text-sm" : undefined}
         />
         {search && (
           <InputGroupAddon align="inline-end">

@@ -1,11 +1,10 @@
 "use client"
 
-import { type ReactNode, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { IconButton } from "@/components/IconButton"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/Tooltip"
 import { ICONS } from "@/icons"
-import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover"
 import { cn } from "@/shadcn/utils"
 import { SearchField, type SearchProps } from "./MapSearch"
 import { MobileMenu } from "./MobileMenu"
@@ -34,7 +33,6 @@ type MapControl = {
   onClick?: () => void
   // only set when there is something to say beyond the label already under the glyph
   tooltip?: string | null
-  popover?: { className: string; content: ReactNode }
   // the compact bar's own copy would be a second, more cramped "get located" flow next to
   // LocateFloatingButton's -- that one already owns this job on mobile
   fullOnly?: boolean
@@ -58,10 +56,6 @@ export function MapControls({
   compassPermission: CompassPermission
   onRequestCompass: () => void
 }) {
-  // a single shared boolean is enough here, unlike the popover-based controls -- a Dialog is one
-  // portal-rendered modal regardless of which of the two (compact/full) trigger buttons opened
-  // it, not a separate instance anchored to each
-  const { search } = props
   const { canInstall, promptInstall } = useInstallPrompt()
   const fixIsVague =
     locationStatus === "granted" &&
@@ -105,16 +99,6 @@ export function MapControls({
     locationStatus === "requesting" || compassPermission === "requesting"
 
   const controls: MapControl[] = [
-    {
-      id: "search",
-      icon: ICONS.search,
-      label: "Search",
-      active: search.length > 0,
-      popover: {
-        className: "flex w-80 flex-col gap-2.5",
-        content: <SearchField {...props} />,
-      },
-    },
     {
       id: "locate",
       fullOnly: true,
@@ -174,7 +158,6 @@ export function MapControls({
           className,
           onClick,
           tooltip,
-          popover,
         }) => {
           const plainButton = (
             <IconButton
@@ -200,16 +183,7 @@ export function MapControls({
 
           return (
             <span key={id} className="relative">
-              {popover ? (
-                <Popover>
-                  <PopoverTrigger asChild>{button}</PopoverTrigger>
-                  <PopoverContent className={popover.className}>
-                    {popover.content}
-                  </PopoverContent>
-                </Popover>
-              ) : (
-                button
-              )}
+              {button}
             </span>
           )
         },
@@ -242,6 +216,7 @@ export function MapControls({
         superClassName="map-controls-full pointer-events-auto absolute top-0 right-0"
         className="gap-1.5"
       >
+        <SearchField bar {...props} />
         {renderControls(false)}
       </SquircleFuserContainer>
     </>
