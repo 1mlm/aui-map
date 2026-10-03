@@ -295,6 +295,11 @@ export function MapCanvas({
                 unoptimized
                 draggable={false}
                 onLoad={() => setMapImageLoaded(true)}
+                // a cached image can finish loading before hydration, and that onLoad is then
+                // never replayed, which left the blurred placeholder up for good
+                ref={(image) => {
+                  if (image?.complete) setMapImageLoaded(true)
+                }}
                 className={cn(
                   "pointer-events-none transition-opacity duration-500",
                   mapImageLoaded ? "opacity-100" : "opacity-0",

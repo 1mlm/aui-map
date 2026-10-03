@@ -35,19 +35,36 @@ Live at [auimap.ma](https://auimap.ma).
 </tr>
 </table>
 
+### Admin dashboard
+
+<table>
+<tr>
+<th>Desktop</th>
+<th>Mobile</th>
+</tr>
+<tr>
+<td><img src="docs/screenshots/admin-pins-desktop.jpg" height="360" alt="Admin pins table on desktop"></td>
+<td><img src="docs/screenshots/admin-pins-mobile.jpg" height="360" alt="Admin pins table on mobile"></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/admin-tags-desktop.jpg" height="360" alt="Admin tags table on desktop"></td>
+<td><img src="docs/screenshots/admin-tags-mobile.jpg" height="360" alt="Admin tags table on mobile"></td>
+</tr>
+</table>
+
 ## Features
 
 - Pan/zoom campus map with tag-colored, searchable, filterable pins
 - Pin detail panel with photos/videos, hours, contacts, links, and directions (Google Maps, Apple Maps, Waze)
 - Live location with compass heading and a "center me" button, only ever on request, never a silent permission prompt
-- Anyone can suggest edits or contribute photos to a pin. No account needed
+- Share a pin by link or QRCode
 - Installable PWA with offline support
-- Admin dashboard to manage pins, tags, and incoming suggestions
+- Admin dashboard to manage pins, tags, and photos
 
 ## Stack
 
 - [`Next.js`](https://nextjs.org/) 16 (App Router, Turbopack) · [`TypeScript`](https://www.typescriptlang.org/) 5 · [`React`](https://react.dev/) 19
-- [`Prisma`](https://www.prisma.io/) 7 + Postgres (Neon), [`Vercel Blob`](https://vercel.com/docs/vercel-blob) for photo/video uploads
+- [`Prisma`](https://www.prisma.io/) 7 + Postgres (Neon), [`Cloudinary`](https://cloudinary.com/) for photo/video uploads
 - [`Tailwind CSS`](https://tailwindcss.com/) 4 · [`shadcn`](https://ui.shadcn.com/) (Nova style, Neutral theme, Medium radius, [`Outfit`](https://fonts.google.com/specimen/Outfit) font) · [`Hugeicons`](https://hugeicons.com/)
 - [`motion`](https://motion.dev/) for pin/panel animation, [`serwist`](https://serwist.pages.dev/) for the offline-capable PWA service worker
 - [`Biome`](https://biomejs.dev/) · [`pnpm`](https://pnpm.io/)
