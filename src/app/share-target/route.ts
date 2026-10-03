@@ -6,7 +6,7 @@ import { uploadBuffer } from "@/utils/cloudinary"
 // only being able to open the form and type from scratch. The shared file (if any) is uploaded
 // here, server-side, since a share_target POST can't be handed off to the client — the redirect
 // below just carries its resulting URL, not the file itself, back to the page as query params for
-// NoticeDialog to read once and pass into SuggestionForm as a prefill
+// AboutDrawer to read once and pass into SuggestionForm as a prefill
 export async function POST(request: Request): Promise<NextResponse> {
   const formData = await request.formData()
   const title = formData.get("title")

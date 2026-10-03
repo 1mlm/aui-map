@@ -1,21 +1,10 @@
 "use client"
 
 import { useState } from "react"
+import { BottomDrawer } from "@/components/BottomDrawer"
 import { Icon } from "@/components/Icon"
 import { IconButton } from "@/components/IconButton"
 import { ICONS } from "@/icons"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/shadcn/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/shadcn/ui/dropdown-menu"
 import { copyImageToClipboard } from "@/utils/clipboard"
 import { triggerHaptic } from "@/utils/haptics"
 import { useCopyFeedback } from "@/utils/useCopyFeedback"
@@ -48,6 +37,7 @@ export function ShareMenu({
   pinId: string
   pinTitle: string
 }) {
+  const [shareOpen, setShareOpen] = useState(false)
   const [qrCodeOpen, setQrCodeOpen] = useState(false)
   const [imageFeedback, setImageFeedback] = useState<
     "copied" | "downloaded" | null
@@ -81,6 +71,7 @@ export function ShareMenu({
 
   function handleOpenQrCode() {
     triggerHaptic()
+    setShareOpen(false)
     setQrCodeOpen(true)
   }
 
@@ -155,49 +146,52 @@ export function ShareMenu({
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            aria-label="Share this place"
-            className="flex cursor-pointer items-center gap-0.5 rounded-full corner-squircle bg-white/10 px-2 py-2 text-white transition-colors hover:bg-white/20"
-          >
-            <Icon icon={linkCopied ? ICONS.copied : ICONS.share} />
-            <Icon icon={ICONS.dropdown} className="size-3" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+      <button
+        type="button"
+        aria-label="Share this place"
+        onClick={() => setShareOpen(true)}
+        className="flex cursor-pointer items-center gap-0.5 rounded-full corner-squircle bg-white/10 px-2 py-2 text-white transition-colors hover:bg-white/20"
+      >
+        <Icon icon={linkCopied ? ICONS.copied : ICONS.share} />
+      </button>
+
+      <BottomDrawer
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        title={`Share ${pinTitle}`}
+      >
+        <nav className="flex flex-col gap-1.5">
           {shareActions.map(({ id, icon, label, onSelect }) => (
-            <DropdownMenuItem
+            <button
               key={id}
-              className="cursor-pointer"
-              {...{ onSelect }}
+              type="button"
+              onClick={onSelect}
+              className="flex items-center gap-3 rounded-2xl corner-superellipse/1.2 p-3 text-left text-sm font-medium ring-1 ring-border transition-colors hover:bg-accent"
             >
-              <Icon {...{ icon }} />
+              <Icon {...{ icon }} className="size-5" />
               {label}
-            </DropdownMenuItem>
+            </button>
           ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+        </nav>
+      </BottomDrawer>
 
-      <Dialog open={qrCodeOpen} onOpenChange={setQrCodeOpen}>
-        <DialogContent className="flex w-auto flex-col items-center gap-3">
-          <DialogTitle>{pinTitle}</DialogTitle>
-          <DialogDescription className="sr-only">
-            QRCode for {pinTitle}
-          </DialogDescription>
-
-          {/* qrCodeOpen-gated, not just left to Dialog's own mount logic — getPinLink() touches
+      <BottomDrawer
+        open={qrCodeOpen}
+        onOpenChange={setQrCodeOpen}
+        title={pinTitle}
+        description={`QRCode for ${pinTitle}`}
+        className="items-center"
+      >
+          {/* qrCodeOpen-gated, not just left to the drawer's own mount logic — getPinLink() touches
           window.location, and JSX children evaluate in this component's render regardless of
-          whether DialogContent ends up mounting them, which would crash during SSR */}
+          whether the drawer ends up mounting them, which would crash during SSR */}
           {qrCodeOpen && (
             <>
               <QrCodePreview url={getPinLink()} />
               <span className="max-w-64 text-center text-xs break-all text-muted-foreground">
                 {getPinLink()}
               </span>
-              {/* icon-only -- three labelled buttons never fit this dialog's width (it shrinks to
-                  the QR image's own size), they just overflowed and clipped */}
+              {/* icon-only -- three labelled buttons never fit this drawer's width, they just overflowed and clipped */}
               <div className="flex gap-3">
                 <IconButton
                   icon={imageFeedback === "copied" ? ICONS.copied : ICONS.copy}
@@ -224,8 +218,7 @@ export function ShareMenu({
               </div>
             </>
           )}
-        </DialogContent>
-      </Dialog>
+      </BottomDrawer>
     </>
   )
 }

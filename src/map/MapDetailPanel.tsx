@@ -3,6 +3,7 @@
 import { motion, type PanInfo } from "motion/react"
 import Image from "next/image"
 import { useState } from "react"
+import { BottomDrawer } from "@/components/BottomDrawer"
 import { Icon } from "@/components/Icon"
 import { IconButton } from "@/components/IconButton"
 import { fuserOverlapClass, SquircleFuser } from "@/components/SquircleFuser"
@@ -14,7 +15,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shadcn/ui/dropdown-menu"
-import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover"
 import { cn } from "@/shadcn/utils"
 import { triggerHaptic } from "@/utils/haptics"
 import { isImageMimeType } from "@/utils/mimeType"
@@ -328,28 +328,33 @@ function HoursLine({
   hours: string
   ramadanHours: string | null
 }) {
+  const [ramadanOpen, setRamadanOpen] = useState(false)
+
   return (
     <span className="flex items-center gap-2">
       <Icon icon={ICONS.clock} className="shrink-0" />
       {hours}
       {ramadanHours && (
-        <Popover>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              aria-label="Ramadan hours"
-              className="rounded-full corner-squircle p-1 opacity-70 transition-opacity hover:bg-foreground/10 hover:opacity-100"
-            >
-              <Icon icon={ICONS.ramadan} className="size-3.5" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto">
+        <>
+          <button
+            type="button"
+            aria-label="Ramadan hours"
+            onClick={() => setRamadanOpen(true)}
+            className="rounded-full corner-squircle p-1 opacity-70 transition-opacity hover:bg-foreground/10 hover:opacity-100"
+          >
+            <Icon icon={ICONS.ramadan} className="size-3.5" />
+          </button>
+          <BottomDrawer
+            open={ramadanOpen}
+            onOpenChange={setRamadanOpen}
+            title="Ramadan hours"
+          >
             <span className="flex items-center gap-1.5 text-sm">
               <Icon icon={ICONS.ramadan} className="size-3.5 shrink-0" />
-              Ramadan hours: {ramadanHours}
+              {ramadanHours}
             </span>
-          </PopoverContent>
-        </Popover>
+          </BottomDrawer>
+        </>
       )}
     </span>
   )

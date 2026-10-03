@@ -523,7 +523,7 @@ function PinPicker({
   )
 }
 
-// the body of the contribute popover: pick what you're giving, then (for the two kinds tied to a
+// the body of the contribute drawer: pick what you're giving, then (for the two kinds tied to a
 // place) which place, then fill in only what that kind needs. One entry point for everything, so
 // it carries the whole map's pins to search rather than expecting one handed to it already picked
 export function ContributeMenu({
@@ -553,15 +553,6 @@ export function ContributeMenu({
   if (!picked)
     return (
       <div className="flex flex-col gap-2">
-        <div className="flex flex-col gap-0.5">
-          <span className="flex items-center gap-2 text-sm font-semibold">
-            <Icon icon={ICONS.contributeMenu} />
-            Contribute
-          </span>
-          <span className="text-xs text-muted-foreground">
-            I read everything before it goes on the map.
-          </span>
-        </div>
         {CONTRIBUTION_TYPES.map((type) => (
           <button
             key={type.id}

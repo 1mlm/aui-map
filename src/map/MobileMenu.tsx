@@ -1,18 +1,13 @@
 "use client"
 
 import { useState } from "react"
+import { BottomDrawer } from "@/components/BottomDrawer"
 import { Icon } from "@/components/Icon"
 import { IconButton } from "@/components/IconButton"
 import { ICONS } from "@/icons"
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/shadcn/ui/drawer"
 import { cn } from "@/shadcn/utils"
 import { triggerHaptic } from "@/utils/haptics"
+import { MadeWithCredit } from "./AboutDrawer"
 
 type MenuAction = {
   id: string
@@ -23,15 +18,15 @@ type MenuAction = {
   isHighlighted?: boolean
 }
 
-// the phone's whole overflow menu: a vaul drawer (drag down to close) whose visible part is a
-// card inset from the screen edges so it floats instead of sitting glued to the bottom
+// the phone's whole overflow menu, every row hands off to its own drawer (or the browser's
+// install prompt) once this one has closed
 export function MobileMenu({
   onContribute,
-  onOpenCredits,
+  onOpenAbout,
   onInstall,
 }: {
   onContribute: () => void
-  onOpenCredits: () => void
+  onOpenAbout: () => void
   onInstall?: () => void
 }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -57,11 +52,11 @@ export function MobileMenu({
         ]
       : []),
     {
-      id: "credits",
+      id: "about",
       icon: ICONS.notice,
-      label: "About and credits",
-      description: "who made this and how it works",
-      onSelect: onOpenCredits,
+      label: "About",
+      description: "what this is and who is behind it",
+      onSelect: onOpenAbout,
     },
   ]
 
@@ -72,60 +67,49 @@ export function MobileMenu({
   }
 
   return (
-    <Drawer open={isOpen} onOpenChange={setIsOpen}>
-      <DrawerTrigger asChild>
-        <IconButton
-          icon={ICONS.moreActions}
-          aria-label="Menu"
-          tone="floating"
-          shape="corner-superellipse/1.2"
-          iconClassName="size-5"
-          className={cn(
-            "size-12 shrink-0 shadow-lg drop-shadow-black/40",
-            onInstall && "animate-pulse-attention",
-          )}
-        />
-      </DrawerTrigger>
-      <DrawerContent
-        aria-describedby={undefined}
-        className="border-none! bg-transparent p-2 [&>div:first-child]:hidden"
+    <>
+      <IconButton
+        icon={ICONS.moreActions}
+        aria-label="Menu"
+        tone="floating"
+        shape="corner-superellipse/1.2"
+        iconClassName="size-5"
+        className={cn(
+          "size-12 shrink-0 shadow-lg drop-shadow-black/40",
+          onInstall && "animate-pulse-attention",
+        )}
+        onClick={() => setIsOpen(true)}
+      />
+      <BottomDrawer
+        open={isOpen}
+        onOpenChange={setIsOpen}
+        title="AUI Map"
+        footer={<MadeWithCredit />}
       >
-        <div className="flex flex-col gap-3 rounded-3xl corner-superellipse/1.2 bg-popover p-3.5 pt-2 text-popover-foreground ring-1 ring-border">
-          <span className="mx-auto h-1 w-10 rounded-full bg-foreground/20" />
-          <div className="flex items-center justify-between">
-            <DrawerTitle className="text-sm font-semibold">AUI Map</DrawerTitle>
-            <DrawerClose
-              aria-label="Close menu"
-              className="grid size-7 place-items-center rounded-full text-foreground/60 ring-1 ring-border"
+        <nav className="flex flex-col gap-1.5">
+          {actions.map((action) => (
+            <button
+              key={action.id}
+              type="button"
+              onClick={() => selectAction(action)}
+              className={cn(
+                "flex items-center gap-3 rounded-2xl corner-superellipse/1.2 p-2.5 text-left ring-1 ring-border transition-colors hover:bg-accent",
+                action.isHighlighted && "bg-accent",
+              )}
             >
-              <Icon icon={ICONS.close} className="size-3.5" />
-            </DrawerClose>
-          </div>
-          <nav className="flex flex-col gap-1.5">
-            {actions.map((action) => (
-              <button
-                key={action.id}
-                type="button"
-                onClick={() => selectAction(action)}
-                className={cn(
-                  "flex items-center gap-3 rounded-2xl corner-superellipse/1.2 p-2.5 text-left ring-1 ring-border transition-colors hover:bg-accent",
-                  action.isHighlighted && "bg-accent",
-                )}
-              >
-                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-foreground text-background">
-                  <Icon icon={action.icon} className="size-5" />
-                </span>
-                <span className="leading-tight">
-                  <p className="text-sm font-semibold">{action.label}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {action.description}
-                  </p>
-                </span>
-              </button>
-            ))}
-          </nav>
-        </div>
-      </DrawerContent>
-    </Drawer>
+              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-foreground text-background">
+                <Icon icon={action.icon} className="size-5" />
+              </span>
+              <span className="leading-tight">
+                <p className="text-sm font-semibold">{action.label}</p>
+                <p className="text-xs text-muted-foreground">
+                  {action.description}
+                </p>
+              </span>
+            </button>
+          ))}
+        </nav>
+      </BottomDrawer>
+    </>
   )
 }

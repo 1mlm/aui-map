@@ -1,12 +1,11 @@
 "use client"
 
-import { type ReactNode, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import { BottomDrawer } from "@/components/BottomDrawer"
 import { IconButton } from "@/components/IconButton"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/Tooltip"
 import { ICONS } from "@/icons"
-import { Dialog, DialogContent, DialogTitle } from "@/shadcn/ui/dialog"
-import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover"
 import { cn } from "@/shadcn/utils"
 import { ContributeMenu, type ContributePin } from "./ContributeMenu"
 import { SearchField, type SearchProps } from "./MapSearch"
@@ -36,14 +35,13 @@ type MapControl = {
   onClick?: () => void
   // only set when there is something to say beyond the label already under the glyph
   tooltip?: string | null
-  popover?: { className: string; content: ReactNode }
   // the compact bar's own copy would be a second, more cramped "get located" flow next to
   // LocateFloatingButton's -- that one already owns this job on mobile
   fullOnly?: boolean
 }
 
 export function MapControls({
-  onOpenNotice,
+  onOpenAbout,
   locationStatus,
   isOffCampus,
   accuracy,
@@ -53,7 +51,7 @@ export function MapControls({
   contributePins,
   ...props
 }: SearchProps & {
-  onOpenNotice: () => void
+  onOpenAbout: () => void
   locationStatus: LocationStatus
   isOffCampus: boolean
   accuracy: number | null
@@ -66,6 +64,7 @@ export function MapControls({
   // portal-rendered modal regardless of which of the two (compact/full) trigger buttons opened
   // it, not a separate instance anchored to each
   const [contributeOpen, setContributeOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   function openContribute() {
     setContributeOpen(true)
   }
@@ -118,10 +117,7 @@ export function MapControls({
       icon: ICONS.search,
       label: "Search",
       active: search.length > 0,
-      popover: {
-        className: "flex w-80 flex-col gap-2.5",
-        content: <SearchField {...props} />,
-      },
+      onClick: () => setSearchOpen(true),
     },
     {
       id: "locate",
@@ -171,7 +167,7 @@ export function MapControls({
       fullOnly: true,
       icon: ICONS.notice,
       label: "About",
-      onClick: onOpenNotice,
+      onClick: onOpenAbout,
     },
   ]
 
@@ -188,7 +184,6 @@ export function MapControls({
           className,
           onClick,
           tooltip,
-          popover,
         }) => {
           const plainButton = (
             <IconButton
@@ -214,16 +209,7 @@ export function MapControls({
 
           return (
             <span key={id} className="relative">
-              {popover ? (
-                <Popover>
-                  <PopoverTrigger asChild>{button}</PopoverTrigger>
-                  <PopoverContent className={popover.className}>
-                    {popover.content}
-                  </PopoverContent>
-                </Popover>
-              ) : (
-                button
-              )}
+              {button}
             </span>
           )
         },
@@ -247,7 +233,7 @@ export function MapControls({
         <SearchField big {...props} />
         <MobileMenu
           onContribute={openContribute}
-          onOpenCredits={onOpenNotice}
+          onOpenAbout={onOpenAbout}
           onInstall={canInstall ? promptInstall : undefined}
         />
       </div>
@@ -260,17 +246,25 @@ export function MapControls({
         {renderControls(false)}
       </SquircleFuserContainer>
 
-      {/* a modal, not a popover -- the form underneath (file uploads, a map picker, multi-step)
-          is real content to focus on, not a quick anchored menu next to the icon that opened it */}
-      <Dialog open={contributeOpen} onOpenChange={setContributeOpen}>
-        <DialogContent className="flex max-h-[85vh] flex-col gap-2 overflow-y-auto sm:max-w-sm">
-          <DialogTitle className="sr-only">Contribute</DialogTitle>
-          <ContributeMenu
-            items={contributePins}
-            onClose={() => setContributeOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
+      <BottomDrawer
+        open={contributeOpen}
+        onOpenChange={setContributeOpen}
+        title="Contribute"
+        description="I read everything before it goes on the map."
+      >
+        <ContributeMenu
+          items={contributePins}
+          onClose={() => setContributeOpen(false)}
+        />
+      </BottomDrawer>
+
+      <BottomDrawer
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        title="Search"
+      >
+        <SearchField {...props} />
+      </BottomDrawer>
     </>
   )
 }
