@@ -1,13 +1,23 @@
 "use client"
 
-import { OrbitControls, PerspectiveCamera } from "@react-three/drei"
-import { Suspense, useEffect, useMemo, useRef, useState } from "react"
+import { Line, OrbitControls, PerspectiveCamera } from "@react-three/drei"
+import { useFrame } from "@react-three/fiber"
+import {
+  type ComponentRef,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
+import * as THREE from "three"
 import { latLongToPosition } from "@/map/geo"
 import type { MapItem } from "@/map/types"
 import { Building, worldToFootprintPoint } from "./Building"
 import type { BuildingSpec } from "./buildingPlacement"
 import { ReferenceOverlay } from "./ReferenceOverlay"
 import { Terrain } from "./Terrain"
+import { getTerrainHeightAt } from "./terrainHeight"
 import { getWorldBounds, positionToWorldPoint } from "./worldSpace"
 
 const SKY_COLOR = "#bcd6ec"
@@ -15,29 +25,33 @@ const SKY_COLOR = "#bcd6ec"
 // how far past the outermost building's edge the camera frames, so the cluster isn't cropped
 // right at the frame's edge
 const FRAMING_PADDING_METERS = 60
+// how quickly the orbit pivot glides to its new target (selecting/deselecting a building) --
+// higher is snappier, this is tuned to feel like a soft follow rather than an instant jump
+const ORBIT_TARGET_FOLLOW_SPEED = 4
+const DRAFT_MARKER_RADIUS_METERS = 1
+const DRAFT_MARKER_HEIGHT_METERS = 0.6
 
-export type BuildingTool = "select" | "add" | "delete" | null
+export type BuildingTool = "add" | null
 
 // a fixed-ish overhead-angled camera (city-builder game framing) rather than free orbit — full
 // orbit lets you flip upside down under the terrain, which reads as broken rather than 3D
 export function Scene({
   items,
-  showReference,
   buildings,
   buildingTool,
   selectedBuildingId,
+  draftPoints,
   onSelectBuilding,
   onMoveVertex,
   onAddVertex,
   onRemoveVertex,
-  onDeleteBuilding,
-  onAddBuilding,
+  onDraftPointClick,
 }: {
   items: MapItem[]
-  showReference: boolean
   buildings: BuildingSpec[]
   buildingTool: BuildingTool
   selectedBuildingId: string | null
+  draftPoints: { x: number; z: number }[]
   onSelectBuilding: (id: string | null) => void
   onMoveVertex: (
     buildingId: string,
@@ -50,8 +64,7 @@ export function Scene({
     point: [number, number],
   ) => void
   onRemoveVertex: (buildingId: string, vertexIndex: number) => void
-  onDeleteBuilding: (spec: BuildingSpec) => void
-  onAddBuilding: (worldX: number, worldZ: number) => void
+  onDraftPointClick: (worldX: number, worldZ: number) => void
 }) {
   // OrbitControls listens on the canvas directly, underneath react-three-fiber's own event
   // system -- a vertex drag's stopPropagation() doesn't reach it, so a real orbit-fights-drag bug
@@ -61,6 +74,7 @@ export function Scene({
     buildingId: string
     vertexIndex: number
   } | null>(null)
+  const controlsRef = useRef<ComponentRef<typeof OrbitControls>>(null)
 
   useEffect(() => {
     function endDrag() {
@@ -82,6 +96,29 @@ export function Scene({
       cameraDistance: bounds.radius + FRAMING_PADDING_METERS,
     }
   }, [items])
+
+  const selectedBuilding = buildings.find((b) => b.id === selectedBuildingId)
+
+  // orbiting around the whole-campus center makes editing any one building swing it wildly
+  // across the screen the moment you rotate -- pivoting on the selected building instead means
+  // your point of view actually follows what you're working on
+  const orbitTarget = useMemo(() => {
+    if (!selectedBuilding) return new THREE.Vector3(center.x, 0, center.z)
+    const groundY = getTerrainHeightAt(selectedBuilding.x, selectedBuilding.z)
+    return new THREE.Vector3(
+      selectedBuilding.x,
+      groundY + selectedBuilding.height / 2,
+      selectedBuilding.z,
+    )
+  }, [selectedBuilding, center])
+
+  useFrame((_state, delta) => {
+    const controls = controlsRef.current
+    if (!controls) return
+    const followAlpha = 1 - Math.exp(-ORBIT_TARGET_FOLLOW_SPEED * delta)
+    controls.target.lerp(orbitTarget, followAlpha)
+    controls.update()
+  })
 
   return (
     <>
@@ -114,8 +151,8 @@ export function Scene({
         buildings={buildings}
         onGroundClick={
           buildingTool === "add"
-            ? (worldX, worldZ) => onAddBuilding(worldX, worldZ)
-            : buildingTool === "select" && selectedBuildingId
+            ? (worldX, worldZ) => onDraftPointClick(worldX, worldZ)
+            : selectedBuildingId
               ? () => onSelectBuilding(null)
               : undefined
         }
@@ -142,28 +179,24 @@ export function Scene({
               selectedId: selectedBuildingId,
               draggingVertex: !orbitEnabled,
               onSelect: onSelectBuilding,
-              onDelete: onDeleteBuilding,
-              onVertexPointerDown: (vertexSpec, vertexIndex, isAltClick) => {
-                if (isAltClick) {
-                  onRemoveVertex(vertexSpec.id, vertexIndex)
-                  return
-                }
+              onVertexPointerDown: (vertexSpec, vertexIndex) => {
                 draggingVertexRef.current = {
                   buildingId: vertexSpec.id,
                   vertexIndex,
                 }
                 setOrbitEnabled(false)
               },
+              onVertexRemove: (vertexSpec, vertexIndex) =>
+                onRemoveVertex(vertexSpec.id, vertexIndex),
               onAddVertex: (vertexSpec, afterIndex, point) =>
                 onAddVertex(vertexSpec.id, afterIndex, point),
             }}
           />
         ))}
-      {showReference && (
-        <Suspense fallback={null}>
-          <ReferenceOverlay />
-        </Suspense>
-      )}
+      <DraftFootprint points={draftPoints} />
+      <Suspense fallback={null}>
+        <ReferenceOverlay />
+      </Suspense>
       <PerspectiveCamera
         makeDefault
         fov={42}
@@ -174,13 +207,54 @@ export function Scene({
         ]}
       />
       <OrbitControls
+        ref={controlsRef}
         enabled={orbitEnabled}
-        target={[center.x, 0, center.z]}
         minDistance={cameraDistance * 0.15}
         maxDistance={cameraDistance * 2.5}
         maxPolarAngle={Math.PI * 0.48}
         enableDamping
       />
     </>
+  )
+}
+
+// live preview of a new building's footprint while it's being clicked out point by point --
+// markers at each placed point plus the edges connecting them, so it reads as "here's the shape
+// so far" rather than a scatter of unrelated dots
+function DraftFootprint({ points }: { points: { x: number; z: number }[] }) {
+  const linePoints = useMemo<[number, number, number][]>(
+    () =>
+      points.map(({ x, z }) => [
+        x,
+        getTerrainHeightAt(x, z) + DRAFT_MARKER_HEIGHT_METERS,
+        z,
+      ]),
+    [points],
+  )
+
+  return (
+    <>
+      {points.map((point, index) => (
+        <DraftMarker
+          // biome-ignore lint/suspicious/noArrayIndexKey: points are appended in click order and never reordered, so index is a stable identity here
+          key={index}
+          x={point.x}
+          z={point.z}
+        />
+      ))}
+      {linePoints.length > 1 && (
+        <Line points={linePoints} color="#22c55e" lineWidth={2} />
+      )}
+    </>
+  )
+}
+
+function DraftMarker({ x, z }: { x: number; z: number }) {
+  const y = getTerrainHeightAt(x, z) + DRAFT_MARKER_HEIGHT_METERS
+  return (
+    <mesh position={[x, y, z]} raycast={() => null}>
+      <sphereGeometry args={[DRAFT_MARKER_RADIUS_METERS, 12, 12]} />
+      <meshBasicMaterial color="#22c55e" />
+    </mesh>
   )
 }

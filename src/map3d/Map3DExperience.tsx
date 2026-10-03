@@ -1,19 +1,19 @@
 "use client"
 
 import { Canvas } from "@react-three/fiber"
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { IconButton } from "@/components/IconButton"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
 import { ICONS } from "@/icons"
 import { MapBrand } from "@/map/MapBrand"
 import type { MapItem } from "@/map/types"
 import { cn } from "@/shadcn/utils"
+import { worldToFootprintPoint } from "./Building"
 import type { FootprintEntry } from "./buildingFootprints"
 import footprintsJson from "./buildingFootprints.json"
 import type { BuildingSpec } from "./buildingPlacement"
 import {
-  DEFAULT_NEW_BUILDING_COLOR,
-  DEFAULT_NEW_BUILDING_FOOTPRINT,
+  BUILDING_WALL_COLOR,
   DEFAULT_NEW_BUILDING_HEIGHT,
   pinToBuildingSpec,
 } from "./buildingPlacement"
@@ -21,17 +21,20 @@ import {
   buildingSpecToExtraRecord,
   getExtraBuildingSpecs,
 } from "./extraBuildings"
-import { saveMap3dData } from "./saveMap3dData"
 import { type BuildingTool, Scene } from "./Scene"
+import { saveMap3dData } from "./saveMap3dData"
+
+// a new building's footprint needs at least a triangle to mean anything
+const MIN_DRAFT_POINTS = 3
 
 // same shell chrome as the 2D map (src/map/MapExperience.tsx) — the border + corner squircle
 // fusers are the one piece of desktop chrome this prototype explicitly keeps
 export function Map3DExperience({ items }: { items: MapItem[] }) {
-  const [showReference, setShowReference] = useState(false)
   const [buildingTool, setBuildingTool] = useState<BuildingTool>(null)
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(
     null,
   )
+  const [draftPoints, setDraftPoints] = useState<{ x: number; z: number }[]>([])
   const [buildings, setBuildings] = useState<BuildingSpec[]>(() => [
     ...items.map(pinToBuildingSpec),
     ...getExtraBuildingSpecs(),
@@ -52,10 +55,6 @@ export function Map3DExperience({ items }: { items: MapItem[] }) {
       current.map((spec) => (spec.id === id ? updater(spec) : spec)),
     )
     setHasUnsavedChanges(true)
-  }
-
-  function toggleBuildingTool(tool: Exclude<BuildingTool, null>) {
-    setBuildingTool((current) => (current === tool ? null : tool))
   }
 
   function handleMoveVertex(
@@ -103,38 +102,81 @@ export function Map3DExperience({ items }: { items: MapItem[] }) {
     )
   }
 
-  function handleDeleteBuilding(spec: BuildingSpec) {
-    setSelectedBuildingId((current) => (current === spec.id ? null : current))
-    if (spec.source === "pin") {
-      touchedPinIdsRef.current.add(spec.id)
-      updateBuilding(spec.id, (current) => ({ ...current, hidden: true }))
-      return
-    }
-    setBuildings((current) => current.filter((b) => b.id !== spec.id))
-    setHasUnsavedChanges(true)
+  function handleToggleAddTool() {
+    setDraftPoints([])
+    setBuildingTool((current) => (current === "add" ? null : "add"))
   }
 
-  function handleAddBuilding(worldX: number, worldZ: number) {
-    const id = `extra-${crypto.randomUUID()}`
-    setBuildings((current) => [
-      ...current,
-      {
-        id,
-        source: "extra",
-        x: worldX,
-        z: worldZ,
-        footprint: DEFAULT_NEW_BUILDING_FOOTPRINT,
-        height: DEFAULT_NEW_BUILDING_HEIGHT,
-        wallColor: DEFAULT_NEW_BUILDING_COLOR,
-        hidden: false,
-      },
-    ])
-    setHasUnsavedChanges(true)
-    setSelectedBuildingId(id)
-    // switch straight to Select so the new building's corners are immediately draggable into
-    // place instead of leaving the user stuck in Add mode after placing it
-    setBuildingTool("select")
-  }
+  // reads the current draft/selection through functional state updates rather than closing over
+  // buildingTool/draftPoints/buildings directly, so this effect only needs the (primitive, stable)
+  // buildingTool as a dependency instead of resubscribing a window listener on every keystroke
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        if (buildingTool === "add") {
+          setDraftPoints([])
+          setBuildingTool(null)
+          return
+        }
+        setSelectedBuildingId(null)
+        return
+      }
+      if (event.key === "Enter" && buildingTool === "add") {
+        setDraftPoints((currentDraft) => {
+          if (currentDraft.length < MIN_DRAFT_POINTS) return currentDraft
+          const [anchor, ...rest] = currentDraft
+          const footprint: [number, number][] = [
+            [0, 0],
+            ...rest.map((point): [number, number] =>
+              worldToFootprintPoint(anchor, point.x, point.z),
+            ),
+          ]
+          const id = `extra-${crypto.randomUUID()}`
+          setBuildings((currentBuildings) => [
+            ...currentBuildings,
+            {
+              id,
+              source: "extra",
+              x: anchor.x,
+              z: anchor.z,
+              footprint,
+              height: DEFAULT_NEW_BUILDING_HEIGHT,
+              wallColor: BUILDING_WALL_COLOR,
+              hidden: false,
+            },
+          ])
+          setHasUnsavedChanges(true)
+          setSelectedBuildingId(id)
+          setBuildingTool(null)
+          return []
+        })
+        return
+      }
+      if (
+        (event.key === "Delete" || event.key === "Backspace") &&
+        buildingTool !== "add"
+      ) {
+        setSelectedBuildingId((currentSelected) => {
+          if (!currentSelected) return currentSelected
+          setBuildings((currentBuildings) => {
+            const spec = currentBuildings.find((b) => b.id === currentSelected)
+            if (!spec) return currentBuildings
+            if (spec.source === "pin") {
+              touchedPinIdsRef.current.add(spec.id)
+              return currentBuildings.map((b) =>
+                b.id === spec.id ? { ...b, hidden: true } : b,
+              )
+            }
+            return currentBuildings.filter((b) => b.id !== spec.id)
+          })
+          setHasUnsavedChanges(true)
+          return null
+        })
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [buildingTool])
 
   async function handleSave() {
     setIsSaving(true)
@@ -167,26 +209,42 @@ export function Map3DExperience({ items }: { items: MapItem[] }) {
     }
   }
 
+  const editHint =
+    buildingTool === "add"
+      ? draftPoints.length < MIN_DRAFT_POINTS
+        ? "Click the ground to place footprint points · Esc to cancel"
+        : "Enter to confirm · click to add more points · Esc to cancel"
+      : selectedBuildingId
+        ? "Drag a point to move it · click a green dot to add one · right-click a point to remove it · Delete to remove the building · Esc to deselect"
+        : null
+
   return (
     <div className="relative h-dvh w-dvw bg-background pb-12 sm:p-3">
       <div className="map-shell relative h-full w-full overflow-hidden rounded-b-[2rem] corner-b-superellipse/1.2 bg-background sm:rounded-[3rem] sm:corner-squircle dark:sm:shadow-2xl">
         <Canvas dpr={[1, 1.5]}>
           <Scene
             items={items}
-            showReference={showReference}
             buildings={buildings}
             buildingTool={buildingTool}
             selectedBuildingId={selectedBuildingId}
+            draftPoints={draftPoints}
             onSelectBuilding={setSelectedBuildingId}
             onMoveVertex={handleMoveVertex}
             onAddVertex={handleAddVertex}
             onRemoveVertex={handleRemoveVertex}
-            onDeleteBuilding={handleDeleteBuilding}
-            onAddBuilding={handleAddBuilding}
+            onDraftPointClick={(x, z) =>
+              setDraftPoints((current) => [...current, { x, z }])
+            }
           />
         </Canvas>
 
         <MapBrand />
+
+        {editHint && (
+          <div className="pointer-events-none absolute top-16 left-1/2 -translate-x-1/2 rounded-full bg-background/90 px-4 py-2 text-foreground/80 text-xs shadow-lg sm:top-3">
+            {editHint}
+          </div>
+        )}
 
         <SquircleFuserContainer
           align="top-right"
@@ -204,36 +262,12 @@ export function Map3DExperience({ items }: { items: MapItem[] }) {
             />
           )}
           <IconButton
-            icon={ICONS.edit}
-            label="Map"
-            layout="inline"
-            aria-label="Show or hide the flat map as a tracing reference on the ground"
-            className={cn(showReference && "bg-foreground/10")}
-            onClick={() => setShowReference((current) => !current)}
-          />
-          <IconButton
-            icon={ICONS.cursor}
-            label="Select"
-            layout="inline"
-            aria-label="Select a building to drag its footprint points -- alt-click a point to remove it, click an edge's green dot to add one"
-            className={cn(buildingTool === "select" && "bg-foreground/10")}
-            onClick={() => toggleBuildingTool("select")}
-          />
-          <IconButton
             icon={ICONS.add}
-            label="Add"
+            label="Add Building"
             layout="inline"
-            aria-label="Click the ground to place a new building"
+            aria-label="Click points on the ground to draft a new building's footprint, Enter to confirm"
             className={cn(buildingTool === "add" && "bg-foreground/10")}
-            onClick={() => toggleBuildingTool("add")}
-          />
-          <IconButton
-            icon={ICONS.delete}
-            label="Delete"
-            layout="inline"
-            aria-label="Click a building to remove it"
-            className={cn(buildingTool === "delete" && "bg-foreground/10")}
-            onClick={() => toggleBuildingTool("delete")}
+            onClick={handleToggleAddTool}
           />
         </SquircleFuserContainer>
       </div>

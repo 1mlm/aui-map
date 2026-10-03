@@ -35,18 +35,17 @@ function worldToFootprintPoint(
 }
 
 export type BuildingEditor = {
-  tool: "select" | "add" | "delete" | null
+  // "add" means a new building's footprint is being drafted -- an existing building's mesh must
+  // stay click-through in that mode so the click lands on the ground underneath as a draft point
+  // instead of selecting the building it happened to land on
+  tool: "add" | null
   selectedId: string | null
-  // true only for the duration of an active vertex drag -- distinct from `tool`, since every
-  // tool needs the building mesh clickable except during that one brief window
+  // true only for the duration of an active vertex drag -- distinct from `tool`, since the
+  // building mesh needs to stay clickable except during that one brief window
   draggingVertex: boolean
   onSelect: (id: string | null) => void
-  onDelete: (spec: BuildingSpec) => void
-  onVertexPointerDown: (
-    spec: BuildingSpec,
-    vertexIndex: number,
-    isAltClick: boolean,
-  ) => void
+  onVertexPointerDown: (spec: BuildingSpec, vertexIndex: number) => void
+  onVertexRemove: (spec: BuildingSpec, vertexIndex: number) => void
   onAddVertex: (
     spec: BuildingSpec,
     afterIndex: number,
@@ -69,13 +68,10 @@ export function Building({
   const selected = editor?.selectedId === spec.id
 
   function handleClick(event: ThreeEvent<MouseEvent>) {
-    if (!editor || editor.tool === null) return
+    // let the click fall through to the ground underneath while a new building is being drafted
+    if (!editor || editor.tool === "add") return
     event.stopPropagation()
-    if (editor.tool === "delete") {
-      editor.onDelete(spec)
-      return
-    }
-    if (editor.tool === "select") editor.onSelect(selected ? null : spec.id)
+    editor.onSelect(selected ? null : spec.id)
   }
 
   return (
@@ -93,10 +89,11 @@ export function Building({
         <meshStandardMaterial color={spec.wallColor} side={THREE.DoubleSide} />
       </mesh>
 
-      {selected && editor?.tool === "select" && (
+      {selected && editor?.tool !== "add" && (
         <EditHandles
           spec={spec}
           onVertexPointerDown={editor.onVertexPointerDown}
+          onVertexRemove={editor.onVertexRemove}
           onAddVertex={editor.onAddVertex}
         />
       )}
@@ -107,10 +104,12 @@ export function Building({
 function EditHandles({
   spec,
   onVertexPointerDown,
+  onVertexRemove,
   onAddVertex,
 }: {
   spec: BuildingSpec
   onVertexPointerDown: BuildingEditor["onVertexPointerDown"]
+  onVertexRemove: BuildingEditor["onVertexRemove"]
   onAddVertex: BuildingEditor["onAddVertex"]
 }) {
   const handleY = spec.height + HANDLE_HEIGHT_ABOVE_ROOF_METERS
@@ -123,7 +122,12 @@ function EditHandles({
           position={[point[0], handleY, -point[1]]}
           onPointerDown={(event) => {
             event.stopPropagation()
-            onVertexPointerDown(spec, index, event.altKey)
+            onVertexPointerDown(spec, index)
+          }}
+          onContextMenu={(event) => {
+            event.nativeEvent.preventDefault()
+            event.stopPropagation()
+            onVertexRemove(spec, index)
           }}
         >
           <sphereGeometry args={[HANDLE_RADIUS_METERS, 12, 12]} />

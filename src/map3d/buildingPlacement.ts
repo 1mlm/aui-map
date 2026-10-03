@@ -2,10 +2,8 @@
 // terrainPads.ts, and the /3d edit tools all work off one type regardless of whether a building is
 // backed by a real pin or was hand-added in the editor.
 import { latLongToPosition } from "@/map/geo"
-import { tagPinFillColor } from "@/map/tagColor"
 import type { MapItem } from "@/map/types"
 import { getBuildingFootprint, isBuildingHidden } from "./buildingFootprints"
-import { oklchToHex } from "./oklchToHex"
 import { positionToWorldPoint } from "./worldSpace"
 
 export type BuildingSpec = {
@@ -38,9 +36,9 @@ export const DEFAULT_NEW_BUILDING_FOOTPRINT: [number, number][] = [
   [-4, 4],
 ]
 export const DEFAULT_NEW_BUILDING_HEIGHT = UNIFORM_BUILDING_HEIGHT_METERS
-// a warm neutral, deliberately distinct from every tag color so a hand-added building always
-// reads as "not a real pin" at a glance
-export const DEFAULT_NEW_BUILDING_COLOR = "#c9b896"
+// every building shares one wall color -- tag colors read fine as tiny 2D pins but made the 3D
+// cluster impossible to scan at a glance once every wall was a different hue
+export const BUILDING_WALL_COLOR = "#c9b896"
 
 export function pinToBuildingSpec(item: MapItem): BuildingSpec {
   const { x, z } = positionToWorldPoint(
@@ -56,10 +54,7 @@ export function pinToBuildingSpec(item: MapItem): BuildingSpec {
     z,
     footprint: getBuildingFootprint(item.id),
     height,
-    // crayon-soft rather than the raw tag color (tagColor.ts) — full-saturation tailwind hues
-    // read fine as tiny pins but look garish across a whole building; this is the same softened
-    // tone the 2D pins already use
-    wallColor: oklchToHex(tagPinFillColor(item.tag.color)),
+    wallColor: BUILDING_WALL_COLOR,
     hidden: isBuildingHidden(item.id),
   }
 }

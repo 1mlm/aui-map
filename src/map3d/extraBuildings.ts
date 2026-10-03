@@ -3,11 +3,9 @@
 // separately from buildingFootprints.json since there's no pin id to key off of and, unlike a
 // pin's footprint, the whole record can be deleted outright -- see buildingPlacement.ts's
 // BuildingSpec.source for why pin-linked buildings can't.
+
+import { BUILDING_WALL_COLOR, type BuildingSpec } from "./buildingPlacement"
 import extraBuildingsData from "./extraBuildings.json"
-import {
-  type BuildingSpec,
-  DEFAULT_NEW_BUILDING_COLOR,
-} from "./buildingPlacement"
 
 export type ExtraBuildingRecord = {
   id: string
@@ -26,7 +24,7 @@ export function getExtraBuildingSpecs(): BuildingSpec[] {
     z: building.z,
     footprint: building.footprint,
     height: building.height,
-    wallColor: building.color ?? DEFAULT_NEW_BUILDING_COLOR,
+    wallColor: building.color ?? BUILDING_WALL_COLOR,
     hidden: false,
   }))
 }
