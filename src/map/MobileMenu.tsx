@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { BottomDrawer } from "@/components/BottomDrawer"
+import { ResponsiveOverlay } from "@/components/ResponsiveOverlay"
 import { Icon } from "@/components/Icon"
 import { IconButton } from "@/components/IconButton"
 import { ICONS } from "@/icons"
@@ -71,7 +71,7 @@ export function MobileMenu({
         )}
         onClick={() => setIsOpen(true)}
       />
-      <BottomDrawer
+      <ResponsiveOverlay
         open={isOpen}
         onOpenChange={setIsOpen}
         title="AUI Map"
@@ -100,7 +100,7 @@ export function MobileMenu({
             </button>
           ))}
         </nav>
-      </BottomDrawer>
+      </ResponsiveOverlay>
     </>
   )
 }
