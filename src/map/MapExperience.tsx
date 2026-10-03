@@ -4,7 +4,7 @@ import { track } from "@vercel/analytics"
 import { AnimatePresence } from "motion/react"
 import dynamic from "next/dynamic"
 import { useEffect, useRef, useState } from "react"
-import { AboutDrawer } from "./AboutDrawer"
+import { About } from "./About"
 import { latLongToPosition } from "./geo"
 import { LocateFloatingButton } from "./LocateFloatingButton"
 import { MapBrand } from "./MapBrand"
@@ -249,7 +249,7 @@ export function MapExperience({
           onHoverTag={setHoveredTagId}
           {...{ activeTagIds, hoveredTagId }}
         />
-        <AboutDrawer open={aboutOpen} onOpenChange={setAboutOpen} />
+        <About open={aboutOpen} onOpenChange={setAboutOpen} />
       </div>
 
       {LEVA_PLAYGROUND_ENABLED && process.env.NODE_ENV === "development" && (

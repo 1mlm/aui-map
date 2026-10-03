@@ -15,10 +15,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shadcn/ui/dropdown-menu"
+import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover"
 import { cn } from "@/shadcn/utils"
 import { triggerHaptic } from "@/utils/haptics"
 import { isImageMimeType } from "@/utils/mimeType"
 import { useCopyFeedback } from "@/utils/useCopyFeedback"
+import { useIsPhone } from "@/utils/useIsPhone"
 import { AttachmentCarousel, AttachmentStrip } from "./AttachmentCarousel"
 import { formatCoordinates } from "./geo"
 import { TagChipIcon, tagChipClassName } from "./MapTagFilter"
@@ -321,6 +323,9 @@ function TagBadge({ tag }: { tag: MapItemTag }) {
   )
 }
 
+const RAMADAN_TRIGGER_CLASS =
+  "rounded-full corner-squircle p-1 opacity-70 transition-opacity hover:bg-foreground/10 hover:opacity-100"
+
 function HoursLine({
   hours,
   ramadanHours,
@@ -328,6 +333,7 @@ function HoursLine({
   hours: string
   ramadanHours: string | null
 }) {
+  const isPhone = useIsPhone()
   const [ramadanOpen, setRamadanOpen] = useState(false)
 
   return (
@@ -335,26 +341,46 @@ function HoursLine({
       <Icon icon={ICONS.clock} className="shrink-0" />
       {hours}
       {ramadanHours && (
-        <>
-          <button
-            type="button"
-            aria-label="Ramadan hours"
-            onClick={() => setRamadanOpen(true)}
-            className="rounded-full corner-squircle p-1 opacity-70 transition-opacity hover:bg-foreground/10 hover:opacity-100"
-          >
-            <Icon icon={ICONS.ramadan} className="size-3.5" />
-          </button>
-          <BottomDrawer
-            open={ramadanOpen}
-            onOpenChange={setRamadanOpen}
-            title="Ramadan hours"
-          >
-            <span className="flex items-center gap-1.5 text-sm">
-              <Icon icon={ICONS.ramadan} className="size-3.5 shrink-0" />
-              {ramadanHours}
-            </span>
-          </BottomDrawer>
-        </>
+        isPhone ? (
+          <>
+            <button
+              type="button"
+              aria-label="Ramadan hours"
+              onClick={() => setRamadanOpen(true)}
+              className={RAMADAN_TRIGGER_CLASS}
+            >
+              <Icon icon={ICONS.ramadan} className="size-3.5" />
+            </button>
+            <BottomDrawer
+              open={ramadanOpen}
+              onOpenChange={setRamadanOpen}
+              title="Ramadan hours"
+            >
+              <span className="flex items-center gap-1.5 text-sm">
+                <Icon icon={ICONS.ramadan} className="size-3.5 shrink-0" />
+                {ramadanHours}
+              </span>
+            </BottomDrawer>
+          </>
+        ) : (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="Ramadan hours"
+                className={RAMADAN_TRIGGER_CLASS}
+              >
+                <Icon icon={ICONS.ramadan} className="size-3.5" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto">
+              <span className="flex items-center gap-1.5 text-sm">
+                <Icon icon={ICONS.ramadan} className="size-3.5 shrink-0" />
+                Ramadan hours: {ramadanHours}
+              </span>
+            </PopoverContent>
+          </Popover>
+        )
       )}
     </span>
   )

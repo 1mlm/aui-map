@@ -4,14 +4,24 @@ import { useState } from "react"
 import { BottomDrawer } from "@/components/BottomDrawer"
 import { Icon } from "@/components/Icon"
 import { IconButton } from "@/components/IconButton"
+import { ResponsiveOverlay } from "@/components/ResponsiveOverlay"
 import { ICONS } from "@/icons"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/shadcn/ui/dropdown-menu"
 import { copyImageToClipboard } from "@/utils/clipboard"
 import { triggerHaptic } from "@/utils/haptics"
 import { useCopyFeedback } from "@/utils/useCopyFeedback"
+import { useIsPhone } from "@/utils/useIsPhone"
 import { QrCodePreview } from "./QrCodePreview"
 import { qrCodeOptions } from "./qrCodeOptions"
 
 const COPIED_FEEDBACK_MS = 1500
+const SHARE_TRIGGER_CLASS =
+  "flex cursor-pointer items-center gap-0.5 rounded-full corner-squircle bg-white/10 px-2 py-2 text-white transition-colors hover:bg-white/20"
 const QR_PNG_SIZE = 512
 
 async function renderQrCodePng(url: string): Promise<Blob | null> {
@@ -37,6 +47,7 @@ export function ShareMenu({
   pinId: string
   pinTitle: string
 }) {
+  const isPhone = useIsPhone()
   const [shareOpen, setShareOpen] = useState(false)
   const [qrCodeOpen, setQrCodeOpen] = useState(false)
   const [imageFeedback, setImageFeedback] = useState<
@@ -146,36 +157,64 @@ export function ShareMenu({
 
   return (
     <>
-      <button
-        type="button"
-        aria-label="Share this place"
-        onClick={() => setShareOpen(true)}
-        className="flex cursor-pointer items-center gap-0.5 rounded-full corner-squircle bg-white/10 px-2 py-2 text-white transition-colors hover:bg-white/20"
-      >
-        <Icon icon={linkCopied ? ICONS.copied : ICONS.share} />
-      </button>
-
-      <BottomDrawer
-        open={shareOpen}
-        onOpenChange={setShareOpen}
-        title={`Share ${pinTitle}`}
-      >
-        <nav className="flex flex-col gap-1.5">
-          {shareActions.map(({ id, icon, label, onSelect }) => (
+      {isPhone ? (
+        <>
+          <button
+            type="button"
+            aria-label="Share this place"
+            onClick={() => setShareOpen(true)}
+            className={SHARE_TRIGGER_CLASS}
+          >
+            <Icon icon={linkCopied ? ICONS.copied : ICONS.share} />
+          </button>
+          <BottomDrawer
+            open={shareOpen}
+            onOpenChange={setShareOpen}
+            title={`Share ${pinTitle}`}
+          >
+            <nav className="flex flex-col gap-1.5">
+              {shareActions.map(({ id, icon, label, onSelect }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={onSelect}
+                  className="flex items-center gap-3 rounded-2xl corner-superellipse/1.2 p-3 text-left text-sm font-medium ring-1 ring-border transition-colors hover:bg-accent"
+                >
+                  <Icon {...{ icon }} className="size-5" />
+                  {label}
+                </button>
+              ))}
+            </nav>
+          </BottomDrawer>
+        </>
+      ) : (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <button
-              key={id}
               type="button"
-              onClick={onSelect}
-              className="flex items-center gap-3 rounded-2xl corner-superellipse/1.2 p-3 text-left text-sm font-medium ring-1 ring-border transition-colors hover:bg-accent"
+              aria-label="Share this place"
+              className={SHARE_TRIGGER_CLASS}
             >
-              <Icon {...{ icon }} className="size-5" />
-              {label}
+              <Icon icon={linkCopied ? ICONS.copied : ICONS.share} />
+              <Icon icon={ICONS.dropdown} className="size-3" />
             </button>
-          ))}
-        </nav>
-      </BottomDrawer>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {shareActions.map(({ id, icon, label, onSelect }) => (
+              <DropdownMenuItem
+                key={id}
+                className="cursor-pointer"
+                {...{ onSelect }}
+              >
+                <Icon {...{ icon }} />
+                {label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
 
-      <BottomDrawer
+      <ResponsiveOverlay
         open={qrCodeOpen}
         onOpenChange={setQrCodeOpen}
         title={pinTitle}
@@ -218,7 +257,7 @@ export function ShareMenu({
               </div>
             </>
           )}
-      </BottomDrawer>
+      </ResponsiveOverlay>
     </>
   )
 }

@@ -7,7 +7,7 @@ import { IconButton } from "@/components/IconButton"
 import { ICONS } from "@/icons"
 import { cn } from "@/shadcn/utils"
 import { triggerHaptic } from "@/utils/haptics"
-import { MadeWithCredit } from "./AboutDrawer"
+import { MadeWithCredit } from "./About"
 
 type MenuAction = {
   id: string

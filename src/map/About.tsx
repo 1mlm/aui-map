@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { BottomDrawer } from "@/components/BottomDrawer"
+import { ResponsiveOverlay } from "@/components/ResponsiveOverlay"
 import { type HugeIcon, Icon } from "@/components/Icon"
 import { ICONS } from "@/icons"
 import { cn } from "@/shadcn/utils"
@@ -110,7 +110,7 @@ export function MadeWithCredit() {
   )
 }
 
-export function AboutDrawer({
+export function About({
   open,
   onOpenChange,
 }: {
@@ -118,7 +118,7 @@ export function AboutDrawer({
   onOpenChange: (open: boolean) => void
 }) {
   return (
-      <BottomDrawer
+      <ResponsiveOverlay
         {...{ open, onOpenChange }}
         title="About"
         footer={<MadeWithCredit />}
@@ -147,6 +147,6 @@ export function AboutDrawer({
             find their way around campus 😋
           </p>
         </div>
-      </BottomDrawer>
+      </ResponsiveOverlay>
   )
 }
