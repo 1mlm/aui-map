@@ -1,19 +1,16 @@
 "use client"
 
-import { AnimatePresence } from "motion/react"
 import { type ReactNode, useEffect, useRef, useState } from "react"
-import { Icon } from "@/components/Icon"
 import { IconButton } from "@/components/IconButton"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/Tooltip"
 import { ICONS } from "@/icons"
 import { Dialog, DialogContent, DialogTitle } from "@/shadcn/ui/dialog"
-import { InputGroupButton } from "@/shadcn/ui/input-group"
 import { Popover, PopoverContent, PopoverTrigger } from "@/shadcn/ui/popover"
 import { cn } from "@/shadcn/utils"
 import { ContributeMenu, type ContributePin } from "./ContributeMenu"
-import { InstallPromptButton } from "./InstallPromptButton"
 import { SearchField, type SearchProps } from "./MapSearch"
+import { MobileMenu } from "./MobileMenu"
 import type { CompassPermission } from "./useCompassHeading"
 import { useInstallPrompt } from "./useInstallPrompt"
 import { type LocationStatus, VAGUE_ACCURACY_METERS } from "./useUserLocation"
@@ -247,26 +244,12 @@ export function MapControls({
           filter row and credit strip use, so the chrome reads as one consistent floating
           language top to bottom */}
       <div className="map-controls-compact pointer-events-auto absolute inset-x-3 top-3 flex items-center gap-2">
-        <SearchField
-          big
-          {...props}
-          trailing={
-            <InputGroupButton
-              size="icon-sm"
-              variant="ghost"
-              aria-label="Contribute"
-              className="size-9 rounded-full corner-superellipse/1.2!"
-              onClick={openContribute}
-            >
-              <Icon icon={ICONS.contributeMenu} className="size-5" />
-            </InputGroupButton>
-          }
+        <SearchField big {...props} />
+        <MobileMenu
+          onContribute={openContribute}
+          onOpenCredits={onOpenNotice}
+          onInstall={canInstall ? promptInstall : undefined}
         />
-        <AnimatePresence>
-          {canInstall && (
-            <InstallPromptButton key="install" onInstall={promptInstall} />
-          )}
-        </AnimatePresence>
       </div>
 
       <SquircleFuserContainer

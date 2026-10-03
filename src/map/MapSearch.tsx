@@ -1,6 +1,6 @@
 "use client"
 
-import { type FormEvent, type ReactNode, useRef } from "react"
+import { type FormEvent, useRef } from "react"
 import { Icon } from "@/components/Icon"
 import { ICONS } from "@/icons"
 import {
@@ -21,16 +21,12 @@ export function SearchField({
   onSearchChange,
   big,
   className,
-  trailing,
 }: SearchProps & {
   // the mobile compact bar's own always-visible searchbar, not a popover's -- bigger touch
   // target, no autofocus (it's mounted on first paint, not opened on demand), and translucent to
   // match the rest of the floating mobile chrome instead of a small boxed field
   big?: boolean
   className?: string
-  // an extra control docked at the field's own right edge, inside the same translucent pill --
-  // the compact bar's Contribute button, so it reads as one piece of chrome instead of two
-  trailing?: ReactNode
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -84,9 +80,6 @@ export function SearchField({
               <Icon icon={ICONS.clear} />
             </InputGroupButton>
           </InputGroupAddon>
-        )}
-        {trailing && (
-          <InputGroupAddon align="inline-end">{trailing}</InputGroupAddon>
         )}
       </InputGroup>
     </form>
