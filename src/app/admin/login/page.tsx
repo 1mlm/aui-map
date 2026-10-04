@@ -6,6 +6,7 @@ import { DelayedButton } from "@/components/DelayedButton"
 import { FormError } from "@/components/FormError"
 import { Icon } from "@/components/Icon"
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/shadcn/ui/input-group"
+import { LOCKOUT_MINUTES } from "@/utils/loginLimits"
 import { unlockWithCode } from "./actions"
 
 export default function AdminLoginPage() {
@@ -48,7 +49,13 @@ export default function AdminLoginPage() {
           <Icon icon={SquareUnlock01Icon} />
           Unlock
         </DelayedButton>
-        {state.error && <FormError className="justify-center">Incorrect code</FormError>}
+        {state.error && (
+          <FormError className="justify-center">
+            {state.rateLimited
+              ? `Too many attempts, try again in ${LOCKOUT_MINUTES} minutes`
+              : "Incorrect code"}
+          </FormError>
+        )}
       </form>
     </div>
   )

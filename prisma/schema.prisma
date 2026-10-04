@@ -197,3 +197,12 @@ model Panorama {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// one row per wrong code typed at /admin/login, counted per ip by utils/loginRateLimit.ts
+model LoginAttempt {
+  id        Int      @id @default(autoincrement())
+  ip        String
+  createdAt DateTime @default(now())
+
+  @@index([ip, createdAt])
+}
