@@ -22,6 +22,7 @@ export async function upsertTag(input: TagInput) {
     update: shared,
   })
   revalidatePath("/")
+  revalidatePath("/[pinId]", "page")
   revalidatePath("/admin/tags")
   revalidatePath(`/admin/tags/${input.id}`)
 }
@@ -38,6 +39,7 @@ export async function deleteTag(id: string) {
   }
   await prisma.tag.delete({ where: { id } })
   revalidatePath("/")
+  revalidatePath("/[pinId]", "page")
   revalidatePath("/admin/tags")
   redirect("/admin/tags")
 }

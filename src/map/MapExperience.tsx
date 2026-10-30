@@ -18,7 +18,7 @@ import { DEFAULT_CRAYON_TUNING, type TagColorName } from "./tagColor"
 import type { MapItem, MapItemTag } from "./types"
 import { useAvailableSpace } from "./useAvailableSpace"
 import { useCompassHeading } from "./useCompassHeading"
-import { useHashState } from "./useHashState"
+import { usePinSelection } from "./usePinSelection"
 import { useShakeGesture } from "./useShakeGesture"
 import { useUserLocation } from "./useUserLocation"
 import { useWakeLock } from "./useWakeLock"
@@ -59,9 +59,11 @@ const ZERO_RESULT_SEARCH_TRACK_DELAY_MS = 800
 export function MapExperience({
   items,
   tags,
+  initialSelectedId = null,
 }: {
   items: MapItem[]
   tags: MapItemTag[]
+  initialSelectedId?: string | null
 }) {
   const shellRef = useRef<HTMLDivElement>(null)
   const mapCanvasRef = useRef<MapCanvasHandle>(null)
@@ -109,8 +111,8 @@ export function MapExperience({
   const [activeTagIds, setActiveTagIds] = useState<Set<string>>(new Set())
   const [hoveredTagId, setHoveredTagId] = useState<string | null>(null)
   const [aboutOpen, setAboutOpen] = useState(false)
-  // in the url hash so a place can be linked to directly: /#m6l
-  const [selectedId, setSelectedId] = useHashState()
+  // in the url path so a place can be linked to directly: /m6l
+  const [selectedId, setSelectedId] = usePinSelection(initialSelectedId)
 
   // dev-only live color overrides from TagColorPlayground — never populated in production, so
   // this is a no-op merge there. Keyed by tag id, applied to both the tags list (for the filter

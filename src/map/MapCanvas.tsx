@@ -1,6 +1,6 @@
 "use client"
 
-import { motion, useMotionValueEvent, useTransform } from "motion/react"
+import { motion, useMotionValueEvent } from "motion/react"
 import Image from "next/image"
 import { useEffect, useImperativeHandle, useRef, useState } from "react"
 import { Icon } from "@/components/Icon"
@@ -160,12 +160,20 @@ export function MapCanvas({
   const [mapImageLoaded, setMapImageLoaded] = useState(false)
 
   // growthExponent and labelShowScale are the same for every pin (only ever overridden app-wide
-  // by the dev-only PinTuningPlayground, never per-item), so these are computed once here and
-  // handed down to every MapPin instead of each of the ~60 pins subscribing to viewportScale and
-  // redoing the identical computation on every zoom frame
-  const pinCounterScaleValue = useTransform(panZoom.scale, (scale) =>
-    pinCounterScale(scale, sizeTuning.growthExponent),
+  // by the dev-only PinTuningPlayground, never per-item), so they're computed once here. The
+  // counter-scale goes out as one css variable on the image box that every pin reads, so a zoom
+  // frame is a single style write instead of one per pin. The initial value is frozen in state:
+  // react only rewrites the style prop when its value changes, so it never fights the imperative
+  // updates below
+  const [initialPinCounterScale] = useState(() =>
+    pinCounterScale(panZoom.scale.get(), sizeTuning.growthExponent),
   )
+  useMotionValueEvent(panZoom.scale, "change", (scale) => {
+    imageBoxRef.current?.style.setProperty(
+      "--pin-counter-scale",
+      String(pinCounterScale(scale, sizeTuning.growthExponent)),
+    )
+  })
   const [showPinLabels, setShowPinLabels] = useState(
     () => panZoom.scale.get() > sizeTuning.labelShowScale,
   )
@@ -271,6 +279,11 @@ export function MapCanvas({
             <div
               ref={imageBoxRef}
               className="relative size-[100cqmax] shrink-0"
+              style={
+                {
+                  "--pin-counter-scale": initialPinCounterScale,
+                } as React.CSSProperties
+              }
             >
               {/* shown until the real image below finishes loading, so first paint never waits
               on it */}
@@ -317,7 +330,6 @@ export function MapCanvas({
                 <MapPin
                   key={item.id}
                   selected={item.id === selectedId}
-                  counterScale={pinCounterScaleValue}
                   showLabel={showPinLabels}
                   onSelect={() =>
                     onSelect(item.id === selectedId ? null : item.id)

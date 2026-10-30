@@ -57,7 +57,7 @@ export function ShareMenu({
     useCopyFeedback(COPIED_FEEDBACK_MS)
 
   function getPinLink() {
-    return new URL(`/#${pinId}`, window.location.origin).toString()
+    return new URL(`/${pinId}`, window.location.origin).toString()
   }
 
   function flashImageFeedback(kind: "copied" | "downloaded") {

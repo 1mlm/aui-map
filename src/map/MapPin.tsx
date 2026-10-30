@@ -1,6 +1,5 @@
 "use client"
 
-import { type MotionValue, motion } from "motion/react"
 import { useState } from "react"
 import { Icon } from "@/components/Icon"
 import { ICONS } from "@/icons"
@@ -100,7 +99,6 @@ function tiltForPin(id: string) {
 export function MapPin({
   item,
   selected,
-  counterScale,
   showLabel,
   onSelect,
   previewing,
@@ -110,11 +108,8 @@ export function MapPin({
 }: {
   item: MapItem
   selected: boolean
-  // shared across every pin (growthExponent/labelShowScale aren't per-item), so MapCanvas
-  // computes these once from its own viewportScale and hands them down — computing the same
-  // useTransform/useMotionValueEvent pair separately in each of the ~60 pins redid identical
-  // work on every zoom frame for no reason
-  counterScale: MotionValue<number>
+  // shared across every pin (labelShowScale isn't per-item), so MapCanvas computes it once
+  // from its own viewportScale and hands it down
   showLabel: boolean
   onSelect: () => void
   // hovering a tag in the filter list previews it: pins outside it fade out, pins inside it
@@ -147,26 +142,24 @@ export function MapPin({
   const sizeScale = item.tag.sizeScale
 
   return (
-    // Two nested scales on purpose: the outer one is owned by the map's zoom motion value, the
-    // inner by hover/tap/selection. Sharing one element would let whileHover overwrite the
-    // counter-scale and leave the pin the wrong size once the pointer leaves.
-    <motion.div
+    // Two nested scales on purpose: the outer one is owned by the map's zoom (--pin-counter-scale,
+    // written once on the shared image box by MapCanvas instead of subscribing every pin to the
+    // zoom motion value), the inner by hover/tap/selection. Sharing one element would let the
+    // hover scale overwrite the counter-scale and leave the pin the wrong size once the pointer
+    // leaves. Plain css rather than motion components: ~100 of these were most of what hydration
+    // had to chew through on a phone
+    <div
       style={{
         ...positionToStyle(position),
-        x: "-50%",
-        y: `${-PIN_TIP_FRACTION * 100}%`,
-        scale: counterScale,
-        originX: 0.5,
-        originY: PIN_TIP_FRACTION,
+        transform: `translate(-50%, ${-PIN_TIP_FRACTION * 100}%) scale(var(--pin-counter-scale))`,
+        transformOrigin: `50% ${PIN_TIP_FRACTION * 100}%`,
         // a selected pin always wins regardless of size; otherwise a smaller-scale tag (food,
         // sports, auditoriums...) stacks in front of the normal-size buildings it sits next to,
         // so it doesn't get lost underneath one
         zIndex: selected ? 1000 : Math.round((2 - sizeScale) * 10),
-      }}
-      animate={{
         opacity: previewing && !matchesPreview ? PREVIEW_DIM_OPACITY : 1,
       }}
-      className="absolute"
+      className="absolute transition-opacity duration-300"
     >
       {/* a plain radial-gradient, not a filter — filters are what made per-pin shadows janky
           before (see useMapPanZoom's isMoving), and a filter drop-shadow has to be stripped
@@ -185,7 +178,7 @@ export function MapPin({
           background: `radial-gradient(closest-side, rgba(0,0,0,${selected ? 0.85 : 0.78}), rgba(0,0,0,0) 75%)`,
         }}
       />
-      <motion.button
+      <button
         type="button"
         onClick={(e) => {
           // ctrl/cmd + click is the canvas's copy-this-coordinate gesture. A pin standing in
@@ -201,17 +194,17 @@ export function MapPin({
         }}
         onBlur={() => setKeyboardFocused(false)}
         aria-label={item.title}
-        className="pin-filter relative block cursor-pointer touch-none outline-none"
-        animate={{
-          scale: (selected ? 1.3 : 1) * sizeScale,
-          rotate: restingTilt,
-        }}
-        whileHover={{
-          scale: (selected ? 1.45 : 1.25) * sizeScale,
-          rotate: selected ? selectedTilt : tilt,
-        }}
-        whileTap={{ scale: 0.9 * sizeScale }}
-        style={{ originX: 0.5, originY: PIN_TIP_FRACTION }}
+        className="pin-filter relative block cursor-pointer touch-none outline-none transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] [transform:scale(var(--pin-scale))_rotate(var(--pin-tilt))] hover:[transform:scale(var(--pin-hover-scale))_rotate(var(--pin-hover-tilt))] active:[transform:scale(var(--pin-tap-scale))_rotate(var(--pin-tilt))]"
+        style={
+          {
+            transformOrigin: `50% ${PIN_TIP_FRACTION * 100}%`,
+            "--pin-scale": (selected ? 1.3 : 1) * sizeScale,
+            "--pin-tilt": `${restingTilt}deg`,
+            "--pin-hover-scale": (selected ? 1.45 : 1.25) * sizeScale,
+            "--pin-hover-tilt": `${selected ? selectedTilt : tilt}deg`,
+            "--pin-tap-scale": 0.9 * sizeScale,
+          } as React.CSSProperties
+        }
       >
         {/* invisible — expands the tap target without changing anything visible. Grows/shrinks
             with the same scale as everything else here, so it stays centered and proportional
@@ -285,7 +278,7 @@ export function MapPin({
           }}
           className="pointer-events-none absolute block"
         />
-      </motion.button>
+      </button>
       {/* zoomed-in-only name label, Google Maps-style — white text with a soft dark halo instead
           of a background pill, so it reads against the satellite image without competing with
           the pin itself. A sibling of the button (not a child) so it only rides the zoom
@@ -313,6 +306,6 @@ export function MapPin({
           {item.shortestName}
         </span>
       )}
-    </motion.div>
+    </div>
   )
 }

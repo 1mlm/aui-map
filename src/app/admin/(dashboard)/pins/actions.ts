@@ -30,6 +30,8 @@ export type PinInput = {
 
 function revalidatePinPaths() {
   revalidatePath("/")
+  revalidatePath("/[pinId]", "page")
+  revalidatePath("/sitemap.xml")
   revalidatePath("/admin/pins")
 }
 

@@ -13,6 +13,9 @@ export const { dynamic, dynamicParams, revalidate, generateStaticParams, GET } =
   createSerwistRoute({
     swSrc: "src/app/sw.ts",
     additionalPrecacheEntries: [{ url: "/~offline", revision }],
+    // the map only needs small chunks; this skips the ~1mb exceljs (admin) one
+    // so a phone installing the service worker isn't made to download them in the background
+    maximumFileSizeToCacheInBytes: 250 * 1024,
     // defaults to false (esbuild-wasm) on non-Windows, which isn't installed — force native
     // esbuild everywhere so this doesn't silently differ between local (Windows) and Vercel (Linux)
     useNativeEsbuild: true,
