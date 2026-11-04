@@ -1,6 +1,6 @@
 "use client"
 
-import { motion } from "motion/react"
+import { m } from "motion/react"
 import { useEffect, useRef, useState } from "react"
 import { Icon } from "@/components/Icon"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
@@ -42,7 +42,7 @@ export function TagPills({
         />
       ))}
       {activeTags.length > 0 && inactiveTags.length > 0 && (
-        <motion.div
+        <m.div
           layout
           className="mx-1 h-4 w-px shrink-0 self-center bg-foreground/15"
         />
@@ -99,7 +99,7 @@ function TagPill({
   onHover: (hovering: boolean) => void
 }) {
   return (
-    <motion.button
+    <m.button
       layout
       transition={{ type: "spring", stiffness: 500, damping: 32 }}
       type="button"
@@ -119,7 +119,7 @@ function TagPill({
       <TagChipIcon {...{ tag, active }} />
       {tag.label}
       {active && <Icon icon={ICONS.close} className="size-3.5" />}
-    </motion.button>
+    </m.button>
   )
 }
 

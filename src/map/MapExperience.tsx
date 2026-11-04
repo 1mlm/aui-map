@@ -1,6 +1,6 @@
 "use client"
 
-import { AnimatePresence } from "motion/react"
+import { AnimatePresence, LazyMotion } from "motion/react"
 import dynamic from "next/dynamic"
 import { useEffect, useRef, useState } from "react"
 import { latLongToPosition } from "./geo"
@@ -36,6 +36,9 @@ const MapDetailPanel = dynamic(() =>
 const About = dynamic(() => import("./About").then((m) => m.About), {
   ssr: false,
 })
+
+const loadMotionFeatures = () =>
+  import("./motionFeatures").then((m) => m.default)
 
 // dev-only — code-split so leva (and this whole file) never reaches production visitors
 const TagColorPlayground = dynamic(
@@ -234,98 +237,102 @@ export function MapExperience({
   }, [search, visibleItems, selectedId, setSelectedId])
 
   return (
-    <div className="relative h-dvh w-dvw bg-background sm:p-3">
-      {/* the shell's shadow is dark-mode only: the gutter around it and the corner fusers inside it
+    <LazyMotion features={loadMotionFeatures}>
+      <div className="relative h-dvh w-dvw bg-background sm:p-3">
+        {/* the shell's shadow is dark-mode only: the gutter around it and the corner fusers inside it
           are both bg-background, so in light mode the only thing separating them was this shadow
           spilling outward and greying the gutter to ~250 against the fusers' 255, which read as a
           seam exactly where the chrome is supposed to look fused into the frame */}
-      <div
-        ref={shellRef}
-        className="map-shell relative h-full w-full overflow-hidden bg-background sm:rounded-[3rem] sm:corner-squircle dark:sm:shadow-2xl"
-      >
-        <MapCanvas
-          ref={mapCanvasRef}
-          items={visibleItems}
-          onSelect={setSelectedId}
-          userPosition={location.position}
-          userAccuracy={location.accuracy}
-          offCampusPosition={location.isOffCampus ? location.rawPosition : null}
-          compassHeading={compass.heading}
-          {...{ selectedId, hoveredTagId, tuning, sizeTuning }}
-        />
-
-        <MapBrand />
-        <NetworkStatusBanner />
-
-        <MapControls
-          onSearchChange={setSearch}
-          onOpenAbout={() => {
-            setAboutMounted(true)
-            setAboutOpen(true)
-          }}
-          locationStatus={location.status}
-          isOffCampus={location.isOffCampus}
-          accuracy={location.accuracy}
-          onLocate={handleLocate}
-          compassPermission={compass.permission}
-          onRequestCompass={compass.requestPermission}
-          {...{ search }}
-        />
-        <AnimatePresence>
-          {!locateButtonDone && (
-            <LocateFloatingButton
-              key="locate"
-              locationStatus={location.status}
-              compassPermission={compass.permission}
-              onLocate={handleLocate}
-              onRequestCompass={compass.requestPermission}
-            />
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {selected && (
-            <MapDetailPanel
-              item={selected}
-              onClose={() => setSelectedId(null)}
-              docked={space.docksPanel}
-            />
-          )}
-        </AnimatePresence>
-
-        <MapFilterBar
-          reservedRight={
-            selected && !space.docksPanel ? UNDOCKED_PANEL_WIDTH : "0rem"
-          }
-          tags={effectiveTags}
-          onToggle={toggleTag}
-          onClearAll={clearTags}
-          onHoverTag={setHoveredTagId}
-          {...{ activeTagIds, hoveredTagId }}
-        />
-        {aboutMounted && (
-          <About open={aboutOpen} onOpenChange={setAboutOpen} />
-        )}
-      </div>
-
-      {LEVA_PLAYGROUND_ENABLED && process.env.NODE_ENV === "development" && (
-        <TagColorPlayground
-          onColorChange={(tagId, color) =>
-            setColorOverrides((current) => ({ ...current, [tagId]: color }))
-          }
-          {...{ tags, tuning }}
-          onTuningChange={setTuning}
-        />
-      )}
-      {PIN_SIZE_PLAYGROUND_ENABLED &&
-        process.env.NODE_ENV === "development" && (
-          <PinTuningPlayground
-            tuning={sizeTuning}
-            onTuningChange={(patch) =>
-              setSizeTuning((current) => ({ ...current, ...patch }))
+        <div
+          ref={shellRef}
+          className="map-shell relative h-full w-full overflow-hidden bg-background sm:rounded-[3rem] sm:corner-squircle dark:sm:shadow-2xl"
+        >
+          <MapCanvas
+            ref={mapCanvasRef}
+            items={visibleItems}
+            onSelect={setSelectedId}
+            userPosition={location.position}
+            userAccuracy={location.accuracy}
+            offCampusPosition={
+              location.isOffCampus ? location.rawPosition : null
             }
+            compassHeading={compass.heading}
+            {...{ selectedId, hoveredTagId, tuning, sizeTuning }}
+          />
+
+          <MapBrand />
+          <NetworkStatusBanner />
+
+          <MapControls
+            onSearchChange={setSearch}
+            onOpenAbout={() => {
+              setAboutMounted(true)
+              setAboutOpen(true)
+            }}
+            locationStatus={location.status}
+            isOffCampus={location.isOffCampus}
+            accuracy={location.accuracy}
+            onLocate={handleLocate}
+            compassPermission={compass.permission}
+            onRequestCompass={compass.requestPermission}
+            {...{ search }}
+          />
+          <AnimatePresence>
+            {!locateButtonDone && (
+              <LocateFloatingButton
+                key="locate"
+                locationStatus={location.status}
+                compassPermission={compass.permission}
+                onLocate={handleLocate}
+                onRequestCompass={compass.requestPermission}
+              />
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {selected && (
+              <MapDetailPanel
+                item={selected}
+                onClose={() => setSelectedId(null)}
+                docked={space.docksPanel}
+              />
+            )}
+          </AnimatePresence>
+
+          <MapFilterBar
+            reservedRight={
+              selected && !space.docksPanel ? UNDOCKED_PANEL_WIDTH : "0rem"
+            }
+            tags={effectiveTags}
+            onToggle={toggleTag}
+            onClearAll={clearTags}
+            onHoverTag={setHoveredTagId}
+            {...{ activeTagIds, hoveredTagId }}
+          />
+          {aboutMounted && (
+            <About open={aboutOpen} onOpenChange={setAboutOpen} />
+          )}
+        </div>
+
+        {LEVA_PLAYGROUND_ENABLED && process.env.NODE_ENV === "development" && (
+          <TagColorPlayground
+            onColorChange={(tagId, color) =>
+              setColorOverrides((current) => ({ ...current, [tagId]: color }))
+            }
+            {...{ tags, tuning }}
+            onTuningChange={setTuning}
           />
         )}
-    </div>
+        {PIN_SIZE_PLAYGROUND_ENABLED &&
+          process.env.NODE_ENV === "development" && (
+            <PinTuningPlayground
+              tuning={sizeTuning}
+              onTuningChange={(patch) =>
+                setSizeTuning((current) => ({ ...current, ...patch }))
+              }
+            />
+          )}
+      </div>
+    </LazyMotion>
   )
 }

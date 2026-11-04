@@ -1,6 +1,6 @@
 "use client"
 
-import { motion } from "motion/react"
+import { m } from "motion/react"
 import { IconButton } from "@/components/IconButton"
 import { ICONS } from "@/icons"
 import { cn } from "@/shadcn/utils"
@@ -35,7 +35,7 @@ export function LocateFloatingButton({
   const wantsAttention = !isBusy && locationStatus !== "granted"
 
   return (
-    <motion.div
+    <m.div
       layout
       initial={{ opacity: 0, scale: 0.7 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -63,6 +63,6 @@ export function LocateFloatingButton({
         )}
         onClick={needsCompassTap ? onRequestCompass : onLocate}
       />
-    </motion.div>
+    </m.div>
   )
 }

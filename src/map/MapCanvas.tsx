@@ -1,6 +1,6 @@
 "use client"
 
-import { motion, useMotionValueEvent } from "motion/react"
+import { m, useMotionValueEvent } from "motion/react"
 import { useEffect, useImperativeHandle, useRef, useState } from "react"
 import { preload } from "react-dom"
 import { Icon } from "@/components/Icon"
@@ -32,12 +32,15 @@ import { pinCounterScale, useMapPanZoom } from "./useMapPanZoom"
 // hoisted into <head> by react during render, so the download starts before the image element
 // even mounts. The browser picks AVIF when it can, and this hint matches that choice
 function preloadMapImage() {
-  preload("/auimap-1312.avif", {
+  preload("/auimap-640.avif", {
     as: "image",
     type: "image/avif",
     fetchPriority: "high",
   })
 }
+
+const BLANK_PIXEL =
+  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
 
 const SURVEYED_COORD_TOAST_MS = 3000
 const COPIED_FEEDBACK_MS = 1500
@@ -241,7 +244,8 @@ export function MapCanvas({
     x: number
     y: number
   } | null>(null)
-  const [mapImageLoaded, setMapImageLoaded] = useState(false)
+  const [lowLoaded, setLowLoaded] = useState(false)
+  const [fullLoaded, setFullLoaded] = useState(false)
 
   // growthExponent and labelShowScale are the same for every pin (only ever overridden app-wide
   // by the dev-only PinTuningPlayground, never per-item), so they're computed once here. The
@@ -384,7 +388,7 @@ export function MapCanvas({
           panZoom.hitLimit && "shadow-[inset_0_0_0_4px_rgba(220,38,38,0.45)]",
         )}
       >
-        <motion.div
+        <m.div
           className="absolute inset-0 flex items-center justify-center [container-type:size]"
           style={{ scale: panZoom.scale, x: panZoom.x, y: panZoom.y }}
         >
@@ -408,7 +412,7 @@ export function MapCanvas({
               aria-hidden
               className={cn(
                 "pointer-events-none absolute inset-0 bg-cover bg-center transition-opacity duration-500",
-                mapImageLoaded ? "opacity-0" : "opacity-100",
+                lowLoaded ? "opacity-0" : "opacity-100",
               )}
               style={{ backgroundImage: `url(${MAP_IMAGE_PLACEHOLDER})` }}
             />
@@ -417,29 +421,54 @@ export function MapCanvas({
               Stays invisible until fully decoded (crossfading with the blurred placeholder above)
               -- otherwise the browser paints whatever's streamed in so far on a slow connection,
               which for a big image shows as scanline-y decode garbage instead of a clean reveal */}
-            {/* AVIF first (about 60% smaller), the webp only for browsers without AVIF. A plain
-              <img> inside <picture> instead of next/image: next's priority preload would fetch the
-              webp too, so the AVIF is preloaded by hand (preload() above) */}
+            {/* three layers, each fading in over the last: the inlined blur above, a 36KB 640px AVIF
+              that lands almost at once, then the full 168KB one. The full one only starts once the
+              small one has arrived (it's mounted by lowLoaded), so the two never fight for
+              bandwidth. Plain <img>s inside <picture> instead of next/image: its priority preload
+              would also fetch the webp fallback, so the small AVIF is preloaded by hand. Browsers
+              without AVIF get a 1px stand-in for the small layer and go straight to the webp.
+              Each layer stays invisible until fully decoded, otherwise a slow connection paints
+              scanline-y half-decoded garbage instead of a clean reveal */}
             <picture>
-              <source type="image/avif" srcSet="/auimap-1312.avif" />
+              <source type="image/avif" srcSet="/auimap-640.avif" />
               <img
-                src="/auimap-1312.webp"
-                alt="Campus map"
+                src={BLANK_PIXEL}
+                alt=""
+                aria-hidden
                 fetchPriority="high"
                 decoding="async"
                 draggable={false}
-                onLoad={() => setMapImageLoaded(true)}
+                onLoad={() => setLowLoaded(true)}
                 // a cached image can finish loading before hydration, and that onLoad is then
                 // never replayed, which left the blurred placeholder up for good
                 ref={(image) => {
-                  if (image?.complete) setMapImageLoaded(true)
+                  if (image?.complete) setLowLoaded(true)
                 }}
                 className={cn(
-                  "pointer-events-none absolute inset-0 size-full object-cover transition-opacity duration-500",
-                  mapImageLoaded ? "opacity-100" : "opacity-0",
+                  "pointer-events-none absolute inset-0 size-full object-cover transition-opacity duration-300",
+                  lowLoaded ? "opacity-100" : "opacity-0",
                 )}
               />
             </picture>
+            {lowLoaded && (
+              <picture>
+                <source type="image/avif" srcSet="/auimap-1312.avif" />
+                <img
+                  src="/auimap-1312.webp"
+                  alt="Campus map"
+                  decoding="async"
+                  draggable={false}
+                  onLoad={() => setFullLoaded(true)}
+                  ref={(image) => {
+                    if (image?.complete) setFullLoaded(true)
+                  }}
+                  className={cn(
+                    "pointer-events-none absolute inset-0 size-full object-cover transition-opacity duration-500",
+                    fullLoaded ? "opacity-100" : "opacity-0",
+                  )}
+                />
+              </picture>
+            )}
             <UserLocationMarker
               position={userPosition}
               heading={compassHeading}
@@ -465,7 +494,7 @@ export function MapCanvas({
               <DroppedPinMarker position={contextMenuPosition} />
             )}
           </div>
-        </motion.div>
+        </m.div>
 
         {/* recesses the map behind the border and the squircle containers floating above it.
           color comes from --map-vignette (theme-aware) rather than a flat black, so this doesn't

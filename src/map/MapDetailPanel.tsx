@@ -1,6 +1,6 @@
 "use client"
 
-import { motion, type PanInfo } from "motion/react"
+import { m, type PanInfo } from "motion/react"
 import Image from "next/image"
 import { useState } from "react"
 import { BottomDrawer } from "@/components/BottomDrawer"
@@ -23,8 +23,8 @@ import { useCopyFeedback } from "@/utils/useCopyFeedback"
 import { useIsPhone } from "@/utils/useIsPhone"
 import { AttachmentCarousel, AttachmentStrip } from "./AttachmentCarousel"
 import { formatCoordinates } from "./geo"
-import { UNDOCKED_PANEL_WIDTH } from "./panelWidth"
 import { TagChipIcon, tagChipClassName } from "./MapTagFilter"
+import { UNDOCKED_PANEL_WIDTH } from "./panelWidth"
 import { ShareMenu } from "./ShareMenu"
 import { tagColorStyle } from "./tagColor"
 import type { MapItem, MapItemAttachment, MapItemTag, PinLink } from "./types"
@@ -82,7 +82,7 @@ export function MapDetailPanel({
   }
 
   return (
-    <motion.div
+    <m.div
       key={item.id}
       initial={enterFrom}
       animate={restingAt}
@@ -150,7 +150,7 @@ export function MapDetailPanel({
         />
       </div>
 
-      <motion.div
+      <m.div
         animate={{
           maxHeight: docked
             ? expanded
@@ -173,7 +173,7 @@ export function MapDetailPanel({
         )}
       >
         {docked && (
-          <motion.span
+          <m.span
             drag="y"
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={0.4}
@@ -221,7 +221,7 @@ export function MapDetailPanel({
           </div>
           <MapsMenuButton {...{ item }} />
         </div>
-      </motion.div>
+      </m.div>
 
       {openAttachmentIndex !== null && (
         <AttachmentCarousel
@@ -230,7 +230,7 @@ export function MapDetailPanel({
           onClose={() => setOpenAttachmentIndex(null)}
         />
       )}
-    </motion.div>
+    </m.div>
   )
 }
 
@@ -340,8 +340,8 @@ function HoursLine({
     <span className="flex items-center gap-2">
       <Icon icon={ICONS.clock} className="shrink-0" />
       {hours}
-      {ramadanHours && (
-        isPhone ? (
+      {ramadanHours &&
+        (isPhone ? (
           <>
             <button
               type="button"
@@ -380,8 +380,7 @@ function HoursLine({
               </span>
             </PopoverContent>
           </Popover>
-        )
-      )}
+        ))}
     </span>
   )
 }

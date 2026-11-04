@@ -1,6 +1,6 @@
 "use client"
 
-import { motion, useReducedMotion } from "motion/react"
+import { m, useReducedMotion } from "motion/react"
 
 // dial center — used as the needle's rotation pivot below
 const NEEDLE_ORIGIN = "15.5px 16.5px"
@@ -90,7 +90,7 @@ export function CompassLogo({ className }: { className?: string }) {
 
       {/* the needle — the only part that moves. rotation pivots on the dial center so the
           background rose/ring stay put while just the pointer wobbles */}
-      <motion.g
+      <m.g
         style={{ transformBox: "view-box", transformOrigin: NEEDLE_ORIGIN }}
         animate={reduceMotion ? undefined : { rotate: [0, 55, 0, -55, 0] }}
         transition={{
@@ -149,7 +149,7 @@ export function CompassLogo({ className }: { className?: string }) {
             fill="url(#paint20_radial_18_4887)"
           />
         </g>
-      </motion.g>
+      </m.g>
 
       <g filter="url(#filter6_f_18_4887)">
         <path

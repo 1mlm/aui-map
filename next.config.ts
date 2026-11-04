@@ -29,7 +29,7 @@ const nextConfig: NextConfig = {
     if (process.env.NODE_ENV !== "production") return []
     return [
       {
-        source: "/auimap-1312.:ext(webp|avif)",
+        source: "/auimap-:size(1312|640).:ext(webp|avif)",
         headers: [
           {
             key: "Cache-Control",

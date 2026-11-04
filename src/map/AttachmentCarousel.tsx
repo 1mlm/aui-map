@@ -1,6 +1,6 @@
 "use client"
 
-import { AnimatePresence, motion } from "motion/react"
+import { AnimatePresence, m } from "motion/react"
 import Image from "next/image"
 import { useState } from "react"
 import { Icon } from "@/components/Icon"
@@ -103,7 +103,7 @@ function CarouselAttachment({
   if (isVideoMimeType(attachment.mimeType)) {
     return (
       // biome-ignore lint/a11y/useMediaCaption: no caption track exists for a visitor-submitted video
-      <motion.video
+      <m.video
         src={attachment.url}
         controls
         playsInline
@@ -117,7 +117,7 @@ function CarouselAttachment({
 
   if (!isImageMimeType(attachment.mimeType)) {
     return (
-      <motion.div
+      <m.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -137,13 +137,13 @@ function CarouselAttachment({
           <Icon icon={ICONS.upload} className="rotate-180" />
           Download
         </a>
-      </motion.div>
+      </m.div>
     )
   }
 
   return (
     // biome-ignore lint/performance/noImgElement: needs motion's drag gesture, which next/image doesn't compose with
-    <motion.img
+    <m.img
       src={cloudinaryOptimized(attachment.url)}
       alt=""
       initial={{ opacity: 0 }}
