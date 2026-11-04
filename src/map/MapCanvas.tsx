@@ -6,12 +6,6 @@ import { useEffect, useImperativeHandle, useRef, useState } from "react"
 import { Icon } from "@/components/Icon"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
 import { ICONS } from "@/icons"
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from "@/shadcn/ui/context-menu"
 import { cn } from "@/shadcn/utils"
 import { copyToClipboard } from "@/utils/clipboard"
 import { triggerHaptic } from "@/utils/haptics"
@@ -76,18 +70,55 @@ function DroppedPinMarker({ position }: { position: NormalizedPosition }) {
   )
 }
 
-function DroppedPinMenuContent({ position }: { position: NormalizedPosition }) {
+const LONG_PRESS_MS = 600
+const LONG_PRESS_MOVE_TOLERANCE_PX = 10
+const MENU_WIDTH_PX = 208
+const MENU_HEIGHT_PX = 4 * 36 + 8
+
+// no menu library on purpose: Radix's context menu (plus its popper/focus-scope) was in the first
+// load for something used once in a while. This is a plain fixed-position list that closes on
+// outside press, Escape or scroll
+function DroppedPinMenu({
+  position,
+  point,
+  onClose,
+}: {
+  position: NormalizedPosition
+  point: { x: number; y: number }
+  onClose: () => void
+}) {
   const { latitude, longitude } = positionToLatLong(position)
   const coordinates = `${latitude},${longitude}`
   const { copied, copy } = useCopyFeedback(COPIED_FEEDBACK_MS)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${coordinates}`
   const appleMapsUrl = `https://maps.apple.com/?ll=${coordinates}`
   const wazeUrl = `https://waze.com/ul?ll=${coordinates}&navigate=yes`
 
+  useEffect(() => {
+    function closeOnOutside(event: PointerEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) onClose()
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose()
+    }
+    window.addEventListener("pointerdown", closeOnOutside, true)
+    window.addEventListener("keydown", closeOnEscape)
+    window.addEventListener("wheel", onClose, { passive: true })
+    window.addEventListener("resize", onClose)
+    return () => {
+      window.removeEventListener("pointerdown", closeOnOutside, true)
+      window.removeEventListener("keydown", closeOnEscape)
+      window.removeEventListener("wheel", onClose)
+      window.removeEventListener("resize", onClose)
+    }
+  }, [onClose])
+
   function openMapsUrl(url: string) {
     triggerHaptic()
     window.open(url, "_blank", "noopener,noreferrer")
+    onClose()
   }
 
   function copyCoordinates() {
@@ -95,25 +126,59 @@ function DroppedPinMenuContent({ position }: { position: NormalizedPosition }) {
     copy(formatCoordinates({ latitude, longitude }))
   }
 
+  const items = [
+    {
+      icon: copied ? ICONS.copied : ICONS.copy,
+      label: copied ? "Copied!" : "Copy coordinates",
+      onSelect: copyCoordinates,
+    },
+    {
+      icon: ICONS.openExternalMap,
+      label: "Open in Google Maps",
+      onSelect: () => openMapsUrl(googleMapsUrl),
+    },
+    {
+      icon: ICONS.openExternalMap,
+      label: "Open in Apple Maps",
+      onSelect: () => openMapsUrl(appleMapsUrl),
+    },
+    {
+      icon: ICONS.openExternalMap,
+      label: "Open in Waze",
+      onSelect: () => openMapsUrl(wazeUrl),
+    },
+  ]
+
   return (
-    <>
-      <ContextMenuItem onSelect={copyCoordinates}>
-        <Icon icon={copied ? ICONS.copied : ICONS.copy} />
-        {copied ? "Copied!" : "Copy coordinates"}
-      </ContextMenuItem>
-      <ContextMenuItem onSelect={() => openMapsUrl(googleMapsUrl)}>
-        <Icon icon={ICONS.openExternalMap} />
-        Open in Google Maps
-      </ContextMenuItem>
-      <ContextMenuItem onSelect={() => openMapsUrl(appleMapsUrl)}>
-        <Icon icon={ICONS.openExternalMap} />
-        Open in Apple Maps
-      </ContextMenuItem>
-      <ContextMenuItem onSelect={() => openMapsUrl(wazeUrl)}>
-        <Icon icon={ICONS.openExternalMap} />
-        Open in Waze
-      </ContextMenuItem>
-    </>
+    <div
+      ref={menuRef}
+      role="menu"
+      style={{
+        left: Math.max(
+          8,
+          Math.min(point.x, window.innerWidth - MENU_WIDTH_PX - 8),
+        ),
+        top: Math.max(
+          8,
+          Math.min(point.y, window.innerHeight - MENU_HEIGHT_PX - 8),
+        ),
+        width: MENU_WIDTH_PX,
+      }}
+      className="fixed z-50 rounded-lg bg-popover/80 p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 backdrop-blur-2xl"
+    >
+      {items.map(({ icon, label, onSelect }) => (
+        <button
+          key={label}
+          type="button"
+          role="menuitem"
+          onClick={onSelect}
+          className="flex h-9 w-full items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-foreground/10 focus-visible:bg-foreground/10 focus-visible:outline-none"
+        >
+          <Icon icon={icon} />
+          {label}
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -155,8 +220,16 @@ export function MapCanvas({
   const imageBoxRef = useRef<HTMLDivElement>(null)
   const [surveyedCoord, setSurveyedCoord] = useState<string | null>(null)
   const surveyedCoordTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  const [contextMenuPosition, setContextMenuPosition] =
-    useState<NormalizedPosition | null>(null)
+  const [contextMenu, setContextMenu] = useState<{
+    position: NormalizedPosition
+    point: { x: number; y: number }
+  } | null>(null)
+  const contextMenuPosition = contextMenu?.position ?? null
+  const longPress = useRef<{
+    timer: ReturnType<typeof setTimeout>
+    x: number
+    y: number
+  } | null>(null)
   const [mapImageLoaded, setMapImageLoaded] = useState(false)
 
   // growthExponent and labelShowScale are the same for every pin (only ever overridden app-wide
@@ -233,143 +306,173 @@ export function MapCanvas({
     )
   }
 
-  // right-click (desktop) or long-press (touch, handled by radix itself) drops a marker and opens
-  // a menu of things to do with that spot. Radix doesn't hand back the triggering coordinate, so
-  // it's read off panZoom's own pointer tracking instead, at the moment the menu actually opens
-  function handleContextMenuOpenChange(open: boolean) {
-    if (!open) {
-      setContextMenuPosition(null)
-      return
-    }
+  // right-click (desktop, Android long-press) or a 600ms touch long-press (iOS fires no
+  // contextmenu event) drops a marker and opens a menu of things to do with that spot
+  function openContextMenuAt(clientX: number, clientY: number) {
     const imageBox = imageBoxRef.current?.getBoundingClientRect()
     if (!imageBox) return
-    setContextMenuPosition(
-      screenPointToPosition(panZoom.getLastPointerClientPosition(), imageBox),
+    setContextMenu({
+      position: screenPointToPosition({ x: clientX, y: clientY }, imageBox),
+      point: { x: clientX, y: clientY },
+    })
+  }
+
+  function cancelLongPress() {
+    if (longPress.current) clearTimeout(longPress.current.timer)
+    longPress.current = null
+  }
+
+  function startLongPress(event: React.PointerEvent) {
+    if (event.pointerType !== "touch") return
+    cancelLongPress()
+    const { clientX, clientY } = event
+    longPress.current = {
+      x: clientX,
+      y: clientY,
+      timer: setTimeout(() => {
+        longPress.current = null
+        triggerHaptic()
+        openContextMenuAt(clientX, clientY)
+      }, LONG_PRESS_MS),
+    }
+  }
+
+  function moveLongPress(event: React.PointerEvent) {
+    const pending = longPress.current
+    if (!pending) return
+    if (
+      Math.hypot(event.clientX - pending.x, event.clientY - pending.y) >
+      LONG_PRESS_MOVE_TOLERANCE_PX
     )
+      cancelLongPress()
   }
 
   return (
-    <ContextMenu onOpenChange={handleContextMenuOpenChange}>
-      <ContextMenuTrigger asChild>
-        <div
-          ref={panZoom.containerRef}
-          {...panZoom.gestureHandlers}
-          onClick={copyCoordinateUnderCursor}
-          style={{ touchAction: "none" }}
-          className={cn(
-            // isolate boxes in every z-index inside (selected pins go to 1000) so they only ever
-            // stack against each other, never against sibling UI chrome (top bar, brand, panel).
-            // That containment would otherwise come for free from the transform on the motion.div
-            // below -- a non-"none" transform creates a stacking context too -- except framer
-            // hasn't written that transform to the DOM yet on the very first frame(s), so pins
-            // could briefly out-rank the chrome around them until it does. isolate doesn't wait.
-            "absolute inset-0 isolate select-none overflow-hidden bg-background transition-[box-shadow]",
-            panZoom.hitLimit && "shadow-[inset_0_0_0_4px_rgba(220,38,38,0.45)]",
-          )}
+    <>
+      <div
+        ref={panZoom.containerRef}
+        {...panZoom.gestureHandlers}
+        onPointerDownCapture={startLongPress}
+        onPointerMoveCapture={moveLongPress}
+        onPointerUpCapture={cancelLongPress}
+        onPointerCancelCapture={cancelLongPress}
+        onContextMenu={(event) => {
+          event.preventDefault()
+          openContextMenuAt(event.clientX, event.clientY)
+        }}
+        onClick={copyCoordinateUnderCursor}
+        style={{ touchAction: "none" }}
+        className={cn(
+          // isolate boxes in every z-index inside (selected pins go to 1000) so they only ever
+          // stack against each other, never against sibling UI chrome (top bar, brand, panel).
+          // That containment would otherwise come for free from the transform on the motion.div
+          // below -- a non-"none" transform creates a stacking context too -- except framer
+          // hasn't written that transform to the DOM yet on the very first frame(s), so pins
+          // could briefly out-rank the chrome around them until it does. isolate doesn't wait.
+          "absolute inset-0 isolate select-none overflow-hidden bg-background transition-[box-shadow]",
+          panZoom.hitLimit && "shadow-[inset_0_0_0_4px_rgba(220,38,38,0.45)]",
+        )}
+      >
+        <motion.div
+          className="absolute inset-0 flex items-center justify-center [container-type:size]"
+          style={{ scale: panZoom.scale, x: panZoom.x, y: panZoom.y }}
         >
-          <motion.div
-            className="absolute inset-0 flex items-center justify-center [container-type:size]"
-            style={{ scale: panZoom.scale, x: panZoom.x, y: panZoom.y }}
-          >
-            {/* the image is square while the viewport isn't, so anything placed against the viewport
+          {/* the image is square while the viewport isn't, so anything placed against the viewport
             box would drift as the image gets cropped to cover it. This square box covers the
             viewport and becomes the one coordinate space the image and every marker agree on.
             Its side is the viewport's longer edge — asking for a square via min-width AND
             min-height instead lets a portrait phone win both, which stretches the image */}
-            <div
-              ref={imageBoxRef}
-              className="relative size-[100cqmax] shrink-0"
-              style={
-                {
-                  "--pin-counter-scale": initialPinCounterScale,
-                } as React.CSSProperties
-              }
-            >
-              {/* shown until the real image below finishes loading, so first paint never waits
+          <div
+            ref={imageBoxRef}
+            className="relative size-[100cqmax] shrink-0"
+            style={
+              {
+                "--pin-counter-scale": initialPinCounterScale,
+              } as React.CSSProperties
+            }
+          >
+            {/* shown until the real image below finishes loading, so first paint never waits
               on it */}
-              <div
-                aria-hidden
-                className={cn(
-                  "pointer-events-none absolute inset-0 bg-cover bg-center transition-opacity duration-500",
-                  mapImageLoaded ? "opacity-0" : "opacity-100",
-                )}
-                style={{ backgroundImage: `url(${MAP_IMAGE_PLACEHOLDER})` }}
-              />
-              {/* unoptimized on purpose: the optimizer would hand back a copy sized to the viewport,
+            <div
+              aria-hidden
+              className={cn(
+                "pointer-events-none absolute inset-0 bg-cover bg-center transition-opacity duration-500",
+                mapImageLoaded ? "opacity-0" : "opacity-100",
+              )}
+              style={{ backgroundImage: `url(${MAP_IMAGE_PLACEHOLDER})` }}
+            />
+            {/* unoptimized on purpose: the optimizer would hand back a copy sized to the viewport,
               which is exactly the detail zooming needs. This file is already a tuned webp.
               Stays invisible until fully decoded (crossfading with the blurred placeholder above)
               -- otherwise the browser paints whatever's streamed in so far on a slow connection,
               which for a big image shows as scanline-y decode garbage instead of a clean reveal */}
-              <Image
-                src="/auimap-1312.webp"
-                alt="Campus map"
-                fill
-                priority
-                unoptimized
-                draggable={false}
-                onLoad={() => setMapImageLoaded(true)}
-                // a cached image can finish loading before hydration, and that onLoad is then
-                // never replayed, which left the blurred placeholder up for good
-                ref={(image) => {
-                  if (image?.complete) setMapImageLoaded(true)
-                }}
-                className={cn(
-                  "pointer-events-none transition-opacity duration-500",
-                  mapImageLoaded ? "opacity-100" : "opacity-0",
-                )}
-              />
-              <UserLocationMarker
-                position={userPosition}
-                heading={compassHeading}
-                accuracy={userAccuracy}
-              />
-              {offCampusPosition && (
-                <OffCampusIndicator position={offCampusPosition} />
+            <Image
+              src="/auimap-1312.webp"
+              alt="Campus map"
+              fill
+              priority
+              unoptimized
+              draggable={false}
+              onLoad={() => setMapImageLoaded(true)}
+              // a cached image can finish loading before hydration, and that onLoad is then
+              // never replayed, which left the blurred placeholder up for good
+              ref={(image) => {
+                if (image?.complete) setMapImageLoaded(true)
+              }}
+              className={cn(
+                "pointer-events-none transition-opacity duration-500",
+                mapImageLoaded ? "opacity-100" : "opacity-0",
               )}
-              {items.map((item) => (
-                <MapPin
-                  key={item.id}
-                  selected={item.id === selectedId}
-                  showLabel={showPinLabels}
-                  onSelect={() =>
-                    onSelect(item.id === selectedId ? null : item.id)
-                  }
-                  previewing={hoveredTagId !== null}
-                  matchesPreview={item.tag.id === hoveredTagId}
-                  {...{ item, tuning, sizeTuning }}
-                />
-              ))}
-              {contextMenuPosition && (
-                <DroppedPinMarker position={contextMenuPosition} />
-              )}
-            </div>
-          </motion.div>
+            />
+            <UserLocationMarker
+              position={userPosition}
+              heading={compassHeading}
+              accuracy={userAccuracy}
+            />
+            {offCampusPosition && (
+              <OffCampusIndicator position={offCampusPosition} />
+            )}
+            {items.map((item) => (
+              <MapPin
+                key={item.id}
+                selected={item.id === selectedId}
+                showLabel={showPinLabels}
+                onSelect={() =>
+                  onSelect(item.id === selectedId ? null : item.id)
+                }
+                previewing={hoveredTagId !== null}
+                matchesPreview={item.tag.id === hoveredTagId}
+                {...{ item, tuning, sizeTuning }}
+              />
+            ))}
+            {contextMenuPosition && (
+              <DroppedPinMarker position={contextMenuPosition} />
+            )}
+          </div>
+        </motion.div>
 
-          {/* recesses the map behind the border and the squircle containers floating above it.
+        {/* recesses the map behind the border and the squircle containers floating above it.
           color comes from --map-vignette (theme-aware) rather than a flat black, so this doesn't
           read as a hard dark ring against the containers' bg-background fusers in light mode */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 shadow-[inset_0_0_32px_8px_var(--color-map-vignette)]"
-          />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 shadow-[inset_0_0_32px_8px_var(--color-map-vignette)]"
+        />
 
-          {surveyedCoord && (
-            <SquircleFuserContainer
-              align="bottom-left"
-              superClassName="absolute bottom-0 left-0"
-              className="gap-2 text-sm"
-            >
-              <Icon icon={ICONS.copy} className="text-muted-foreground" />
-              <span className="font-mono">{surveyedCoord}</span>
-            </SquircleFuserContainer>
-          )}
-        </div>
-      </ContextMenuTrigger>
-      {contextMenuPosition && (
-        <ContextMenuContent>
-          <DroppedPinMenuContent position={contextMenuPosition} />
-        </ContextMenuContent>
+        {surveyedCoord && (
+          <SquircleFuserContainer
+            align="bottom-left"
+            superClassName="absolute bottom-0 left-0"
+            className="gap-2 text-sm"
+          >
+            <Icon icon={ICONS.copy} className="text-muted-foreground" />
+            <span className="font-mono">{surveyedCoord}</span>
+          </SquircleFuserContainer>
+        )}
+      </div>
+      {contextMenu && (
+        <DroppedPinMenu {...contextMenu} onClose={() => setContextMenu(null)} />
       )}
-    </ContextMenu>
+    </>
   )
 }
