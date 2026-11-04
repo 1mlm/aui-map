@@ -1,8 +1,8 @@
 "use client"
 
 import { motion, useMotionValueEvent } from "motion/react"
-import Image from "next/image"
 import { useEffect, useImperativeHandle, useRef, useState } from "react"
+import { preload } from "react-dom"
 import { Icon } from "@/components/Icon"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
 import { ICONS } from "@/icons"
@@ -28,6 +28,16 @@ import type { CrayonTuning } from "./tagColor"
 import type { MapItem } from "./types"
 import { type UserLocation, UserLocationMarker } from "./UserLocationMarker"
 import { pinCounterScale, useMapPanZoom } from "./useMapPanZoom"
+
+// hoisted into <head> by react during render, so the download starts before the image element
+// even mounts. The browser picks AVIF when it can, and this hint matches that choice
+function preloadMapImage() {
+  preload("/auimap-1312.avif", {
+    as: "image",
+    type: "image/avif",
+    fetchPriority: "high",
+  })
+}
 
 const SURVEYED_COORD_TOAST_MS = 3000
 const COPIED_FEEDBACK_MS = 1500
@@ -216,6 +226,7 @@ export function MapCanvas({
   sizeTuning?: PinSizeTuning
   ref?: React.Ref<MapCanvasHandle>
 }) {
+  preloadMapImage()
   const panZoom = useMapPanZoom()
   const imageBoxRef = useRef<HTMLDivElement>(null)
   const [surveyedCoord, setSurveyedCoord] = useState<string | null>(null)
@@ -406,24 +417,29 @@ export function MapCanvas({
               Stays invisible until fully decoded (crossfading with the blurred placeholder above)
               -- otherwise the browser paints whatever's streamed in so far on a slow connection,
               which for a big image shows as scanline-y decode garbage instead of a clean reveal */}
-            <Image
-              src="/auimap-1312.webp"
-              alt="Campus map"
-              fill
-              priority
-              unoptimized
-              draggable={false}
-              onLoad={() => setMapImageLoaded(true)}
-              // a cached image can finish loading before hydration, and that onLoad is then
-              // never replayed, which left the blurred placeholder up for good
-              ref={(image) => {
-                if (image?.complete) setMapImageLoaded(true)
-              }}
-              className={cn(
-                "pointer-events-none transition-opacity duration-500",
-                mapImageLoaded ? "opacity-100" : "opacity-0",
-              )}
-            />
+            {/* AVIF first (about 60% smaller), the webp only for browsers without AVIF. A plain
+              <img> inside <picture> instead of next/image: next's priority preload would fetch the
+              webp too, so the AVIF is preloaded by hand (preload() above) */}
+            <picture>
+              <source type="image/avif" srcSet="/auimap-1312.avif" />
+              <img
+                src="/auimap-1312.webp"
+                alt="Campus map"
+                fetchPriority="high"
+                decoding="async"
+                draggable={false}
+                onLoad={() => setMapImageLoaded(true)}
+                // a cached image can finish loading before hydration, and that onLoad is then
+                // never replayed, which left the blurred placeholder up for good
+                ref={(image) => {
+                  if (image?.complete) setMapImageLoaded(true)
+                }}
+                className={cn(
+                  "pointer-events-none absolute inset-0 size-full object-cover transition-opacity duration-500",
+                  mapImageLoaded ? "opacity-100" : "opacity-0",
+                )}
+              />
+            </picture>
             <UserLocationMarker
               position={userPosition}
               heading={compassHeading}

@@ -20,7 +20,7 @@ declare const self: ServiceWorkerGlobalScope
 // time. Precaching it would fetch it a second time on a visitor's very first load, on top of
 // the page's own <img> request for the same file
 const mapImageCaching: RuntimeCaching = {
-  matcher: /\/auimap-1312\.webp$/,
+  matcher: /\/auimap-1312\.(webp|avif)$/,
   handler: new CacheFirst({ cacheName: "campus-map-image" }),
 }
 
