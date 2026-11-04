@@ -1,6 +1,5 @@
 "use client"
 
-import { track } from "@vercel/analytics"
 import { AnimatePresence } from "motion/react"
 import dynamic from "next/dynamic"
 import { useEffect, useRef, useState } from "react"
@@ -14,6 +13,7 @@ import { MapDetailPanel, UNDOCKED_PANEL_WIDTH } from "./MapDetailPanel"
 import { DEFAULT_PIN_SIZE_TUNING, type PinSizeTuning } from "./MapPin"
 import { MapFilterBar } from "./MapTagFilter"
 import { NetworkStatusBanner } from "./NetworkStatusBanner"
+import { recordSearchMiss } from "./searchMissActions"
 import { DEFAULT_CRAYON_TUNING, type TagColorName } from "./tagColor"
 import type { MapItem, MapItemTag } from "./types"
 import { useAvailableSpace } from "./useAvailableSpace"
@@ -76,7 +76,9 @@ function matchesSearch(item: MapItem, query: string) {
     return haystack.some((value) => value.includes(whole))
   }
   // every word has to hit something on the pin, in any order
-  return tokens.every((token) => haystack.some((value) => value.includes(token)))
+  return tokens.every((token) =>
+    haystack.some((value) => value.includes(token)),
+  )
 }
 
 // long enough that it only fires once someone's actually done typing, not on every keystroke
@@ -190,8 +192,7 @@ export function MapExperience({
       const matchesSomething = effectiveItems.some((item) =>
         matchesSearch(item, query),
       )
-      if (!matchesSomething)
-        track("search_no_results", { query: query.toLowerCase() })
+      if (!matchesSomething) recordSearchMiss(query)
     }, ZERO_RESULT_SEARCH_TRACK_DELAY_MS)
     return () => clearTimeout(timer)
   }, [search, effectiveItems])

@@ -10,4 +10,10 @@ export const APP_HEADER: AppNavBrand = {
 export const NAV_ITEMS: AppNavItem[] = [
   { href: "/admin/pins", label: "Pins", icon: ICONS.place, countKey: "pins" },
   { href: "/admin/tags", label: "Tags", icon: ICONS.tag, countKey: "tags" },
+  {
+    href: "/admin/search-misses",
+    label: "Missed searches",
+    icon: ICONS.search,
+    countKey: "searchMisses",
+  },
 ]

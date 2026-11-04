@@ -206,3 +206,14 @@ model LoginAttempt {
 
   @@index([ip, createdAt])
 }
+
+// a map search that matched nothing, one row per distinct (lowercased) query. Only the text and how
+// often/when it was typed, no ip or user id. The admin reads it to find places missing from the map
+model SearchMiss {
+  query     String   @id
+  count     Int      @default(1)
+  firstSeen DateTime @default(now())
+  lastSeen  DateTime @default(now())
+
+  @@index([count])
+}
