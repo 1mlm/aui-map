@@ -3,73 +3,95 @@
 import {
   type ComponentProps,
   createContext,
+  type PropsWithChildren,
   useContext,
   useEffect,
   useRef,
   useState,
 } from "react"
-import {
-  Tooltip as TooltipPrimitive,
-  TooltipTrigger as TooltipTriggerPrimitive,
-} from "@/shadcn/ui/tooltip"
+import { cn } from "@/shadcn/utils"
 import { useHasHoverSupport } from "@/utils/useHasHoverSupport"
+
+// no library on purpose: the Radix tooltip alone was a chunk of the first-load JS for a label that
+// shows on hover. This is css only (group hover / focus-within) plus an optional controlled `open`
+// and, on touch (no hover), a tap that shows the label for a moment
 
 const TAP_TOOLTIP_VISIBLE_MS = 1600
 
-const TapTooltipContext = createContext<(() => void) | null>(null)
+type TooltipState = { open: boolean; reveal: (() => void) | null }
+const TooltipContext = createContext<TooltipState>({
+  open: false,
+  reveal: null,
+})
 
-// Radix's tooltip only opens on hover/focus, neither of which a touch tap reliably produces —
-// the label either never shows or flashes for a frame. On a device with no real hover (touch),
-// this makes the tooltip content ride along on the same tap that already triggers the button's
-// own onClick, staying open long enough to actually read before auto-dismissing. Devices with
-// real hover get Radix's normal hover/focus behavior, completely untouched
 export function Tooltip({
+  open: controlledOpen,
+  onOpenChange,
   children,
-  ...props
-}: ComponentProps<typeof TooltipPrimitive>) {
+}: PropsWithChildren<{
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+}>) {
   const hasHover = useHasHoverSupport()
-  const [open, setOpen] = useState(false)
-  const dismissTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
-    undefined,
-  )
+  const [tapOpen, setTapOpen] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
-  useEffect(() => () => clearTimeout(dismissTimer.current), [])
-
-  if (hasHover)
-    return <TooltipPrimitive {...props}>{children}</TooltipPrimitive>
+  useEffect(() => () => clearTimeout(timer.current), [])
 
   function reveal() {
-    clearTimeout(dismissTimer.current)
-    setOpen(true)
-    dismissTimer.current = setTimeout(
-      () => setOpen(false),
-      TAP_TOOLTIP_VISIBLE_MS,
-    )
+    clearTimeout(timer.current)
+    setTapOpen(true)
+    onOpenChange?.(true)
+    timer.current = setTimeout(() => {
+      setTapOpen(false)
+      onOpenChange?.(false)
+    }, TAP_TOOLTIP_VISIBLE_MS)
   }
 
   return (
-    <TapTooltipContext.Provider value={reveal}>
-      <TooltipPrimitive open={open} onOpenChange={setOpen} {...props}>
-        {children}
-      </TooltipPrimitive>
-    </TapTooltipContext.Provider>
+    <TooltipContext.Provider
+      value={{
+        open: controlledOpen ?? tapOpen,
+        reveal: hasHover ? null : reveal,
+      }}
+    >
+      <span className="group/tooltip relative inline-flex">{children}</span>
+    </TooltipContext.Provider>
   )
 }
 
-export function TooltipTrigger(
-  props: ComponentProps<typeof TooltipTriggerPrimitive>,
-) {
-  const reveal = useContext(TapTooltipContext)
-  if (!reveal) return <TooltipTriggerPrimitive {...props} />
-
-  // captures ahead of the trigger's own onClick (which still fires normally, e.g. centering the
-  // map) — `contents` keeps this span out of flex/gap layout entirely, it's here purely to catch
-  // the tap
+// the trigger is just its child, the wrapper span in Tooltip already carries the hover/focus state
+export function TooltipTrigger({
+  children,
+}: PropsWithChildren<{ asChild?: boolean }>) {
+  const { reveal } = useContext(TooltipContext)
+  if (!reveal) return <>{children}</>
   return (
     <span className="contents" onClickCapture={reveal}>
-      <TooltipTriggerPrimitive {...props} />
+      {children}
     </span>
   )
 }
 
-export { TooltipContent, TooltipProvider } from "@/shadcn/ui/tooltip"
+export function TooltipContent({
+  side = "top",
+  sideOffset = 0,
+  className,
+  children,
+}: ComponentProps<"span"> & { side?: "top" | "bottom"; sideOffset?: number }) {
+  const { open } = useContext(TooltipContext)
+  return (
+    <span
+      role="tooltip"
+      style={{ [side === "bottom" ? "marginTop" : "marginBottom"]: sideOffset }}
+      className={cn(
+        "pointer-events-none absolute left-1/2 z-50 inline-flex w-max max-w-xs -translate-x-1/2 items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-background text-xs opacity-0 transition-opacity duration-100 group-focus-within/tooltip:opacity-100 group-hover/tooltip:opacity-100",
+        side === "bottom" ? "top-full" : "bottom-full",
+        open && "opacity-100",
+        className,
+      )}
+    >
+      {children}
+    </span>
+  )
+}

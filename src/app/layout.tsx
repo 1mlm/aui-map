@@ -6,7 +6,6 @@ import { Outfit } from "next/font/google"
 import "@/shadcn/styles/globals.css"
 import { NuqsAdapter } from "nuqs/adapters/next/app"
 import type { PropsWithChildren } from "react"
-import { TooltipProvider } from "@/shadcn/ui/tooltip"
 
 const outfit = Outfit()
 
@@ -75,9 +74,7 @@ export default function RootLayout({ children }: PropsWithChildren) {
           swUrl="/serwist/sw.js"
           disable={process.env.NODE_ENV === "development"}
         >
-          <NuqsAdapter>
-            <TooltipProvider>{children}</TooltipProvider>
-          </NuqsAdapter>
+          <NuqsAdapter>{children}</NuqsAdapter>
           <Analytics />
           <SpeedInsights />
         </SerwistProvider>

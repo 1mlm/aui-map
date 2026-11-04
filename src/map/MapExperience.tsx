@@ -3,16 +3,15 @@
 import { AnimatePresence } from "motion/react"
 import dynamic from "next/dynamic"
 import { useEffect, useRef, useState } from "react"
-import { About } from "./About"
 import { latLongToPosition } from "./geo"
 import { LocateFloatingButton } from "./LocateFloatingButton"
 import { MapBrand } from "./MapBrand"
 import { MapCanvas, type MapCanvasHandle } from "./MapCanvas"
 import { MapControls } from "./MapControls"
-import { MapDetailPanel, UNDOCKED_PANEL_WIDTH } from "./MapDetailPanel"
 import { DEFAULT_PIN_SIZE_TUNING, type PinSizeTuning } from "./MapPin"
 import { MapFilterBar } from "./MapTagFilter"
 import { NetworkStatusBanner } from "./NetworkStatusBanner"
+import { UNDOCKED_PANEL_WIDTH } from "./panelWidth"
 import { recordSearchMiss } from "./searchMissActions"
 import { DEFAULT_CRAYON_TUNING, type TagColorName } from "./tagColor"
 import type { MapItem, MapItemTag } from "./types"
@@ -27,6 +26,16 @@ import { useWakeLock } from "./useWakeLock"
 const LEVA_PLAYGROUND_ENABLED = false
 // flip true to bring back the leva pin-size/label playground
 const PIN_SIZE_PLAYGROUND_ENABLED = false
+
+// not needed to paint the map: the detail panel is fetched when idle (so the first tap is
+// instant) and About only when someone opens it
+const loadDetailPanel = () => import("./MapDetailPanel")
+const MapDetailPanel = dynamic(() =>
+  loadDetailPanel().then((m) => m.MapDetailPanel),
+)
+const About = dynamic(() => import("./About").then((m) => m.About), {
+  ssr: false,
+})
 
 // dev-only — code-split so leva (and this whole file) never reaches production visitors
 const TagColorPlayground = dynamic(
@@ -139,6 +148,19 @@ export function MapExperience({
   const [activeTagIds, setActiveTagIds] = useState<Set<string>>(new Set())
   const [hoveredTagId, setHoveredTagId] = useState<string | null>(null)
   const [aboutOpen, setAboutOpen] = useState(false)
+  // About stays mounted once it has been opened, so closing it can still animate out
+  const [aboutMounted, setAboutMounted] = useState(false)
+
+  // warm the detail panel chunk once the map has painted and the browser is idle
+  useEffect(() => {
+    const idle =
+      window.requestIdleCallback ?? ((cb: () => void) => setTimeout(cb, 1500))
+    const handle = idle(() => void loadDetailPanel())
+    return () => {
+      if (window.cancelIdleCallback && typeof handle === "number")
+        window.cancelIdleCallback(handle)
+    }
+  }, [])
   // in the url path so a place can be linked to directly: /m6l
   const [selectedId, setSelectedId] = usePinSelection(initialSelectedId)
 
@@ -237,7 +259,10 @@ export function MapExperience({
 
         <MapControls
           onSearchChange={setSearch}
-          onOpenAbout={() => setAboutOpen(true)}
+          onOpenAbout={() => {
+            setAboutMounted(true)
+            setAboutOpen(true)
+          }}
           locationStatus={location.status}
           isOffCampus={location.isOffCampus}
           accuracy={location.accuracy}
@@ -278,7 +303,9 @@ export function MapExperience({
           onHoverTag={setHoveredTagId}
           {...{ activeTagIds, hoveredTagId }}
         />
-        <About open={aboutOpen} onOpenChange={setAboutOpen} />
+        {aboutMounted && (
+          <About open={aboutOpen} onOpenChange={setAboutOpen} />
+        )}
       </div>
 
       {LEVA_PLAYGROUND_ENABLED && process.env.NODE_ENV === "development" && (

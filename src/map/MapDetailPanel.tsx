@@ -23,6 +23,7 @@ import { useCopyFeedback } from "@/utils/useCopyFeedback"
 import { useIsPhone } from "@/utils/useIsPhone"
 import { AttachmentCarousel, AttachmentStrip } from "./AttachmentCarousel"
 import { formatCoordinates } from "./geo"
+import { UNDOCKED_PANEL_WIDTH } from "./panelWidth"
 import { TagChipIcon, tagChipClassName } from "./MapTagFilter"
 import { ShareMenu } from "./ShareMenu"
 import { tagColorStyle } from "./tagColor"
@@ -39,7 +40,6 @@ const DRAG_DISMISS_THRESHOLD_PX = 100
 // the side panel's width when it docks to the right edge. Shared because the bottom filter bar
 // has to shrink out from under it — a bar that keeps centering on the whole shell ends up with
 // half of itself, and one of its fuser patches, hidden behind the panel
-export const UNDOCKED_PANEL_WIDTH = "20rem"
 
 export function MapDetailPanel({
   item,
