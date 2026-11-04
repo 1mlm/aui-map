@@ -26,9 +26,33 @@ async function getPinPageData({ params }: PageProps) {
   return { pin, items, tags }
 }
 
+// what each category is, in plain words. Only used when a pin has no hand-written description,
+// so every pin page still gets a real sentence for the meta description / search snippet
+const TAG_NOUNS: Record<string, string> = {
+  building: "general building",
+  unknownHousing: "student housing building",
+  auditorium: "auditorium",
+  food: "place to eat",
+  sports: "sports facility",
+  parking: "parking area",
+  service: "campus service",
+  other: "point of interest",
+}
+
 function getPinDescription(pin: MapItem) {
   const where = `${pin.title} at Al Akhawayn University, Ifrane, Morocco.`
-  return pin.description ? `${where} ${pin.description}` : where
+  // admin descriptions are multi-line, a meta description is one line
+  const written = pin.description?.replace(/\s+/g, " ").trim()
+  if (written) return `${where} ${written}`
+
+  const noun = TAG_NOUNS[pin.tag.id] ?? "place"
+  const facts = [
+    `${pin.title} is a ${noun} on the Al Akhawayn University campus.`,
+    pin.hours && `Opening hours: ${pin.hours}.`,
+    pin.phone && `Phone: ${pin.phone}.`,
+    "See its exact location on the AUI campus map.",
+  ]
+  return [where, ...facts].filter(Boolean).join(" ")
 }
 
 function getPinThumbnailUrl(pin: MapItem) {
