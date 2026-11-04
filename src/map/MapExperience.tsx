@@ -45,12 +45,38 @@ function normalizeForSearch(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "")
 }
 
+// words people prepend out of habit ("aui b8", "akhawayn library", "building 12") that say nothing
+// about which pin they want -- every pin is at AUI, so they'd only make the match fail
+const SEARCH_FILLER_WORDS = new Set([
+  "aui",
+  "akhawayn",
+  "alakhawayn",
+  "university",
+  "al",
+  "the",
+  "building",
+  "bldg",
+  "campus",
+])
+
 function matchesSearch(item: MapItem, query: string) {
-  if (!query) return true
-  const normalizedQuery = normalizeForSearch(query)
-  return [item.id, item.title, ...item.aliases].some((value) =>
-    normalizeForSearch(value).includes(normalizedQuery),
+  if (!query.trim()) return true
+  const haystack = [item.id, item.title, ...item.aliases].map(
+    normalizeForSearch,
   )
+  const tokens = query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((token) => token && !SEARCH_FILLER_WORDS.has(token))
+    .map(normalizeForSearch)
+    .filter(Boolean)
+  // the whole query was filler ("aui"): don't hide everything, fall back to the plain compare
+  if (tokens.length === 0) {
+    const whole = normalizeForSearch(query)
+    return haystack.some((value) => value.includes(whole))
+  }
+  // every word has to hit something on the pin, in any order
+  return tokens.every((token) => haystack.some((value) => value.includes(token)))
 }
 
 // long enough that it only fires once someone's actually done typing, not on every keystroke
