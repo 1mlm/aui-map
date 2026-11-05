@@ -11,6 +11,7 @@ import {
   FloppyDiskIcon,
   Image01Icon,
   Link01Icon,
+  MagnetIcon,
   MapPinIcon,
   Maximize01Icon,
   Pentagon01Icon,
@@ -148,6 +149,66 @@ function centerOf(b: Building): Point {
   ]
 }
 
+// ---- snapping: making things parallel ----
+const ANGLE_TOL = 4 // degrees
+const deg = (r: number) => (r * 180) / Math.PI
+const mod180 = (a: number) => ((a % 180) + 180) % 180
+const angleOf = (a: Point, b: Point) =>
+  mod180(deg(Math.atan2(b[1] - a[1], b[0] - a[0])))
+// the smallest turn (in degrees) that makes angle a parallel to angle b
+const turnBetween = (a: number, b: number) => {
+  const d = mod180(a - b)
+  return d > 90 ? d - 180 : d
+}
+const sidesOf = (b: Building): [Point, Point][] => {
+  const pts = outlineOf(b)
+  return pts.map((q, k) => [q, pts[(k + 1) % pts.length]] as [Point, Point])
+}
+// the sides of the other buildings close to a point: what the thing being edited should line up with
+function nearbySides(
+  all: Building[],
+  at: Point,
+  reach: number,
+  skip: number,
+): [Point, Point][] {
+  const out: [Point, Point][] = []
+  all.forEach((b, i) => {
+    if (i === skip) return
+    if (outlineOf(b).some((q) => dist(q, at) < reach)) out.push(...sidesOf(b))
+  })
+  return out
+}
+const anglesOf = (sides: [Point, Point][]) => [
+  0,
+  90,
+  ...sides.map(([a, b]) => angleOf(a, b)),
+]
+
+// move `to` so the line from `from` runs parallel to the closest of `refs`, when one is close enough
+function snapParallel(
+  from: Point,
+  to: Point,
+  refs: number[],
+): { pt: Point; ref: number } | null {
+  if (dist(from, to) < 1) return null
+  const here = angleOf(from, to)
+  let best: number | null = null
+  let bestTurn = ANGLE_TOL
+  for (const r of refs) {
+    const t = Math.abs(turnBetween(here, r))
+    if (t < bestTurn) {
+      bestTurn = t
+      best = r
+    }
+  }
+  if (best === null) return null
+  const rad = (best * Math.PI) / 180
+  const dx = Math.cos(rad)
+  const dy = Math.sin(rad)
+  const along = (to[0] - from[0]) * dx + (to[1] - from[1]) * dy
+  return { pt: [from[0] + dx * along, from[1] + dy * along], ref: best }
+}
+
 function IconBtn({
   icon,
   label,
@@ -205,6 +266,9 @@ export function MapEditor({
   const [history, setHistory] = useState<CampusShapes[]>([])
   const [satOpacity, setSatOpacity] = useState(0.8)
   const [showPins, setShowPins] = useState(true)
+  // snapping sides parallel to their neighbours (Alt held skips it for one drag)
+  const [snapOn, setSnapOn] = useState(true)
+  const [guides, setGuides] = useState<[Point, Point][]>([])
   // names inside buildings: only where they fit (auto), everywhere, or not at all
   const [names, setNames] = useState<"auto" | "all" | "off">("auto")
   const [status, setStatus] = useState("")
@@ -331,10 +395,18 @@ export function MapEditor({
   }
 
   function addRect() {
+    const centre: Point = [view.x + view.s / 2, view.y + view.s / 2]
+    // a new rectangle starts out parallel to whatever is closest, so it is usually already lined up
+    const closest = shapes.buildings
+      .map((b) => ({ b, d: dist(centerOf(b), centre) }))
+      .sort((a, b) => a.d - b.d)[0]?.b
+    const angle = closest
+      ? closest.r
+        ? closest.r[4]
+        : angleOf(...(sidesOf(closest)[0] as [Point, Point]))
+      : 0
     change((d) =>
-      d.buildings.push({
-        r: [view.x + view.s / 2, view.y + view.s / 2, 24, 16, 0],
-      }),
+      d.buildings.push({ r: [centre[0], centre[1], 24, 16, angle] }),
     )
     setSel({ i: shapes.buildings.length })
   }
@@ -378,10 +450,25 @@ export function MapEditor({
     drag.current = d
   }
 
+  // the points of the shape being drawn, with the side being added snapped parallel to its surroundings
+  function snapDraw(raw: Point, free: boolean): Point {
+    if (free || draft.length === 0) {
+      setGuides([])
+      return raw
+    }
+    const last = draft[draft.length - 1]
+    const sides = nearbySides(shapes.buildings, raw, px * 250, -1)
+    const own = draft.slice(1).map((q, k) => angleOf(draft[k], q))
+    const hit = snapParallel(last, raw, [...anglesOf(sides), ...own])
+    setGuides(hit ? [[last, hit.pt]] : [])
+    return hit ? hit.pt : raw
+  }
+
   function onPointerMove(event: React.PointerEvent) {
     const d = drag.current
-    const p = toSvg(event)
-    if (tool !== "select") setCursor(p)
+    const raw = toSvg(event)
+    const free = event.altKey || !snapOn
+    if (tool !== "select") setCursor(snapDraw(raw, free))
     if (!d) return
     if (d.kind === "pan") {
       if (
@@ -396,8 +483,8 @@ export function MapEditor({
         y: d.view.y - (event.clientY - d.start[1]) * k,
       })
     } else if (d.kind === "move") {
-      const dx = p[0] - d.start[0]
-      const dy = p[1] - d.start[1]
+      const dx = raw[0] - d.start[0]
+      const dy = raw[1] - d.start[1]
       const next = clone(d.orig)
       const b = next.buildings[d.i]
       if (b.r) {
@@ -411,25 +498,148 @@ export function MapEditor({
       }
       setShapes(next)
     } else if (d.kind === "vertex") {
+      // the two sides at this corner snap parallel to nearby sides, or to this shape's own other sides
+      let at = raw
+      let lines: [Point, Point][] = []
+      const pts = shapes.buildings[d.i].p
+      if (pts && !free) {
+        const prev = pts[(d.v - 1 + pts.length) % pts.length]
+        const next = pts[(d.v + 1) % pts.length]
+        const others = nearbySides(shapes.buildings, raw, px * 250, d.i)
+        const own = pts
+          .map((q, k) => [k, q, pts[(k + 1) % pts.length]] as const)
+          .filter(([k]) => k !== d.v && (k + 1) % pts.length !== d.v)
+          .map(([, a, b]) => angleOf(a, b))
+        const refs = [...anglesOf(others), ...own]
+        const s1 = snapParallel(prev, raw, refs)
+        const s2 = snapParallel(next, raw, refs)
+        if (s1 && s2) {
+          // both sides want to be parallel to something: the corner goes where those two lines cross
+          const r1 = (s1.ref * Math.PI) / 180
+          const r2 = (s2.ref * Math.PI) / 180
+          const det = Math.cos(r1) * Math.sin(r2) - Math.sin(r1) * Math.cos(r2)
+          if (Math.abs(det) > 0.15) {
+            const t =
+              ((next[0] - prev[0]) * Math.sin(r2) -
+                (next[1] - prev[1]) * Math.cos(r2)) /
+              det
+            at = [prev[0] + Math.cos(r1) * t, prev[1] + Math.sin(r1) * t]
+            lines = [
+              [prev, at],
+              [next, at],
+            ]
+          } else {
+            at = s1.pt
+            lines = [[prev, at]]
+          }
+        } else if (s1) {
+          at = s1.pt
+          lines = [[prev, at]]
+        } else if (s2) {
+          at = s2.pt
+          lines = [[next, at]]
+        }
+      }
+      setGuides(lines)
       setShapes((current) => {
         const next = clone(current)
-        const pts = next.buildings[d.i].p
-        if (pts) pts[d.v] = [p[0], p[1]]
+        const target = next.buildings[d.i].p
+        if (target) target[d.v] = [at[0], at[1]]
         return next
       })
     } else if (d.kind === "rect") {
+      // a side pulled close to a parallel side of a neighbour lands flush against it
+      let at = raw
+      const lines: [Point, Point][] = []
+      if (!free) {
+        const { ux, uy } = axes(d.orig[4])
+        const near = nearbySides(
+          shapes.buildings,
+          [d.orig[0], d.orig[1]],
+          px * 250 + Math.max(d.orig[2], d.orig[3]),
+          d.i,
+        )
+        const tol = px * 8
+        const flush = (axis: number[], along: number[], moving: boolean) => {
+          if (!moving) return
+          let best: { shift: number; side: [Point, Point] } | null = null
+          for (const side of near) {
+            // only sides running along `along` (so they face the same way as the one being dragged)
+            if (
+              Math.abs(
+                turnBetween(
+                  angleOf(side[0], side[1]),
+                  mod180(deg(Math.atan2(along[1], along[0]))),
+                ),
+              ) > 2.5
+            )
+              continue
+            const shift =
+              side[0][0] * axis[0] +
+              side[0][1] * axis[1] -
+              (at[0] * axis[0] + at[1] * axis[1])
+            if (
+              Math.abs(shift) < tol &&
+              (!best || Math.abs(shift) < Math.abs(best.shift))
+            )
+              best = { shift, side }
+          }
+          if (best) {
+            at = [at[0] + axis[0] * best.shift, at[1] + axis[1] * best.shift]
+            lines.push(best.side)
+          }
+        }
+        flush(ux, uy, d.sx !== 0)
+        flush(uy, ux, d.sy !== 0)
+      }
+      setGuides(lines)
       setShapes((current) => {
         const next = clone(current)
-        next.buildings[d.i].r = resizeRect(d.orig, p, d.sx, d.sy)
+        next.buildings[d.i].r = resizeRect(d.orig, at, d.sx, d.sy)
         return next
       })
     } else if (d.kind === "rotate") {
+      const rect0 = shapes.buildings[d.i].r
+      let angle =
+        deg(
+          Math.atan2(raw[1] - (rect0?.[1] ?? 0), raw[0] - (rect0?.[0] ?? 0)),
+        ) + 90
+      let lines: [Point, Point][] = []
+      if (rect0 && !free) {
+        const near = nearbySides(
+          shapes.buildings,
+          [rect0[0], rect0[1]],
+          px * 250 + Math.max(rect0[2], rect0[3]),
+          d.i,
+        )
+        let bestTurn = ANGLE_TOL
+        let target: number | null = null
+        for (const r of anglesOf(near)) {
+          // a rectangle looks the same every 90 degrees
+          const t = ((((angle - r) % 90) + 135) % 90) - 45
+          if (Math.abs(t) < bestTurn) {
+            bestTurn = Math.abs(t)
+            target = angle - t
+          }
+        }
+        if (target !== null) {
+          angle = target
+          const c: Point = [rect0[0], rect0[1]]
+          const long = Math.max(rect0[2], rect0[3]) * 0.9
+          const rad = (angle * Math.PI) / 180
+          lines = [
+            [
+              [c[0] - Math.cos(rad) * long, c[1] - Math.sin(rad) * long],
+              [c[0] + Math.cos(rad) * long, c[1] + Math.sin(rad) * long],
+            ],
+          ]
+        }
+      }
+      setGuides(lines)
       setShapes((current) => {
         const next = clone(current)
         const rect = next.buildings[d.i].r
-        if (rect)
-          rect[4] =
-            (Math.atan2(p[1] - rect[1], p[0] - rect[0]) * 180) / Math.PI + 90
+        if (rect) rect[4] = angle
         return next
       })
     }
@@ -438,14 +648,19 @@ export function MapEditor({
   function onPointerUp(event: React.PointerEvent) {
     const d = drag.current
     drag.current = null
+    setGuides([])
     if (d?.kind === "pan" && !d.moved) {
       // a plain click on empty space
       if (tool === "select") setSel(null)
       else {
-        const at = toSvg(event)
+        const raw = toSvg(event)
         // clicking the first corner again closes the shape
-        if (draft.length >= 3 && dist(at, draft[0]) < px * 10) finishDraw()
-        else setDraft((current) => [...current, at])
+        if (draft.length >= 3 && dist(raw, draft[0]) < px * 10) finishDraw()
+        else {
+          const at = snapDraw(raw, event.altKey || !snapOn)
+          setGuides([])
+          setDraft((current) => [...current, at])
+        }
       }
     }
   }
@@ -621,7 +836,7 @@ export function MapEditor({
 
   return (
     <div className="flex h-[calc(100dvh-1rem)] flex-col gap-2 p-2 lg:flex-row">
-      <div className="flex min-h-0 flex-1 flex-col gap-2">
+      <div className="flex min-h-0 flex-1 select-none flex-col gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           <IconBtn
             icon={Cursor02Icon}
@@ -649,6 +864,12 @@ export function MapEditor({
             label="Undo"
             onClick={undo}
             disabled={history.length === 0}
+          />
+          <IconBtn
+            icon={MagnetIcon}
+            label="Snap sides parallel (hold Alt to skip)"
+            active={snapOn}
+            onClick={() => setSnapOn((v) => !v)}
           />
           <IconBtn
             icon={MapPinIcon}
@@ -712,8 +933,14 @@ export function MapEditor({
           <svg
             ref={svgRef}
             viewBox={`${view.x} ${view.y} ${view.s} ${view.s}`}
-            className="size-full touch-none rounded-2xl bg-neutral-900"
-            style={{ cursor: tool === "select" ? "default" : "crosshair" }}
+            className="size-full touch-none select-none rounded-2xl bg-neutral-900"
+            style={{
+              cursor: tool === "select" ? "default" : "crosshair",
+              userSelect: "none",
+              WebkitUserSelect: "none",
+            }}
+            onMouseDown={(e) => e.preventDefault()}
+            onDragStart={(e) => e.preventDefault()}
             preserveAspectRatio="xMidYMid meet"
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
@@ -864,6 +1091,21 @@ export function MapEditor({
                 ))}
               </g>
             )}
+
+            {/* what the thing being dragged is lining up with */}
+            {guides.map(([a, b], k) => (
+              <line
+                key={`g${k}`}
+                x1={a[0]}
+                y1={a[1]}
+                x2={b[0]}
+                y2={b[1]}
+                stroke="#e879f9"
+                strokeWidth={stroke * 1.6}
+                strokeDasharray={`${px * 5} ${px * 4}`}
+                pointerEvents="none"
+              />
+            ))}
 
             {/* handles of the selected building: a rectangle has edges and corners, plain vertices have points */}
             {tool === "select" &&
