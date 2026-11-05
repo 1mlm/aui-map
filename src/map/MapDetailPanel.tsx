@@ -24,8 +24,9 @@ import { useIsPhone } from "@/utils/useIsPhone"
 import { AttachmentCarousel, AttachmentStrip } from "./AttachmentCarousel"
 import { formatCoordinates } from "./geo"
 import { TagChipIcon, tagChipClassName } from "./MapTagFilter"
-import { UNDOCKED_PANEL_WIDTH } from "./panelWidth"
+import { MentionText } from "./MentionText"
 import { PinCommentButton } from "./PinCommentButton"
+import { UNDOCKED_PANEL_WIDTH } from "./panelWidth"
 import { ShareMenu } from "./ShareMenu"
 import { tagColorStyle } from "./tagColor"
 import type { MapItem, MapItemAttachment, MapItemTag, PinLink } from "./types"
@@ -46,9 +47,16 @@ export function MapDetailPanel({
   item,
   onClose,
   docked,
+  places,
+  onOpenPlace,
+  onPreviewPlace,
 }: {
   item: MapItem
   onClose: () => void
+  // every place on the map, for the @mentions inside a description
+  places?: MapItem[]
+  onOpenPlace?: (item: MapItem) => void
+  onPreviewPlace?: (item: MapItem | null) => void
   // narrow layouts have no room for a side panel, so it becomes a bottom sheet instead
   docked?: boolean
 }) {
@@ -202,7 +210,16 @@ export function MapDetailPanel({
 
         {item.description && (
           <p className="text-sm whitespace-pre-wrap opacity-90">
-            {item.description}
+            {places && onOpenPlace && onPreviewPlace ? (
+              <MentionText
+                text={item.description}
+                {...{ places }}
+                onOpen={onOpenPlace}
+                onPreview={onPreviewPlace}
+              />
+            ) : (
+              item.description
+            )}
           </p>
         )}
 

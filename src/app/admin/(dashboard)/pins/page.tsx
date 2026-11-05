@@ -25,6 +25,8 @@ export default async function AdminPinsPage() {
     id: pin.id,
     title: pin.title,
     aliases: pin.aliases,
+    keywords: pin.keywords,
+    minZoom: pin.minZoom,
     description: pin.description,
     latitude: pin.latitude,
     longitude: pin.longitude,

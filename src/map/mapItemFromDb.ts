@@ -3,7 +3,9 @@ import { resolveIcon } from "./iconRegistry"
 import type { TagColorName } from "./tagColor"
 import { type MapItem, type MapItemTag, parsePinLinks } from "./types"
 
-type PinWithAttachments = Prisma.PinGetPayload<{ include: { attachments: true } }>
+type PinWithAttachments = Prisma.PinGetPayload<{
+  include: { attachments: true }
+}>
 
 // the one place a db row turns into the shapes the map/admin ui actually render —
 // server-only, since it resolves icon strings via the registry
@@ -19,14 +21,20 @@ export function tagRowToMapItemTag(tag: Tag): MapItemTag {
     icon: resolveIcon(tag.icon),
     color: (tag.color ?? undefined) as TagColorName | undefined,
     sizeScale: tag.sizeScale,
+    keywords: tag.keywords ?? [],
   }
 }
 
-export function pinRowToMapItem(pin: PinWithAttachments, tag: MapItemTag): MapItem {
+export function pinRowToMapItem(
+  pin: PinWithAttachments,
+  tag: MapItemTag,
+): MapItem {
   return {
     id: pin.id,
     title: pin.title,
     aliases: pin.aliases,
+    keywords: pin.keywords ?? [],
+    minZoom: pin.minZoom ?? null,
     shortestName: getShortestName([pin.title, ...pin.aliases]),
     description: pin.description ?? undefined,
     latitude: pin.latitude,

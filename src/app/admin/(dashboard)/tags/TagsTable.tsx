@@ -26,6 +26,7 @@ const emptyTag: AdminTag = {
   icon: "MoreIcon",
   color: null,
   sizeScale: 1,
+  keywords: [],
   pinCount: 0,
 }
 

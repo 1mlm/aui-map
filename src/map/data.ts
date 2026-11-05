@@ -19,6 +19,7 @@ export const MAP_TAGS = {
     icon: BedIcon,
     color: "indigo",
     sizeScale: 1,
+    keywords: [],
   },
   food: {
     id: "food",
@@ -26,6 +27,7 @@ export const MAP_TAGS = {
     icon: Restaurant02Icon,
     color: "red",
     sizeScale: SMALL_PIN_SCALE,
+    keywords: [],
   },
   sports: {
     id: "sports",
@@ -33,6 +35,7 @@ export const MAP_TAGS = {
     icon: FootballIcon,
     color: "green",
     sizeScale: SMALL_PIN_SCALE,
+    keywords: [],
   },
   other: {
     id: "other",
@@ -40,6 +43,7 @@ export const MAP_TAGS = {
     icon: MoreIcon,
     color: "fuchsia",
     sizeScale: SMALL_PIN_SCALE,
+    keywords: [],
   },
   parking: {
     id: "parking",
@@ -47,6 +51,7 @@ export const MAP_TAGS = {
     icon: Car,
     color: "grey",
     sizeScale: 1,
+    keywords: [],
   },
   academic: {
     id: "academic",
@@ -54,6 +59,7 @@ export const MAP_TAGS = {
     icon: Building06Icon,
     color: "orange",
     sizeScale: 1,
+    keywords: [],
   },
   auditorium: {
     id: "auditorium",
@@ -61,6 +67,7 @@ export const MAP_TAGS = {
     icon: TheaterIcon,
     color: "yellow",
     sizeScale: SMALL_PIN_SCALE,
+    keywords: [],
   },
 } satisfies Record<string, MapItemTag>
 
@@ -449,6 +456,8 @@ export const MAP_ITEMS: MapItem[] = rawMapItems.map(
     id,
     title,
     aliases,
+    keywords: [],
+    minZoom: null,
     shortestName: getShortestName([title, ...aliases]),
     description,
     mapsUrl: null,

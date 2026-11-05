@@ -15,6 +15,7 @@ export async function upsertTag(input: TagInput) {
     icon: input.icon,
     color: input.color,
     sizeScale: input.sizeScale,
+    keywords: input.keywords,
   }
   await prisma.tag.upsert({
     where: { id: input.id },

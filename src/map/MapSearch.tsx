@@ -1,12 +1,6 @@
 "use client"
 
-import {
-  type FormEvent,
-  type KeyboardEvent,
-  useEffect,
-  useRef,
-  useState,
-} from "react"
+import { type FormEvent, type KeyboardEvent, useRef } from "react"
 import { Icon } from "@/components/Icon"
 import { ICONS } from "@/icons"
 import {
@@ -25,18 +19,6 @@ export type SearchProps = {
   // arrows, Enter and Escape move through the suggestions. Return true when it handled the key
   onSearchKey?: (key: "up" | "down" | "enter" | "escape") => boolean
 }
-
-// what the empty box suggests, one at a time, so a first-time visitor sees what it can do
-const EXAMPLES = [
-  "Library",
-  "Hungry?",
-  "B8",
-  "Gym",
-  "Doctor",
-  "Print",
-  "Pray",
-  "Mail",
-]
 
 export function SearchField({
   search,
@@ -57,16 +39,6 @@ export function SearchField({
   className?: string
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
-  const [example, setExample] = useState(0)
-  const [focused, setFocused] = useState(false)
-  useEffect(() => {
-    if (focused || search) return
-    const timer = setInterval(
-      () => setExample((i) => (i + 1) % EXAMPLES.length),
-      3200,
-    )
-    return () => clearInterval(timer)
-  }, [focused, search])
 
   function handleKeyDown(event: KeyboardEvent) {
     const key =
@@ -119,18 +91,16 @@ export function SearchField({
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           onFocus={() => {
-            setFocused(true)
             onFocusChange?.(true)
           }}
           onBlur={() => {
-            setFocused(false)
             onFocusChange?.(false)
           }}
           onKeyDown={handleKeyDown}
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
-          placeholder={EXAMPLES[example]}
+          placeholder="B34, B38, Library..."
           className={big ? "text-base" : bar ? "text-sm" : undefined}
         />
         {search && (

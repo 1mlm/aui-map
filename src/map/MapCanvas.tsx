@@ -216,6 +216,10 @@ export type MapCanvasHandle = {
   // the user has already panned around, since clicking a "center me" button is unambiguous
   // intent to jump back to their position
   centerOn: (position: [number, number]) => void
+  // slide to a place and back again, see useMapPanZoom
+  peekAt: (position: [number, number]) => void
+  endPeek: () => void
+  commitPeek: () => void
 }
 
 export function MapCanvas({
@@ -288,10 +292,26 @@ export function MapCanvas({
     const next = scale > sizeTuning.labelShowScale
     setShowPinLabels((current) => (current === next ? current : next))
   })
+  // small details (a bathroom, a printer) only appear once the map is zoomed in far enough. Tracked
+  // in quarter steps so zooming doesn't re-render the map on every frame
+  const [zoomStep, setZoomStep] = useState(
+    () => Math.floor(panZoom.scale.get() * 4) / 4,
+  )
+  useMotionValueEvent(panZoom.scale, "change", (scale) => {
+    const next = Math.floor(scale * 4) / 4
+    setZoomStep((current) => (current === next ? current : next))
+  })
 
-  useImperativeHandle(ref, () => ({ centerOn: panZoom.centerOn }), [
-    panZoom.centerOn,
-  ])
+  useImperativeHandle(
+    ref,
+    () => ({
+      centerOn: panZoom.centerOn,
+      peekAt: panZoom.peekAt,
+      endPeek: panZoom.endPeek,
+      commitPeek: panZoom.commitPeek,
+    }),
+    [panZoom.centerOn, panZoom.peekAt, panZoom.endPeek, panZoom.commitPeek],
+  )
 
   useEffect(() => () => clearTimeout(surveyedCoordTimer.current), [])
 
@@ -507,19 +527,26 @@ export function MapCanvas({
             {offCampusPosition && (
               <OffCampusIndicator position={offCampusPosition} />
             )}
-            {items.map((item) => (
-              <MapPin
-                key={item.id}
-                selected={item.id === selectedId}
-                showLabel={showPinLabels}
-                onSelect={() =>
-                  onSelect(item.id === selectedId ? null : item.id)
-                }
-                previewing={hoveredTagId !== null}
-                matchesPreview={item.tag.id === hoveredTagId}
-                {...{ item, tuning, sizeTuning }}
-              />
-            ))}
+            {items
+              .filter(
+                (item) =>
+                  item.minZoom == null ||
+                  zoomStep >= item.minZoom ||
+                  item.id === selectedId,
+              )
+              .map((item) => (
+                <MapPin
+                  key={item.id}
+                  selected={item.id === selectedId}
+                  showLabel={showPinLabels}
+                  onSelect={() =>
+                    onSelect(item.id === selectedId ? null : item.id)
+                  }
+                  previewing={hoveredTagId !== null}
+                  matchesPreview={item.tag.id === hoveredTagId}
+                  {...{ item, tuning, sizeTuning }}
+                />
+              ))}
             {contextMenuPosition && (
               <DroppedPinMarker position={contextMenuPosition} />
             )}

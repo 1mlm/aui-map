@@ -31,6 +31,7 @@ export type AdminTag = {
   icon: IconName
   color: string | null
   sizeScale: number
+  keywords: string[]
   pinCount: number
 }
 
@@ -56,6 +57,7 @@ export function TagDialog({
   const [icon, setIcon] = useState<IconName>(tag.icon)
   const [color, setColor] = useState<string | null>(tag.color)
   const [sizeScale, setSizeScale] = useState(tag.sizeScale)
+  const [keywordsText, setKeywordsText] = useState(tag.keywords.join(", "))
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
@@ -72,7 +74,17 @@ export function TagDialog({
     }
     startTransition(async () => {
       try {
-        await upsertTag({ id, label, icon, color, sizeScale })
+        await upsertTag({
+          id,
+          label,
+          icon,
+          color,
+          sizeScale,
+          keywords: keywordsText
+            .split(",")
+            .map((word) => word.trim().toLowerCase())
+            .filter(Boolean),
+        })
         onOpenChange(false)
       } catch {
         setError("Couldn't save — that id might already be in use.")
@@ -218,6 +230,22 @@ export function TagDialog({
               </SelectItem>
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel icon={ICONS.aliases} htmlFor="tag-keywords">
+            Hidden search words
+          </FieldLabel>
+          <Input
+            id="tag-keywords"
+            placeholder="e.g. eat, hungry, lunch"
+            value={keywordsText}
+            onChange={(e) => setKeywordsText(e.target.value)}
+            className={INPUT_CLASS}
+          />
+          <p className="text-muted-foreground text-xs">
+            Never shown. Typing one of these finds every place of this category.
+          </p>
         </div>
 
         {!isNew && tag.pinCount > 0 && (

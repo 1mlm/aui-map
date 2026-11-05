@@ -5,8 +5,8 @@ import { Prisma } from "@/generated/prisma/client"
 import type { PinLink } from "@/map/types"
 import { deleteFile } from "@/utils/cloudinary"
 import { prisma } from "@/utils/prisma"
-import { RESERVED_PIN_IDS } from "@/utils/reservedPinIds"
 import { requireAuth } from "@/utils/requireAuth"
+import { RESERVED_PIN_IDS } from "@/utils/reservedPinIds"
 
 export type PinInput = {
   // null for a pin that doesn't exist yet — upsertPin creates one and lets the db generate its
@@ -15,6 +15,8 @@ export type PinInput = {
   id: string
   title: string
   aliases: string[]
+  keywords: string[]
+  minZoom: number | null
   description: string | null
   latitude: number
   longitude: number
@@ -85,6 +87,8 @@ export async function upsertPin(
     id: input.id,
     title: input.title,
     aliases: input.aliases,
+    keywords: input.keywords,
+    minZoom: input.minZoom,
     description: input.description,
     latitude: input.latitude,
     longitude: input.longitude,

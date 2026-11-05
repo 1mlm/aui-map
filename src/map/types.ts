@@ -8,6 +8,8 @@ export type MapItemTag = {
   color?: TagColorName
   // pin size multiplier — see Tag.sizeScale in prisma/schema.prisma
   sizeScale: number
+  // hidden search words for every pin of this category, see Tag.keywords
+  keywords: string[]
 }
 
 export type MapItemAttachment = {
@@ -37,6 +39,10 @@ export type MapItem = {
   id: string
   title: string
   aliases: string[]
+  // hidden search words ("doctor" for the health center), never shown, see Pin.keywords
+  keywords: string[]
+  // only drawn once the map is zoomed in this far, null = always. See Pin.minZoom
+  minZoom: number | null
   shortestName: string
   description?: string
   latitude: number

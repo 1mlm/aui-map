@@ -36,6 +36,10 @@ export type AdminPin = {
   id: string
   title: string
   aliases: string[]
+  // hidden search words, see Pin.keywords
+  keywords: string[]
+  // null = always on the map, otherwise only once zoomed in this far
+  minZoom: number | null
   description: string | null
   latitude: number
   longitude: number
@@ -116,12 +120,15 @@ function LinksEditor({
 export function PinDialog({
   pin,
   tags,
+  allPins,
   isNew,
   open,
   onOpenChange,
 }: {
   pin: AdminPin
   tags: MapItemTag[]
+  // every pin, for mentioning one inside a description
+  allPins: { id: string; title: string }[]
   isNew: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -129,6 +136,8 @@ export function PinDialog({
   const [id, setId] = useState(pin.id)
   const [title, setTitle] = useState(pin.title)
   const [aliasesText, setAliasesText] = useState(pin.aliases.join(", "))
+  const [keywordsText, setKeywordsText] = useState(pin.keywords.join(", "))
+  const [minZoom, setMinZoom] = useState<number | null>(pin.minZoom)
   const [description, setDescription] = useState(pin.description ?? "")
   const [mapsUrl, setMapsUrl] = useState(pin.mapsUrl ?? "")
   const [hours, setHours] = useState(pin.hours ?? "")
@@ -177,6 +186,11 @@ export function PinDialog({
             .split(",")
             .map((alias) => alias.trim())
             .filter(Boolean),
+          keywords: keywordsText
+            .split(",")
+            .map((word) => word.trim().toLowerCase())
+            .filter(Boolean),
+          minZoom,
           description: description || null,
           mapsUrl: mapsUrl.trim() || null,
           hours: hours.trim() || null,
@@ -290,6 +304,22 @@ export function PinDialog({
           />
         </div>
         <div className="flex flex-col gap-1.5">
+          <FieldLabel icon={ICONS.aliases} htmlFor="pin-keywords">
+            Hidden search words
+          </FieldLabel>
+          <Input
+            id="pin-keywords"
+            placeholder="e.g. doctor, nurse, sick, medicine"
+            value={keywordsText}
+            onChange={(e) => setKeywordsText(e.target.value)}
+            className={INPUT_CLASS}
+          />
+          <p className="text-muted-foreground text-xs">
+            Never shown. Typing one of these finds this place, even if the name
+            is different.
+          </p>
+        </div>
+        <div className="flex flex-col gap-1.5">
           <FieldLabel icon={ICONS.description} htmlFor="pin-description">
             Description
           </FieldLabel>
@@ -301,6 +331,33 @@ export function PinDialog({
             rows={2}
             className={INPUT_CLASS}
           />
+          <div className="flex items-center gap-2">
+            <select
+              aria-label="Mention a place"
+              value=""
+              onChange={(e) => {
+                const mention = e.target.value
+                if (mention)
+                  setDescription(
+                    (text) =>
+                      `${text}${text && !/\s$/.test(text) ? " " : ""}@${mention} `,
+                  )
+              }}
+              className="rounded-xl corner-squircle border bg-background px-2 py-1 text-sm"
+            >
+              <option value="">Mention a place...</option>
+              {allPins
+                .filter((other) => other.id !== id)
+                .map((other) => (
+                  <option key={other.id} value={other.id}>
+                    {other.title}
+                  </option>
+                ))}
+            </select>
+            <span className="text-muted-foreground text-xs">
+              Adds @id. Visitors see a tappable chip for that place.
+            </span>
+          </div>
         </div>
         <PinPositionEditor {...position} onChange={setPosition} />
         <div className="flex flex-col gap-1.5">
@@ -347,6 +404,26 @@ export function PinDialog({
             />
           </div>
         )}
+
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel icon={ICONS.size} htmlFor="pin-minzoom">
+            Shows on the map
+          </FieldLabel>
+          <select
+            id="pin-minzoom"
+            value={minZoom === null ? "" : String(minZoom)}
+            onChange={(e) =>
+              setMinZoom(e.target.value ? Number(e.target.value) : null)
+            }
+            className="rounded-xl corner-squircle border bg-background px-2.5 py-2 text-sm"
+          >
+            <option value="">Always</option>
+            <option value="1.8">
+              Only when zoomed in a little (bathrooms, printers...)
+            </option>
+            <option value="2.5">Only when zoomed in close</option>
+          </select>
+        </div>
 
         <Disclosure label="Show additional options">
           <label

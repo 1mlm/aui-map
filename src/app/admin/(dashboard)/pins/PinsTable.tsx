@@ -26,6 +26,8 @@ const emptyPin = (): AdminPin => ({
   id: "",
   title: "",
   aliases: [],
+  keywords: [],
+  minZoom: null,
   description: null,
   mapsUrl: null,
   hours: null,
@@ -173,6 +175,7 @@ function PinsTableInner({
           isNew={false}
           open={Boolean(editingPin)}
           onOpenChange={(open) => !open && setEditingPin(null)}
+          allPins={pins.map(({ id, title }) => ({ id, title }))}
           {...{ tags }}
         />
       )}
@@ -182,6 +185,7 @@ function PinsTableInner({
           isNew={true}
           open={creating}
           onOpenChange={setCreating}
+          allPins={pins.map(({ id, title }) => ({ id, title }))}
           {...{ tags }}
         />
       )}

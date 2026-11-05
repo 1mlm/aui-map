@@ -18,6 +18,7 @@ export default async function AdminTagsPage() {
     icon: tag.icon as IconName,
     color: tag.color,
     sizeScale: tag.sizeScale,
+    keywords: tag.keywords,
     pinCount: tag._count.pins,
   }))
 

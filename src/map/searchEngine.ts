@@ -8,7 +8,9 @@ export type Searchable = {
   id: string
   title: string
   aliases: string[]
-  tag: { id: string; label: string }
+  // hidden words for this place, edited in the admin ("doctor", "sick" for the health center)
+  keywords?: string[]
+  tag: { id: string; label: string; keywords?: string[] }
 }
 
 export type SearchMode =
@@ -16,7 +18,7 @@ export type SearchMode =
   | "empty"
   // the place itself: its name, number or alias
   | "places"
-  // a category or a need ("food", "hungry", "doctor"): a group of places
+  // found through a hidden keyword or a category word ("doctor", "food"), not through a name
   | "concept"
   // nothing matched exactly, these are the closest names
   | "fuzzy"
@@ -28,8 +30,6 @@ export type SearchHit<T> = { item: T; score: number }
 export type SearchOutcome<T> = {
   mode: SearchMode
   hits: SearchHit<T>[]
-  // for "concept": what the words were taken to mean ("Food")
-  concept?: string
 }
 
 // ---- normalising ----
@@ -87,330 +87,6 @@ const FILLER = new Set([
   "est",
 ])
 
-// ---- what people actually need, in their own words ----
-// each group points at a whole category (tagIds) and/or specific places (pinIds). Anything that
-// doesn't exist on the current map is simply skipped, so this can list more than is there today
-type Concept = {
-  label: string
-  words: string[]
-  tagIds?: string[]
-  pinIds?: string[]
-}
-export const CONCEPTS: Concept[] = [
-  {
-    label: "Food",
-    words: [
-      "eat",
-      "eating",
-      "food",
-      "hungry",
-      "hunger",
-      "lunch",
-      "dinner",
-      "breakfast",
-      "restaurant",
-      "restaurants",
-      "cafe",
-      "coffee",
-      "snack",
-      "snacks",
-      "sandwich",
-      "burger",
-      "drink",
-      "meal",
-      "cafeteria",
-      "faim",
-      "manger",
-      "resto",
-      "dejeuner",
-      "diner",
-      "kiosk",
-    ],
-    tagIds: ["food"],
-  },
-  {
-    label: "Housing",
-    words: [
-      "sleep",
-      "dorm",
-      "dorms",
-      "dormitory",
-      "housing",
-      "room",
-      "rooms",
-      "residence",
-      "residences",
-      "live",
-      "living",
-      "logement",
-      "chambre",
-      "apartment",
-      "apartments",
-    ],
-    tagIds: ["unknownHousing"],
-  },
-  {
-    label: "Swimming",
-    words: ["swim", "swimming", "pool", "piscine", "swimmer"],
-    pinIds: ["pool"],
-  },
-  {
-    label: "Sports",
-    words: [
-      "sport",
-      "sports",
-      "workout",
-      "exercise",
-      "fitness",
-      "swim",
-      "swimming",
-      "football",
-      "soccer",
-      "basketball",
-      "volleyball",
-      "handball",
-      "tennis",
-      "padel",
-      "run",
-      "running",
-      "jog",
-      "pitch",
-      "court",
-      "courts",
-      "muscu",
-    ],
-    tagIds: ["sports"],
-  },
-  {
-    label: "Parking",
-    words: ["parking", "park", "car", "cars", "drive", "garage", "voiture"],
-    tagIds: ["parking"],
-  },
-  {
-    label: "Auditoriums",
-    words: [
-      "auditorium",
-      "auditoriums",
-      "amphitheater",
-      "amphitheatre",
-      "amphi",
-      "theater",
-      "theatre",
-      "presentation",
-      "graduation",
-      "conference",
-      "talk",
-      "talks",
-      "defense",
-    ],
-    tagIds: ["auditorium"],
-  },
-  {
-    label: "Health",
-    words: [
-      "doctor",
-      "nurse",
-      "sick",
-      "ill",
-      "medical",
-      "medic",
-      "health",
-      "clinic",
-      "pharmacy",
-      "medicine",
-      "hospital",
-      "infirmary",
-      "pain",
-      "medecin",
-      "sante",
-      "malade",
-    ],
-    pinIds: ["health-center"],
-  },
-  {
-    label: "Money",
-    words: [
-      "money",
-      "cash",
-      "atm",
-      "atms",
-      "bank",
-      "withdraw",
-      "pay",
-      "payment",
-      "fees",
-      "wallet",
-      "card",
-      "tuition",
-      "argent",
-      "banque",
-      "guichet",
-    ],
-    pinIds: ["atms", "business-office"],
-  },
-  {
-    label: "IT help",
-    words: [
-      "print",
-      "printer",
-      "printing",
-      "wifi",
-      "internet",
-      "computer",
-      "laptop",
-      "it",
-      "tech",
-      "password",
-      "network",
-      "imprimer",
-    ],
-    pinIds: ["its"],
-  },
-  {
-    label: "Study",
-    words: [
-      "study",
-      "studying",
-      "read",
-      "reading",
-      "quiet",
-      "research",
-      "library",
-      "bibliotheque",
-      "livre",
-    ],
-    pinIds: ["m6l"],
-  },
-  {
-    label: "Books and shops",
-    words: [
-      "book",
-      "books",
-      "textbook",
-      "textbooks",
-      "buy",
-      "store",
-      "supermarket",
-      "grocery",
-      "groceries",
-      "shop",
-      "shopping",
-      "stationery",
-      "magasin",
-    ],
-    pinIds: ["bookstore", "shop"],
-  },
-  {
-    label: "Prayer",
-    words: [
-      "pray",
-      "prayer",
-      "prayers",
-      "mosque",
-      "masjid",
-      "salat",
-      "salah",
-      "muslim",
-      "mosquee",
-      "priere",
-    ],
-    pinIds: ["mosque"],
-  },
-  {
-    label: "Mail",
-    words: [
-      "mail",
-      "post",
-      "package",
-      "parcel",
-      "letter",
-      "send",
-      "stamp",
-      "colis",
-      "poste",
-    ],
-    pinIds: ["post-office"],
-  },
-  {
-    label: "Registration",
-    words: [
-      "register",
-      "registration",
-      "enroll",
-      "enrol",
-      "enrollment",
-      "transcript",
-      "records",
-      "certificate",
-      "paperwork",
-      "inscription",
-      "scolarite",
-    ],
-    pinIds: ["registrar"],
-  },
-  {
-    label: "Clubs and events",
-    words: [
-      "club",
-      "clubs",
-      "events",
-      "event",
-      "activities",
-      "activity",
-      "student",
-      "students",
-      "society",
-      "associations",
-      "association",
-    ],
-    pinIds: ["sao", "event-room"],
-  },
-  {
-    label: "Entrance",
-    words: [
-      "gate",
-      "entrance",
-      "enter",
-      "entry",
-      "exit",
-      "leave",
-      "security",
-      "arrive",
-      "arrival",
-      "entree",
-      "sortie",
-      "porte",
-    ],
-    pinIds: ["main-gate"],
-  },
-  {
-    label: "Laundry",
-    words: ["laundry", "wash", "washing", "clothes", "laverie", "linge"],
-    pinIds: ["laundry"],
-  },
-  {
-    label: "Classes",
-    words: [
-      "class",
-      "classes",
-      "classroom",
-      "classrooms",
-      "lecture",
-      "lectures",
-      "lab",
-      "labs",
-      "professor",
-      "professors",
-      "teacher",
-      "office",
-      "offices",
-      "cours",
-      "salle",
-    ],
-    tagIds: ["building"],
-  },
-]
-
 // ---- typo tolerance ----
 // Damerau-Levenshtein (a swapped pair of letters counts as one mistake)
 function distance(a: string, b: string) {
@@ -446,6 +122,10 @@ function keysOf(item: Searchable) {
     title: normalizeForSearch(item.title),
     aliases: item.aliases.filter(Boolean).map(normalizeForSearch),
     tag: normalizeForSearch(item.tag.label),
+    keywords: (item.keywords ?? []).map(normalizeForSearch).filter(Boolean),
+    tagKeywords: (item.tag.keywords ?? [])
+      .map(normalizeForSearch)
+      .filter(Boolean),
     allWords: [
       ...words(item.title),
       ...item.aliases.flatMap(words),
@@ -475,46 +155,24 @@ export function searchPlaces<T extends Searchable>(
   const asked = new Set(queryWords)
   const askedKeys = [...asked].map(normalizeForSearch)
 
-  // the places a group points at, when it names any that exist on this map
-  const concept = (() => {
-    const tagMatches = keyed.filter(({ keys }) =>
-      askedKeys.some(
-        (key) =>
-          key.length >= 3 && (keys.tag === key || keys.tag.startsWith(key)),
-      ),
+  // places found by a hidden word, the strongest being a word of the place itself, then its category's
+  const matchesKeyword = (list: string[], key: string) =>
+    list.some(
+      (word) => word === key || (key.length >= 3 && word.startsWith(key)),
     )
-    if (tagMatches.length)
-      return {
-        label: tagMatches[0].item.tag.label,
-        hits: tagMatches.map(({ item }) => ({ item, score: 60 })),
-      }
-    for (const group of CONCEPTS) {
-      const named = askedKeys.some((key) =>
-        group.words.some(
-          (word) => word === key || (key.length >= 3 && word.startsWith(key)),
-        ),
+  const concept = (() => {
+    const found: SearchHit<T>[] = []
+    for (const { item, keys } of keyed) {
+      const own = askedKeys.some((key) => matchesKeyword(keys.keywords, key))
+      const byTag = askedKeys.some(
+        (key) =>
+          matchesKeyword(keys.tagKeywords, key) ||
+          (key.length >= 3 && (keys.tag === key || keys.tag.startsWith(key))),
       )
-      if (!named) continue
-      const byPin =
-        group.pinIds?.flatMap((id) =>
-          keyed.filter(({ item }) => item.id === id).map(({ item }) => item),
-        ) ?? []
-      const byTag = group.tagIds
-        ? keyed
-            .filter(({ item }) => group.tagIds?.includes(item.tag.id))
-            .map(({ item }) => item)
-        : []
-      const found = [...new Set([...byPin, ...byTag])]
-      if (found.length)
-        return {
-          label: group.label,
-          hits: found.map((item) => ({
-            item,
-            score: byPin.includes(item) ? 65 : 55,
-          })),
-        }
+      if (own) found.push({ item, score: 65 })
+      else if (byTag) found.push({ item, score: 55 })
     }
-    return null
+    return found.length ? { hits: found } : null
   })()
   const byName = (a: SearchHit<T>, b: SearchHit<T>) =>
     b.score - a.score || a.item.title.localeCompare(b.item.title)
@@ -545,11 +203,7 @@ export function searchPlaces<T extends Searchable>(
 
   if (concept && bestPlace < 70) {
     // a need ("eat", "doctor"): only weak look-alikes inside other words ("eat" in "amphitheater") lose to it
-    return {
-      mode: "concept",
-      concept: concept.label,
-      hits: concept.hits.sort(byName),
-    }
+    return { mode: "concept", hits: concept.hits.sort(byName) }
   }
   if (placeHits.length) {
     // a clear place, plus the rest of its group underneath ("club": the club house, then the clubs office)
@@ -580,34 +234,18 @@ export function searchPlaces<T extends Searchable>(
       if (best <= allowed)
         fuzzy.set(item, Math.max(fuzzy.get(item) ?? 0, 40 - best * 5))
     }
-    // a misspelled need: "hungary", "docter"
-    for (const concept of CONCEPTS)
-      for (const word of concept.words) {
+    // a misspelled hidden word: "docter", "hungary"
+    for (const { item, keys } of keyed) {
+      for (const word of [...keys.keywords, ...keys.tagKeywords]) {
         if (
           word.length < 4 ||
           Math.abs(word.length - key.length) > allowed ||
           distance(key, word) > allowed
         )
           continue
-        const byPin =
-          concept.pinIds?.flatMap((id) =>
-            keyed.filter(({ item }) => item.id === id).map(({ item }) => item),
-          ) ?? []
-        const byTag = concept.tagIds
-          ? keyed
-              .filter(({ item }) => concept.tagIds?.includes(item.tag.id))
-              .map(({ item }) => item)
-          : []
-        const found = [...new Set([...byPin, ...byTag])]
-        if (found.length)
-          return {
-            mode: "concept",
-            concept: concept.label,
-            hits: found
-              .map((item) => ({ item, score: 50 }))
-              .sort((a, b) => a.item.title.localeCompare(b.item.title)),
-          }
+        fuzzy.set(item, Math.max(fuzzy.get(item) ?? 0, 35))
       }
+    }
   }
   if (fuzzy.size) {
     const hits = [...fuzzy].map(([item, score]) => ({ item, score }))

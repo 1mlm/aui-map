@@ -5,11 +5,7 @@ import dynamic from "next/dynamic"
 import { useEffect, useRef, useState } from "react"
 import { triggerHaptic } from "@/utils/haptics"
 import { CoordinateResult } from "./CoordinateResult"
-import {
-  latLongToPosition,
-  parseCoordinateQuery,
-  positionToLatLong,
-} from "./geo"
+import { latLongToPosition, parseCoordinateQuery } from "./geo"
 import { LocateFloatingButton } from "./LocateFloatingButton"
 import { MapBrand } from "./MapBrand"
 import { MapCanvas, type MapCanvasHandle } from "./MapCanvas"
@@ -18,7 +14,7 @@ import { DEFAULT_PIN_SIZE_TUNING, type PinSizeTuning } from "./MapPin"
 import { MapFilterBar } from "./MapTagFilter"
 import { NetworkStatusBanner } from "./NetworkStatusBanner"
 import { UNDOCKED_PANEL_WIDTH } from "./panelWidth"
-import { SearchSuggestions, type SuggestionRow } from "./SearchSuggestions"
+import { SearchSuggestions } from "./SearchSuggestions"
 import { searchPlaces } from "./searchEngine"
 import { recordSearchMiss } from "./searchMissActions"
 import { DEFAULT_CRAYON_TUNING, type TagColorName } from "./tagColor"
@@ -61,37 +57,6 @@ const PinTuningPlayground = dynamic(
   () => import("./PinTuningPlayground").then((m) => m.PinTuningPlayground),
   { ssr: false },
 )
-
-// the places people go most, offered when the search box is empty or nothing matched. Any that
-// don't exist on the current map are skipped
-const POPULAR_IDS = [
-  "m6l",
-  "cossa",
-  "health-center",
-  "main-gate",
-  "gym",
-  "bookstore",
-  "registrar",
-  "post-office",
-  "mosque",
-]
-const RECENT_KEY = "aui_recent_places"
-
-// straight-line meters between two spots on the map (haversine)
-function metersBetween(a: [number, number], b: [number, number]) {
-  const [p, q] = [positionToLatLong(a), positionToLatLong(b)]
-  const rad = (d: number) => (d * Math.PI) / 180
-  const h =
-    Math.sin(rad(q.latitude - p.latitude) / 2) ** 2 +
-    Math.cos(rad(p.latitude)) *
-      Math.cos(rad(q.latitude)) *
-      Math.sin(rad(q.longitude - p.longitude) / 2) ** 2
-  return 2 * 6371000 * Math.asin(Math.sqrt(h))
-}
-const distanceLabel = (meters: number) =>
-  meters < 1000
-    ? `${Math.max(10, Math.round(meters / 10) * 10)} m`
-    : `${(meters / 1000).toFixed(1)} km`
 
 // long enough that it only fires once someone's actually done typing, not on every keystroke
 const ZERO_RESULT_SEARCH_TRACK_DELAY_MS = 800
@@ -271,69 +236,49 @@ export function MapExperience({
   }, [search, visibleItems, selectedId, setSelectedId, outcome.mode])
 
   // ---- the suggestions under the search bar ----
+  // only while typing: what matches, nothing more. An empty box offers nothing
   const [searchFocused, setSearchFocused] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
-  const [recentIds, setRecentIds] = useState<string[]>([])
-  useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]")
-      if (Array.isArray(saved))
-        setRecentIds(saved.filter((id) => typeof id === "string"))
-    } catch {}
-  }, [])
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new word starts from the top of the list again
   useEffect(() => setActiveIndex(-1), [search])
 
   const searchQuery = search.trim()
-  const nothingTyped = !searchQuery || coordinateSearch
-  const distanceOf = (item: MapItem) =>
-    location.position
-      ? metersBetween(
-          location.position,
-          latLongToPosition(item.latitude, item.longitude),
-        )
-      : undefined
-  const popular = POPULAR_IDS.map((id) =>
-    effectiveItems.find((item) => item.id === id),
-  ).filter((item): item is MapItem => Boolean(item))
-  const recent = recentIds
-    .map((id) => effectiveItems.find((item) => item.id === id))
-    .filter((item): item is MapItem => Boolean(item))
-    .slice(0, 3)
-  let rowItems: MapItem[]
-  let recentCount = 0
-  if (nothingTyped) {
-    recentCount = recent.length
-    rowItems = [
-      ...recent,
-      ...popular.filter((item) => !recent.includes(item)),
-    ].slice(0, 6)
-  } else if (outcome.mode === "none") rowItems = popular.slice(0, 4)
-  else {
-    let hits = outcome.hits.map((hit) => hit.item)
-    // "food" / "doctor": the nearest first, when the visitor's position is known
-    if (outcome.mode === "concept" && location.position)
-      hits = [...hits].sort(
-        (a, b) => (distanceOf(a) ?? 0) - (distanceOf(b) ?? 0),
-      )
-    rowItems = hits.slice(0, outcome.mode === "concept" ? 8 : 6)
-  }
-  const suggestionRows: SuggestionRow[] = rowItems.map((item) => {
-    const meters = distanceOf(item)
-    return {
-      item,
-      distance: meters === undefined ? undefined : distanceLabel(meters),
-    }
-  })
+  const suggestionItems = outcome.hits.slice(0, 7).map((hit) => hit.item)
   const showSuggestions =
     searchFocused &&
     !coordinateSearch &&
+    searchQuery.length > 0 &&
     // a single place that is already open needs no list
     !(
       outcome.mode === "places" &&
-      suggestionRows.length === 1 &&
-      suggestionRows[0].item.id === selectedId
+      suggestionItems.length === 1 &&
+      suggestionItems[0].id === selectedId
     )
+
+  // a mention hovered in a description: the map slides to that place and back, with a marker there
+  const [previewPosition, setPreviewPosition] = useState<
+    [number, number] | null
+  >(null)
+  function previewPlace(place: MapItem | null) {
+    if (!place) {
+      mapCanvasRef.current?.endPeek()
+      setPreviewPosition(null)
+      return
+    }
+    const position = latLongToPosition(place.latitude, place.longitude)
+    mapCanvasRef.current?.peekAt(position)
+    setPreviewPosition(position)
+  }
+  // clicking a mention opens that place for real, and keeps the view it slid to
+  function openPlace(place: MapItem) {
+    mapCanvasRef.current?.commitPeek()
+    setPreviewPosition(null)
+    triggerHaptic("selection")
+    setSelectedId(place.id)
+    mapCanvasRef.current?.centerOn(
+      latLongToPosition(place.latitude, place.longitude),
+    )
+  }
 
   const blurSearch = () =>
     (document.activeElement as HTMLElement | null)?.blur()
@@ -344,22 +289,6 @@ export function MapExperience({
       latLongToPosition(item.latitude, item.longitude),
     )
     setSearch("")
-    setRecentIds((previous) => {
-      const next = [item.id, ...previous.filter((id) => id !== item.id)].slice(
-        0,
-        5,
-      )
-      try {
-        localStorage.setItem(RECENT_KEY, JSON.stringify(next))
-      } catch {}
-      return next
-    })
-    blurSearch()
-  }
-  function pickTag(tag: MapItemTag) {
-    triggerHaptic("selection")
-    setActiveTagIds(new Set([tag.id]))
-    setSearch("")
     blurSearch()
   }
   // arrows move through the list, Enter opens the highlighted place (or the first one)
@@ -369,17 +298,16 @@ export function MapExperience({
       return true
     }
     if (key === "down" || key === "up") {
-      if (!suggestionRows.length) return false
+      if (!suggestionItems.length) return false
       const step = key === "down" ? 1 : -1
       setActiveIndex(
-        (i) => (i + step + suggestionRows.length) % suggestionRows.length,
+        (i) => (i + step + suggestionItems.length) % suggestionItems.length,
       )
       return true
     }
-    if (nothingTyped || outcome.mode === "none") return false
-    const row = suggestionRows[activeIndex >= 0 ? activeIndex : 0]
-    if (!row) return false
-    pickItem(row.item)
+    const item = suggestionItems[activeIndex >= 0 ? activeIndex : 0]
+    if (!searchQuery || !item) return false
+    pickItem(item)
     return true
   }
 
@@ -404,7 +332,9 @@ export function MapExperience({
               location.isOffCampus ? location.rawPosition : null
             }
             compassHeading={compass.heading}
-            searchedPosition={searchedOnCampus ? searchedPosition : null}
+            searchedPosition={
+              searchedOnCampus ? searchedPosition : previewPosition
+            }
             {...{ selectedId, hoveredTagId, tuning, sizeTuning }}
           />
 
@@ -436,18 +366,11 @@ export function MapExperience({
           />
           {showSuggestions && (
             <SearchSuggestions
-              className="absolute inset-x-3 top-[4.25rem] z-40 max-h-[min(30rem,calc(100dvh-7rem))] sm:inset-x-auto sm:top-[3.75rem] sm:right-3 sm:w-96"
+              className="absolute inset-x-3 top-[4.25rem] z-40 max-h-[min(26rem,calc(100dvh-7rem))] sm:inset-x-auto sm:top-[3.75rem] sm:right-3 sm:w-96"
               query={search}
-              mode={nothingTyped ? "empty" : outcome.mode}
-              concept={outcome.concept}
-              rows={suggestionRows}
-              recentCount={recentCount}
-              tags={effectiveTags}
+              items={suggestionItems}
               activeIndex={activeIndex}
-              totalMatches={outcome.hits.length}
               onPick={pickItem}
-              onPickTag={pickTag}
-              onNearest={location.position ? undefined : handleLocate}
             />
           )}
           <AnimatePresence>
@@ -465,6 +388,9 @@ export function MapExperience({
           <AnimatePresence>
             {selected && (
               <MapDetailPanel
+                places={effectiveItems}
+                onOpenPlace={openPlace}
+                onPreviewPlace={previewPlace}
                 item={selected}
                 onClose={() => setSelectedId(null)}
                 docked={space.docksPanel}

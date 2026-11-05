@@ -17,6 +17,9 @@ model Tag {
   // pin size multiplier — 1 (normal) for buildings, smaller (e.g. 0.8) for things like food
   // stands or auditoriums that sit inside/next to a building and shouldn't compete with it visually
   sizeScale Float   @default(1)
+  // hidden words that find every pin of this category in the search ("eat", "hungry" for food).
+  // Never shown to visitors, edited in /admin/tags
+  keywords  String[] @default([])
   pins      Pin[]
 }
 
@@ -30,6 +33,12 @@ model Pin {
   title        String
   aliases      String[]
   description  String?
+  // hidden words that find this pin in the search ("doctor", "sick" for the health center).
+  // Never shown to visitors, edited in /admin/pins
+  keywords     String[]     @default([])
+  // a small detail (a bathroom, a printer...) that would crowd the map: null shows it always,
+  // otherwise it only appears once the map is zoomed in this far (1 = fully zoomed out, 5 = closest)
+  minZoom      Float?
   latitude     Float
   longitude    Float
   // curated place link (reviews/photos) some pins get by hand — overrides the

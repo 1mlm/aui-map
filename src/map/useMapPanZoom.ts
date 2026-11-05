@@ -8,9 +8,9 @@ import {
   distanceBetween,
   midpointOf,
   type Pan,
+  type Point,
   panAnchoredAt,
   panCenteredOn,
-  type Point,
 } from "./panZoomMath"
 
 // the image sits in a square box already sized to cover the viewport, so 1 is the smallest
@@ -202,6 +202,40 @@ export function useMapPanZoom() {
     animate(scale, toScale, LOCATE_TRANSITION).then(() => isMoving.set(0))
     animate(x, pan.x, LOCATE_TRANSITION)
     animate(y, pan.y, LOCATE_TRANSITION)
+  }
+
+  // a look at somewhere else on the map (hovering a mention in a description): the view slides there
+  // and, when the pointer leaves, slides back to exactly where it was. Opening the place instead
+  // keeps the new view (commitPeek)
+  const peekReturn = useRef<{ x: number; y: number; scale: number } | null>(
+    null,
+  )
+  function peekAt([nx, ny]: [number, number]) {
+    if (!rect.current) return
+    if (!peekReturn.current)
+      peekReturn.current = { x: x.get(), y: y.get(), scale: scale.get() }
+    const toScale = Math.max(scale.get(), DOUBLE_TAP_SCALE)
+    const pan = clampPanToOverhang(
+      panCenteredOn(nx, ny, toScale, rect.current),
+      toScale,
+      rect.current,
+    )
+    isMoving.set(1)
+    animate(scale, toScale, LOCATE_TRANSITION).then(() => isMoving.set(0))
+    animate(x, pan.x, LOCATE_TRANSITION)
+    animate(y, pan.y, LOCATE_TRANSITION)
+  }
+  function endPeek() {
+    const back = peekReturn.current
+    if (!back) return
+    peekReturn.current = null
+    isMoving.set(1)
+    animate(scale, back.scale, LOCATE_TRANSITION).then(() => isMoving.set(0))
+    animate(x, back.x, LOCATE_TRANSITION)
+    animate(y, back.y, LOCATE_TRANSITION)
+  }
+  function commitPeek() {
+    peekReturn.current = null
   }
 
   function toggleZoom(origin: Point) {
@@ -403,6 +437,9 @@ export function useMapPanZoom() {
     hitLimit,
     hasInteracted,
     centerOn,
+    peekAt,
+    endPeek,
+    commitPeek,
     getLastPointerClientPosition: () => lastPointerClientPosition.current,
     gestureHandlers: {
       onPointerDown: handlePointerDown,
