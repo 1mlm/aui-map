@@ -16,8 +16,10 @@ import shots from "./installShots.json"
 import { type InstallPlatform, useInstallPrompt } from "./useInstallPrompt"
 
 const DISMISSED_KEY = "aui_install_dismissed"
-const SHOW_AGAIN_AFTER_MS = 7 * 24 * 60 * 60 * 1000
-const SHOW_AFTER_MS = 5000
+const SHOW_AGAIN_AFTER_MS = 3 * 24 * 60 * 60 * 1000
+const WAIT_SECONDS = 10
+// search engines and link previewers load the page as a phone too, they never see the gate
+const BOT = /bot|crawl|spider|lighthouse|headless|preview/i
 
 function wasRecentlyDismissed() {
   try {
@@ -28,59 +30,88 @@ function wasRecentlyDismissed() {
   }
 }
 
-// a big, obvious "get the app" card for people who'd never find the browser's own install menu.
-// Shows a few seconds after the map is up, never on top of the first paint, and stays away for a
-// week once closed
+// first thing a phone sees: the map is nicer as an app. Install is the big obvious button. A
+// smaller ghost one counts down from 10 and then lets them in anyway, so nobody is ever stuck.
+// Never on a desktop, never once it's installed, and not again for a few days after they got in
 export function InstallNudge() {
-  const { platform, installing, promptInstall } = useInstallPrompt()
-  const [visible, setVisible] = useState(false)
+  const { platform, isPhoneDevice, installing, promptInstall } =
+    useInstallPrompt()
+  const [open, setOpen] = useState(false)
   const [guideOpen, setGuideOpen] = useState(false)
+  const [seconds, setSeconds] = useState(WAIT_SECONDS)
 
   useEffect(() => {
-    if (platform === "none" || wasRecentlyDismissed()) return
-    const timer = setTimeout(() => setVisible(true), SHOW_AFTER_MS)
-    return () => clearTimeout(timer)
-  }, [platform])
+    if (
+      platform === "none" ||
+      !isPhoneDevice ||
+      BOT.test(navigator.userAgent) ||
+      wasRecentlyDismissed()
+    )
+      return
+    setOpen(true)
+  }, [platform, isPhoneDevice])
 
-  function dismiss() {
-    setVisible(false)
+  useEffect(() => {
+    if (!open || seconds <= 0) return
+    const timer = setTimeout(() => setSeconds((current) => current - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [open, seconds])
+
+  function enter() {
+    setOpen(false)
     try {
       localStorage.setItem(DISMISSED_KEY, String(Date.now()))
     } catch {}
   }
 
   function handleInstall() {
+    triggerHaptic()
     if (platform === "prompt") {
-      setVisible(false)
+      setOpen(false)
       void promptInstall()
     } else setGuideOpen(true)
   }
 
   return (
     <>
-      {visible && platform !== "none" && (
-        <div className="pointer-events-auto fixed inset-x-3 bottom-3 z-40 mx-auto flex max-w-md items-center gap-3 rounded-3xl corner-superellipse/1.2 bg-background p-3 shadow-xl ring-1 ring-foreground/10 sm:right-auto sm:left-6 sm:mx-0">
-          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground">
-            <Icon icon={ICONS.download} className="size-6" />
-          </span>
-          <span className="min-w-0 flex-1 text-base font-semibold leading-tight">
-            Get the app
-          </span>
-          <button
-            type="button"
-            onClick={handleInstall}
-            className="shrink-0 rounded-full corner-squircle bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-          >
-            Install
-          </button>
-          <button
-            type="button"
-            onClick={dismiss}
-            aria-label="Not now"
-            className="absolute -top-2 -right-2 grid size-6 place-items-center rounded-full bg-foreground text-background"
-          >
-            <Icon icon={ICONS.close} className="size-3.5" />
-          </button>
+      {open && platform !== "none" && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-8 bg-background/85 p-6 backdrop-blur-xl">
+          {/* biome-ignore lint/performance/noImgElement: a small static icon */}
+          <img
+            src="/icons/icon-192.png"
+            alt=""
+            width={96}
+            height={96}
+            className="size-24 rounded-[1.4rem] corner-squircle shadow-xl"
+          />
+          <p className="max-w-64 text-center text-2xl leading-tight font-semibold text-balance">
+            The map is better as an app
+          </p>
+          <div className="flex w-full max-w-64 flex-col items-center gap-3">
+            <button
+              type="button"
+              onClick={handleInstall}
+              className="flex w-full items-center justify-center gap-2 rounded-3xl corner-squircle bg-primary px-6 py-4 text-lg font-semibold text-primary-foreground shadow-lg active:scale-[0.98]"
+            >
+              <Icon icon={ICONS.download} className="size-6" />
+              Install
+            </button>
+            <button
+              type="button"
+              onClick={enter}
+              disabled={seconds > 0}
+              className="flex items-center justify-center gap-1.5 rounded-2xl corner-squircle px-4 py-2 text-sm font-medium text-foreground/60 tabular-nums transition-colors enabled:text-foreground enabled:ring-1 enabled:ring-foreground/20 disabled:cursor-default"
+            >
+              {seconds > 0 ? (
+                `Wait ${seconds}`
+              ) : (
+                <>
+                  Continue
+                  <Icon icon={ArrowRight01Icon} className="size-4" />
+                </>
+              )}
+            </button>
+          </div>
         </div>
       )}
 
@@ -89,7 +120,10 @@ export function InstallNudge() {
         open={guideOpen}
         onOpenChange={setGuideOpen}
         platform={platform}
-        onDone={dismiss}
+        onDone={() => {
+          setGuideOpen(false)
+          enter()
+        }}
       />
     </>
   )
@@ -143,16 +177,18 @@ function IosGuide({
   const names = GUIDES[platform]
   const isLast = !names || step === names.length - 1
 
+  // closing with the X or Escape goes back to the first screen, only finishing the steps counts
   function close() {
     setStep(0)
     onOpenChange(false)
-    onDone()
   }
 
   function next() {
     triggerHaptic("selection")
-    if (isLast) close()
-    else setStep((current) => current + 1)
+    if (isLast) {
+      setStep(0)
+      onDone()
+    } else setStep((current) => current + 1)
   }
 
   return (
@@ -165,7 +201,7 @@ function IosGuide({
         type="button"
         onClick={close}
         aria-label="Close"
-        className="absolute top-4 right-4 grid size-11 place-items-center rounded-full bg-white text-black"
+        className="absolute top-4 right-4 grid size-11 place-items-center rounded-2xl corner-squircle bg-white text-black"
       >
         <Icon icon={ICONS.close} className="size-5" />
       </button>
@@ -184,7 +220,7 @@ function IosGuide({
               onClick={() => setStep((current) => Math.max(0, current - 1))}
               disabled={step === 0}
               aria-label="Back"
-              className="grid size-12 place-items-center rounded-full bg-white/15 text-white disabled:opacity-30"
+              className="grid size-12 place-items-center rounded-2xl corner-squircle bg-white/15 text-white disabled:opacity-30"
             >
               <Icon icon={ArrowLeft01Icon} className="size-6" />
             </button>
@@ -203,7 +239,7 @@ function IosGuide({
               type="button"
               onClick={next}
               aria-label={isLast ? "Done" : "Next"}
-              className="grid size-12 place-items-center rounded-full bg-white text-black"
+              className="grid size-12 place-items-center rounded-2xl corner-squircle bg-white text-black"
             >
               <Icon
                 icon={isLast ? ICONS.check : ArrowRight01Icon}

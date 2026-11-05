@@ -98,6 +98,8 @@ export function useInstallPrompt() {
 
   return {
     canInstall: platform === "prompt",
+    // a phone or tablet, not a desktop browser that happens to offer an install prompt
+    isPhoneDevice: ios !== null || isAndroid,
     platform,
     installing,
     promptInstall,
