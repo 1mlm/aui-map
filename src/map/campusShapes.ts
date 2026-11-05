@@ -2,12 +2,15 @@ import bundled from "./campusShapes.json"
 
 // the hand drawn campus, in the pixel space of the satellite image (1312 x 1312)
 export type Point = [number, number]
-// a building is one or more rotated rectangles: centre x, centre y, width, height, angle in degrees
+// a building is one or more parts, glued into one shape. A part is a rotated rectangle (centre x,
+// centre y, width, height, angle in degrees) or, when a rectangle won't do, a free polygon
 export type Rect = [cx: number, cy: number, w: number, h: number, a: number]
 export type Building = {
   // the pin this building is, when it is one. Plenty of buildings have no pin
   id?: string
   r: Rect[]
+  // polygon parts (3+ points each), for the buildings that aren't made of rectangles
+  p?: Point[][]
 }
 export type Road = { w: number; p: Point[] }
 export type Path = { w: number; kind: "walk" | "dirt"; p: Point[] }
@@ -45,11 +48,16 @@ export function sanitizeShapes(input: unknown): CampusShapes | null {
 
   const buildings: Building[] = []
   for (const item of list("buildings")) {
-    const entry = item as { id?: unknown; r?: unknown }
-    if (!Array.isArray(entry?.r) || entry.r.length < 1 || entry.r.length > 8)
+    const entry = item as { id?: unknown; r?: unknown; p?: unknown }
+    const rawRects = Array.isArray(entry?.r) ? entry.r : []
+    const rawPolys = Array.isArray(entry?.p) ? entry.p : []
+    if (
+      rawRects.length + rawPolys.length < 1 ||
+      rawRects.length + rawPolys.length > 12
+    )
       return null
     const r: Rect[] = []
-    for (const rect of entry.r) {
+    for (const rect of rawRects) {
       if (!Array.isArray(rect) || rect.length !== 5 || !rect.every(finite))
         return null
       const [cx, cy, w, h, a] = rect as number[]
@@ -57,6 +65,15 @@ export function sanitizeShapes(input: unknown): CampusShapes | null {
       r.push([round(cx), round(cy), round(w), round(h), round(a)])
     }
     const building: Building = { r }
+    if (rawPolys.length) {
+      const polys: Point[][] = []
+      for (const poly of rawPolys) {
+        const pts = points(poly, 3)
+        if (!pts) return null
+        polys.push(pts.map(([x, y]) => [round(x), round(y)]))
+      }
+      building.p = polys
+    }
     if (typeof entry.id === "string" && entry.id)
       building.id = entry.id.slice(0, 80)
     buildings.push(building)
@@ -134,10 +151,11 @@ export function buildCampusSvg(
     body += `<path class="${ZONE_CLASS[zone.kind]}" d="${polygon(zone.p)}"/>`
   for (const path of shapes.paths)
     body += `<path class="${path.kind === "dirt" ? "pd" : "pw"}" stroke-width="${path.w}" d="${smoothPath(path.p)}"/>`
-  for (const road of shapes.roads) {
-    const d = smoothPath(road.p)
-    body += `<path class="rc" stroke-width="${n(road.w + 2.4)}" d="${d}"/><path class="rr" stroke-width="${road.w}" d="${d}"/>`
-  }
+  // every outline first, then every fill, so two roads that meet read as one joined road
+  for (const road of shapes.roads)
+    body += `<path class="rc" stroke-width="${n(road.w + 2.4)}" d="${smoothPath(road.p)}"/>`
+  for (const road of shapes.roads)
+    body += `<path class="rr" stroke-width="${road.w}" d="${smoothPath(road.p)}"/>`
   for (const building of shapes.buildings) {
     const tag = building.id ? tagByPinId[building.id] : undefined
     const rects = building.r
@@ -146,7 +164,10 @@ export function buildCampusSvg(
           `<rect x="${n(-w / 2)}" y="${n(-h / 2)}" width="${n(w)}" height="${n(h)}" rx="1.2" transform="translate(${n(cx)} ${n(cy)}) rotate(${n(a)})"/>`,
       )
       .join("")
-    body += `<g class="${tag ? `b b-${tag}` : "b"}">${rects}</g>`
+    const polys = (building.p ?? [])
+      .map((pts) => `<path d="${polygon(pts)}"/>`)
+      .join("")
+    body += `<g class="${tag ? `b b-${tag}` : "b"}">${rects}${polys}</g>`
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${shapes.size} ${shapes.size}" width="${shapes.size}" height="${shapes.size}"><style>${STYLE}</style>${body}</svg>\n`
 }
