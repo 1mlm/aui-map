@@ -74,8 +74,9 @@ export const tagSolidColor = (name?: TagColorName) => getShades(name)[500]
 // matter the hue — only the hue itself comes from the tailwind swatch. Mixing straight toward gray
 // (the previous approach) cut chroma by a flat percentage, which left warm hues (orange, green)
 // looking fine by luck but collapsed cool hues (blue, purple) into an indistinguishable muddy gray
-const CRAYON_LIGHTNESS = 80
-const CRAYON_CHROMA = 0.25
+// deep enough that a white icon reads on top of it, Google Maps style
+const CRAYON_LIGHTNESS = 60
+const CRAYON_CHROMA = 0.17
 
 export type CrayonTuning = { lightness: number; chroma: number }
 export const DEFAULT_CRAYON_TUNING: CrayonTuning = {
@@ -114,7 +115,7 @@ export function tagPinFillColor(
   const shades = getShades(name)
   const { chroma, hue } = parseOklch(shades[500])
   // achromatic families are meant to stay neutral, so they skip the crayon treatment
-  if (chroma < ACHROMATIC_CHROMA_THRESHOLD) return shades[600]
+  if (chroma < ACHROMATIC_CHROMA_THRESHOLD) return shades[500]
   return `oklch(${tuning.lightness}% ${tuning.chroma} ${hue})`
 }
 // 950 is as dark as tailwind goes and still reads washed out against the satellite image, so the

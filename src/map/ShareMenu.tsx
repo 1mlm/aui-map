@@ -12,6 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shadcn/ui/dropdown-menu"
+import { cn } from "@/shadcn/utils"
 import { copyImageToClipboard } from "@/utils/clipboard"
 import { triggerHaptic } from "@/utils/haptics"
 import { useCopyFeedback } from "@/utils/useCopyFeedback"
@@ -20,8 +21,14 @@ import { QrCodePreview } from "./QrCodePreview"
 import { qrCodeOptions } from "./qrCodeOptions"
 
 const COPIED_FEEDBACK_MS = 1500
-const SHARE_TRIGGER_CLASS =
-  "flex cursor-pointer items-center gap-0.5 rounded-full corner-squircle bg-white/10 px-2 py-2 text-white transition-colors hover:bg-white/20"
+// dark over a photo, theme-coloured on the plain panel, same as the close button next to it
+const shareTriggerClass = (onPhoto: boolean) =>
+  cn(
+    "flex cursor-pointer items-center gap-0.5 rounded-full corner-squircle px-2 py-2 transition-colors",
+    onPhoto
+      ? "bg-black/70 text-white backdrop-blur-sm hover:bg-black/80"
+      : "bg-foreground/10 text-foreground/70 hover:bg-foreground/15 hover:text-foreground",
+  )
 const QR_PNG_SIZE = 512
 
 async function renderQrCodePng(url: string): Promise<Blob | null> {
@@ -43,9 +50,12 @@ function downloadBlob(blob: Blob, fileName: string) {
 export function ShareMenu({
   pinId,
   pinTitle,
+  onPhoto = false,
 }: {
   pinId: string
   pinTitle: string
+  // sitting over the place's photo rather than the plain panel
+  onPhoto?: boolean
 }) {
   const isPhone = useIsPhone()
   const [shareOpen, setShareOpen] = useState(false)
@@ -163,7 +173,7 @@ export function ShareMenu({
             type="button"
             aria-label="Share this place"
             onClick={() => setShareOpen(true)}
-            className={SHARE_TRIGGER_CLASS}
+            className={shareTriggerClass(onPhoto)}
           >
             <Icon icon={linkCopied ? ICONS.copied : ICONS.share} />
           </button>
@@ -193,7 +203,7 @@ export function ShareMenu({
             <button
               type="button"
               aria-label="Share this place"
-              className={SHARE_TRIGGER_CLASS}
+              className={shareTriggerClass(onPhoto)}
             >
               <Icon icon={linkCopied ? ICONS.copied : ICONS.share} />
               <Icon icon={ICONS.dropdown} className="size-3" />
@@ -221,42 +231,40 @@ export function ShareMenu({
         description={`QRCode for ${pinTitle}`}
         className="items-center"
       >
-          {/* qrCodeOpen-gated, not just left to the drawer's own mount logic — getPinLink() touches
+        {/* qrCodeOpen-gated, not just left to the drawer's own mount logic — getPinLink() touches
           window.location, and JSX children evaluate in this component's render regardless of
           whether the drawer ends up mounting them, which would crash during SSR */}
-          {qrCodeOpen && (
-            <>
-              <QrCodePreview url={getPinLink()} />
-              <span className="max-w-64 text-center text-xs break-all text-muted-foreground">
-                {getPinLink()}
-              </span>
-              {/* icon-only -- three labelled buttons never fit this drawer's width, they just overflowed and clipped */}
-              <div className="flex gap-3">
-                <IconButton
-                  icon={imageFeedback === "copied" ? ICONS.copied : ICONS.copy}
-                  label="Copy image"
-                  tone="subtle"
-                  onClick={handleCopyImage}
-                />
-                <IconButton
-                  icon={
-                    imageFeedback === "downloaded"
-                      ? ICONS.copied
-                      : ICONS.download
-                  }
-                  label="Download"
-                  tone="subtle"
-                  onClick={handleDownload}
-                />
-                <IconButton
-                  icon={ICONS.share}
-                  label="Share"
-                  tone="subtle"
-                  onClick={handleShareImage}
-                />
-              </div>
-            </>
-          )}
+        {qrCodeOpen && (
+          <>
+            <QrCodePreview url={getPinLink()} />
+            <span className="max-w-64 text-center text-xs break-all text-muted-foreground">
+              {getPinLink()}
+            </span>
+            {/* icon-only -- three labelled buttons never fit this drawer's width, they just overflowed and clipped */}
+            <div className="flex gap-3">
+              <IconButton
+                icon={imageFeedback === "copied" ? ICONS.copied : ICONS.copy}
+                label="Copy image"
+                tone="subtle"
+                onClick={handleCopyImage}
+              />
+              <IconButton
+                icon={
+                  imageFeedback === "downloaded" ? ICONS.copied : ICONS.download
+                }
+                label="Download"
+                tone="subtle"
+                onClick={handleDownload}
+              />
+              <IconButton
+                icon={ICONS.share}
+                label="Share"
+                tone="subtle"
+                onClick={handleShareImage}
+              />
+            </div>
+          </>
+        )}
       </ResponsiveOverlay>
     </>
   )

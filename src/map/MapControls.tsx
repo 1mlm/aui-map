@@ -213,20 +213,20 @@ export function MapControls({
           <IconButton
             icon={ICONS.filter}
             aria-label="Filter"
-            tone="floating"
+            tone="glass"
             shape="corner-superellipse/1.2"
             iconClassName="size-5"
             className="size-12 shadow-lg drop-shadow-black/40"
             onClick={onOpenFilter}
           />
           {filtered && (
-            <span className="pointer-events-none absolute top-2 right-2 size-2.5 rounded-full corner-squircle bg-primary ring-2 ring-black/70" />
+            <span className="pointer-events-none absolute top-2 right-2 size-2.5 rounded-full corner-squircle bg-primary ring-2 ring-background" />
           )}
         </span>
         <IconButton
           icon={ICONS.notice}
           aria-label="About"
-          tone="floating"
+          tone="glass"
           shape="corner-superellipse/1.2"
           iconClassName="size-5"
           className="size-12 shrink-0 shadow-lg drop-shadow-black/40"

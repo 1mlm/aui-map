@@ -12,6 +12,10 @@ const toneClasses = {
   // sits directly on the map, where it needs its own backdrop to stay legible against whatever
   // busy satellite imagery happens to be underneath -- opaque enough to actually stand out there
   floating: "bg-black/70 text-white backdrop-blur-sm hover:bg-black/80",
+  // the map's own floating chrome: same frosted, theme-following look as the search bar, so the
+  // whole top row reads as one set (white in light mode, dark in dark mode)
+  glass:
+    "map-live-blur bg-background/70 text-foreground backdrop-blur-md hover:bg-background/85",
   // the control is doing something right now — a search is typed, filters are on
   primary: "bg-primary text-primary-foreground hover:bg-primary/85",
 } as const

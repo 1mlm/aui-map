@@ -10,7 +10,6 @@ import {
   DEFAULT_CRAYON_TUNING,
   tagLabelTextColor,
   tagPinFillColor,
-  tagPinOutlineColor,
 } from "./tagColor"
 import type { MapItem } from "./types"
 import { DEFAULT_PIN_GROWTH_EXPONENT } from "./useMapPanZoom"
@@ -23,6 +22,7 @@ export const PIN_TIP_FRACTION = 22 / 24
 const PIN_HEAD_FRACTION = 11 / 24
 
 const PREVIEW_DIM_OPACITY = 0.2
+const PIN_RIM_COLOR = "rgba(255,255,255,0.9)"
 // a small, deliberately subtle set rather than a continuous range — reads as a nudge, not a spin.
 // only for hover and the tag-preview wiggle — selection uses SELECTED_TILT_DEG instead, which is
 // meant to actually read as a tilt
@@ -56,9 +56,8 @@ export type PinSizeTuning = {
   // little see-through keeps the buildings/paths underneath legible without the pin itself
   // reading as faded or broken
   pinOpacity: number
-  // deliberately hairline: the pin's outline and the icon inside it are the same dark color, so a
-  // heavy teardrop edge competes with the glyph for attention instead of framing it. Thin enough
-  // to read as a rim around the fill, not as a shape of its own
+  // a thin white rim, Google Maps style: just enough to lift the pin off the satellite image
+  // without reading as a shape of its own
   pinStrokeWidth: number
   // the tag icon drawn inside the pin head, as a fraction of the pin's own box. The teardrop
   // narrows fast below its widest point, so anything much past this pokes its corners out
@@ -77,8 +76,8 @@ export const DEFAULT_PIN_SIZE_TUNING: PinSizeTuning = {
   labelFontFamily: "sans",
   labelStrokeWidth: 3.2,
   labelGapPx: 4,
-  pinOpacity: 0.9,
-  pinStrokeWidth: 0.75,
+  pinOpacity: 0.95,
+  pinStrokeWidth: 1.2,
   innerIconFraction: 0.42,
   innerIconStrokeWidth: 2.4,
 }
@@ -123,7 +122,8 @@ export function MapPin({
 }) {
   const position = latLongToPosition(item.latitude, item.longitude)
   const fill = tagPinFillColor(item.tag.color, tuning)
-  const outline = tagPinOutlineColor(item.tag.color)
+  // Google Maps style: a solid deep colour with a white rim and a white icon
+  const outline = PIN_RIM_COLOR
   const tilt = tiltForPin(item.id)
   // browser's default focus rectangle looks out of place on a round pin — keyboard nav gets the
   // same colored glow a selected pin gets instead. :focus-visible's own heuristic already tells
@@ -257,16 +257,15 @@ export function MapPin({
         />
         {/* the tag's own icon, sitting in the head rather than the middle of the box — the
             teardrop's round part is the top half, so PIN_HEAD_FRACTION (the same anchor the glow
-            and the label already use) is where "centered" actually looks centered. Dark outline
-            color on the light crayon fill, which is the strongest contrast pair the tag already
-            has. Not inside the <Icon> above because that one carries the selection drop-shadow,
+            and the label already use) is where "centered" actually looks centered. White on the
+            deep fill, Google Maps style. Not inside the <Icon> above because that one carries the selection drop-shadow,
             and a glow around the pin shouldn't also bloom around the glyph inside it */}
         <Icon
           icon={item.tag.icon}
           aria-hidden
           strokeWidth={sizeTuning.innerIconStrokeWidth}
           style={{
-            color: outline,
+            color: "white",
             left: "50%",
             top: `${PIN_HEAD_FRACTION * 100}%`,
             transform: "translate(-50%, -50%)",

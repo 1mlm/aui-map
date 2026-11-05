@@ -52,10 +52,10 @@ export function LocateFloatingButton({
               : ICONS.locate
         }
         label={label}
-        tone="floating"
+        tone="glass"
         shape="corner-superellipse/1.2"
         iconClassName={cn("text-[1.75rem]", isBusy && "animate-spin")}
-        labelClassName="text-[0.7rem] text-white/85"
+        labelClassName="text-[0.7rem] text-foreground/80"
         disabled={isBusy}
         className={cn(
           "size-20 gap-1 drop-shadow-lg drop-shadow-black/40",

@@ -150,10 +150,10 @@ export function MapDetailPanel({
       )}
 
       <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-        <ShareMenu pinId={item.id} pinTitle={item.title} />
+        <ShareMenu pinId={item.id} pinTitle={item.title} onPhoto={!!hero} />
         <IconButton
           icon={ICONS.close}
-          tone="floating"
+          tone={hero ? "floating" : "subtle"}
           onClick={onClose}
           aria-label="Close"
         />
