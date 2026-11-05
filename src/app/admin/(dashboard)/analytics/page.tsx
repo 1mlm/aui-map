@@ -1,149 +1,188 @@
 import type { Metadata } from "next"
-import Link from "next/link"
+import { Prisma } from "@/generated/prisma/client"
 import { prisma } from "@/utils/prisma"
+import {
+  type AnalyticsData,
+  AnalyticsView,
+  RANGES,
+  type RangeKey,
+  UNITS,
+  type Unit,
+} from "./AnalyticsView"
 
 export const metadata: Metadata = { title: "Analytics" }
 export const dynamic = "force-dynamic"
 
-const RANGES = { "7": 7, "30": 30, "90": 90, all: 3650 } as const
-type RangeKey = keyof typeof RANGES
+const TZ = "Africa/Casablanca"
+const MS = { hour: 3_600_000, day: 86_400_000, week: 604_800_000 }
+const MAX_SOURCES = 9
 
-type Row = Record<string, string | number | bigint | Date>
+type Row = Record<string, string | number | bigint>
 const num = (value: unknown) => Number(value ?? 0)
+
+// every bucket between two moments, gaps included, so a quiet hour is a visible empty slot
+function bucketKeys(since: Date, unit: Unit) {
+  const keys: { key: string; label: string; sub: string }[] = []
+  const fmt = (date: Date, options: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: TZ, ...options }).format(date)
+  const now = Date.now()
+  let t = since.getTime()
+  const step = unit === "month" ? 28 * MS.day : MS[unit]
+  const seen = new Set<string>()
+  while (t <= now) {
+    const date = new Date(t)
+    const ymd = fmt(date, { year: "numeric", month: "2-digit", day: "2-digit" })
+    const hour = fmt(date, { hour: "2-digit", hourCycle: "h23" })
+    const key =
+      unit === "hour"
+        ? `${ymd}T${hour}`
+        : unit === "day"
+          ? ymd
+          : unit === "week"
+            ? mondayOf(ymd)
+            : ymd.slice(0, 7)
+    if (!seen.has(key)) {
+      seen.add(key)
+      keys.push({
+        key,
+        label:
+          unit === "hour"
+            ? hour
+            : unit === "day"
+              ? ymd.slice(8)
+              : unit === "week"
+                ? key.slice(5)
+                : fmt(date, { month: "short" }),
+        sub:
+          unit === "hour"
+            ? fmt(date, {
+                weekday: "short",
+                day: "numeric",
+                month: "short",
+              }).replace(",", "")
+            : unit === "month"
+              ? fmt(date, { year: "numeric" })
+              : fmt(date, { month: "short", year: "numeric" }),
+      })
+    }
+    t += unit === "month" ? 7 * MS.day : step
+  }
+  return keys
+}
+
+function mondayOf(ymd: string) {
+  const d = new Date(`${ymd}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7))
+  return d.toISOString().slice(0, 10)
+}
 
 export default async function AdminAnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string }>
+  searchParams: Promise<{ range?: string; by?: string }>
 }) {
-  const { range } = await searchParams
-  const rangeKey: RangeKey =
-    range && range in RANGES ? (range as RangeKey) : "30"
-  const since = new Date(Date.now() - RANGES[rangeKey] * 24 * 60 * 60 * 1000)
+  const params = await searchParams
+  const range: RangeKey =
+    params.range && params.range in RANGES ? (params.range as RangeKey) : "30"
+  let unit: Unit = (UNITS as readonly string[]).includes(params.by ?? "")
+    ? (params.by as Unit)
+    : range === "1"
+      ? "hour"
+      : "day"
+  // 8760 hourly bars is a wall, past 90 days hours fall back to days
+  if (unit === "hour" && RANGES[range] > 90) unit = "day"
+  const since = new Date(Date.now() - RANGES[range] * MS.day)
+  const trunc = Prisma.raw(`'${unit}'`)
+  const tz = Prisma.raw(`'${TZ}'`)
+  const keyFormat = Prisma.raw(
+    unit === "hour"
+      ? `'YYYY-MM-DD"T"HH24'`
+      : unit === "month"
+        ? `'YYYY-MM'`
+        : `'YYYY-MM-DD'`,
+  )
 
-  const [totals, daily, sources, pages, regulars] = await Promise.all([
-    prisma.$queryRaw<Row[]>`
-      select count(*) as views, count(distinct "visitorId") as visitors,
-             count(distinct "visitorId") filter (where "isNew") as new_visitors
-      from "PageView" where "createdAt" >= ${since}`,
-    prisma.$queryRaw<Row[]>`
-      select to_char("createdAt", 'YYYY-MM-DD') as day, count(*) as views,
-             count(distinct "visitorId") as visitors
-      from "PageView" where "createdAt" >= ${since} group by 1 order by 1 desc limit 120`,
-    prisma.$queryRaw<Row[]>`
+  const [series, sources, pages, totals, hours, weekdays, regulars] =
+    await Promise.all([
+      prisma.$queryRaw<Row[]>`
+      select to_char(date_trunc(${trunc}, "createdAt" at time zone ${tz}), ${keyFormat}) as key,
+             source, count(*) as views
+      from "PageView" where "createdAt" >= ${since} group by 1, 2`,
+      prisma.$queryRaw<Row[]>`
       select source, count(*) as views, count(distinct "visitorId") as visitors
-      from "PageView" where "createdAt" >= ${since} group by 1 order by 2 desc limit 25`,
-    prisma.$queryRaw<Row[]>`
+      from "PageView" where "createdAt" >= ${since} group by 1 order by 2 desc`,
+      prisma.$queryRaw<Row[]>`
       select path, count(*) as views from "PageView"
-      where "createdAt" >= ${since} group by 1 order by 2 desc limit 25`,
-    prisma.$queryRaw<Row[]>`
+      where "createdAt" >= ${since} group by 1 order by 2 desc limit 14`,
+      prisma.$queryRaw<Row[]>`
+      select count(*) as views, count(distinct "visitorId") as visitors,
+             count(*) filter (where "isNew") as new_views
+      from "PageView" where "createdAt" >= ${since}`,
+      prisma.$queryRaw<Row[]>`
+      select extract(hour from "createdAt" at time zone ${tz}) as h, count(*) as views
+      from "PageView" where "createdAt" >= ${since} group by 1`,
+      prisma.$queryRaw<Row[]>`
+      select extract(isodow from "createdAt" at time zone ${tz}) as d, count(*) as views
+      from "PageView" where "createdAt" >= ${since} group by 1`,
+      prisma.$queryRaw<Row[]>`
       select count(*) as regulars from (
         select "visitorId" from "PageView" where "createdAt" >= ${since}
-        group by 1 having count(distinct date_trunc('day', "createdAt")) >= 3) t`,
-  ])
+        group by 1 having count(distinct date_trunc('day', "createdAt" at time zone ${tz})) >= 3) t`,
+    ])
 
-  const views = num(totals[0]?.views)
-  const visitors = num(totals[0]?.visitors)
-  const newVisitors = num(totals[0]?.new_visitors)
-  const maxDaily = Math.max(1, ...daily.map((row) => num(row.views)))
+  // the biggest sources keep their own colour, the long tail is one "other" slice
+  const sourceRows = sources.map((row) => ({
+    name: String(row.source),
+    views: num(row.views),
+    visitors: num(row.visitors),
+  }))
+  const top = sourceRows.slice(0, MAX_SOURCES)
+  const rest = sourceRows.slice(MAX_SOURCES)
+  const merged = rest.length
+    ? [
+        ...top,
+        {
+          name: "other",
+          views: rest.reduce((s, r) => s + r.views, 0),
+          visitors: 0,
+        },
+      ]
+    : top
+  const topNames = new Set(top.map((source) => source.name))
 
-  return (
-    <div className="space-y-6 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-semibold text-xl">Analytics</h1>
-          <p className="text-muted-foreground text-sm">
-            Page loads of the public map. No IPs, one anonymous cookie per
-            browser.
-          </p>
-        </div>
-        <div className="flex gap-1 text-sm">
-          {(Object.keys(RANGES) as RangeKey[]).map((key) => (
-            <Link
-              key={key}
-              href={`/admin/analytics?range=${key}`}
-              className={`rounded-full px-3 py-1 ${key === rangeKey ? "bg-foreground text-background" : "bg-foreground/10"}`}
-            >
-              {key === "all" ? "All time" : `${key} days`}
-            </Link>
-          ))}
-        </div>
-      </div>
+  const byKey = new Map<string, Record<string, number>>()
+  for (const row of series) {
+    const source = topNames.has(String(row.source))
+      ? String(row.source)
+      : "other"
+    const entry = byKey.get(String(row.key)) ?? {}
+    entry[source] = (entry[source] ?? 0) + num(row.views)
+    byKey.set(String(row.key), entry)
+  }
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
-          ["Page loads", views],
-          ["Visitors", visitors],
-          ["First time", newVisitors],
-          ["Came back 3+ days", num(regulars[0]?.regulars)],
-        ].map(([label, value]) => (
-          <div key={label} className="rounded-2xl border p-3">
-            <div className="text-muted-foreground text-xs">{label}</div>
-            <div className="font-semibold text-2xl tabular-nums">{value}</div>
-          </div>
-        ))}
-      </div>
+  const data: AnalyticsData = {
+    buckets: bucketKeys(since, unit).map((bucket) => ({
+      ...bucket,
+      by: byKey.get(bucket.key) ?? {},
+    })),
+    sources: merged,
+    pages: pages.map((row) => ({
+      path: String(row.path),
+      views: num(row.views),
+    })),
+    totals: {
+      views: num(totals[0]?.views),
+      visitors: num(totals[0]?.visitors),
+      newViews: num(totals[0]?.new_views),
+      regulars: num(regulars[0]?.regulars),
+    },
+    byHourOfDay: Array.from({ length: 24 }, (_, hour) =>
+      num(hours.find((row) => num(row.h) === hour)?.views),
+    ),
+    byWeekday: Array.from({ length: 7 }, (_, day) =>
+      num(weekdays.find((row) => num(row.d) === day + 1)?.views),
+    ),
+  }
 
-      <section className="space-y-2">
-        <h2 className="font-medium">Per day</h2>
-        {daily.length === 0 && (
-          <p className="text-muted-foreground text-sm">Nothing yet.</p>
-        )}
-        {daily.map((row) => (
-          <div
-            key={String(row.day)}
-            className="flex items-center gap-3 text-sm"
-          >
-            <span className="w-24 shrink-0 tabular-nums text-muted-foreground">
-              {String(row.day)}
-            </span>
-            <div className="h-3 flex-1 overflow-hidden rounded-full bg-foreground/10">
-              <div
-                className="h-full rounded-full bg-primary"
-                style={{ width: `${(num(row.views) / maxDaily) * 100}%` }}
-              />
-            </div>
-            <span className="w-24 shrink-0 text-right tabular-nums">
-              {num(row.views)} / {num(row.visitors)}
-            </span>
-          </div>
-        ))}
-        <p className="text-muted-foreground text-xs">loads / visitors</p>
-      </section>
-
-      <div className="grid gap-6 sm:grid-cols-2">
-        <section className="space-y-1">
-          <h2 className="font-medium">Where they came from</h2>
-          {sources.map((row) => (
-            <div
-              key={String(row.source)}
-              className="flex justify-between text-sm"
-            >
-              <span>{String(row.source)}</span>
-              <span className="tabular-nums text-muted-foreground">
-                {num(row.views)} loads, {num(row.visitors)} people
-              </span>
-            </div>
-          ))}
-          <p className="pt-1 text-muted-foreground text-xs">
-            Tag a link with ?s=poster (any word) to see it here by name.
-          </p>
-        </section>
-        <section className="space-y-1">
-          <h2 className="font-medium">Most opened</h2>
-          {pages.map((row) => (
-            <div
-              key={String(row.path)}
-              className="flex justify-between text-sm"
-            >
-              <span>{String(row.path)}</span>
-              <span className="tabular-nums text-muted-foreground">
-                {num(row.views)}
-              </span>
-            </div>
-          ))}
-        </section>
-      </div>
-    </div>
-  )
+  return <AnalyticsView {...{ data, range, unit }} />
 }

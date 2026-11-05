@@ -1,0 +1,44 @@
+{
+  "ios-1": {
+    "left": 44.1,
+    "top": 77.6,
+    "width": 9.7,
+    "height": 11.5,
+    "aspect": "390 / 330"
+  },
+  "ios-2": {
+    "left": 2.1,
+    "top": 61.9,
+    "width": 95.9,
+    "height": 11.9,
+    "aspect": "390 / 520"
+  },
+  "ios-3": {
+    "left": 84.3,
+    "top": 11.5,
+    "width": 13.7,
+    "height": 10.9,
+    "aspect": "390 / 330"
+  },
+  "android-1": {
+    "left": 87.2,
+    "top": 2.6,
+    "width": 11.8,
+    "height": 13.9,
+    "aspect": "390 / 330"
+  },
+  "android-2": {
+    "left": 22.1,
+    "top": 73.2,
+    "width": 77.4,
+    "height": 11.5,
+    "aspect": "390 / 470"
+  },
+  "android-3": {
+    "left": 66,
+    "top": 57,
+    "width": 25.2,
+    "height": 15.5,
+    "aspect": "390 / 330"
+  }
+}

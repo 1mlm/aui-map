@@ -16,6 +16,8 @@ type IOSDeviceOrientationEvent = typeof DeviceOrientationEvent & {
 // safari gates orientation behind a real tap; chrome/android hand it over with no prompt at all
 function getIOSOrientationGate(): IOSDeviceOrientationEvent | null {
   if (typeof DeviceOrientationEvent === "undefined") return null
+  // a laptop has no compass to ask for, even when its browser exposes the iOS-style gate
+  if (!window.matchMedia("(pointer: coarse)").matches) return null
   const ctor =
     DeviceOrientationEvent as unknown as Partial<IOSDeviceOrientationEvent>
   return typeof ctor.requestPermission === "function"

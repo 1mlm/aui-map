@@ -3,6 +3,7 @@
 import { AnimatePresence, LazyMotion } from "motion/react"
 import dynamic from "next/dynamic"
 import { useEffect, useRef, useState } from "react"
+import { triggerHaptic } from "@/utils/haptics"
 import { latLongToPosition } from "./geo"
 import { LocateFloatingButton } from "./LocateFloatingButton"
 import { MapBrand } from "./MapBrand"
@@ -234,6 +235,8 @@ export function MapExperience({
     if (visibleItems.length !== 1) return
     const [onlyMatch] = visibleItems
     if (onlyMatch.id === selectedId) return
+    // a tap in the hand, so a phone user feels the jump even with the keyboard covering half the map
+    triggerHaptic("success")
     setSelectedId(onlyMatch.id)
     mapCanvasRef.current?.centerOn(
       latLongToPosition(onlyMatch.latitude, onlyMatch.longitude),

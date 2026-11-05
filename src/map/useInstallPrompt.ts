@@ -24,6 +24,9 @@ export type InstallPlatform =
   | "ios-safari"
   // iPhone or iPad in Chrome, Instagram's browser...: can't install at all, has to open Safari
   | "ios-other"
+  // an Android browser that gave no install prompt (Samsung Internet, one already used up...):
+  // the browser's own menu is the only way
+  | "android-manual"
   | "none"
 
 function detectIos() {
@@ -44,12 +47,14 @@ export function useInstallPrompt() {
     useState<BeforeInstallPromptEvent | null>(null)
   const [installed, setInstalled] = useState(true) // assume yes until checked, so nothing flashes
   const [ios, setIos] = useState<"ios-safari" | "ios-other" | null>(null)
+  const [isAndroid, setIsAndroid] = useState(false)
   // true while the browser's own install box is on screen, the app dims everything and points at it
   const [installing, setInstalling] = useState(false)
 
   useEffect(() => {
     setInstalled(isStandalone())
     setIos(detectIos())
+    setIsAndroid(/Android/.test(navigator.userAgent))
 
     function handleBeforeInstallPrompt(event: Event) {
       // stops chrome's own mini-infobar so the app's own button is the one and only trigger
@@ -89,7 +94,7 @@ export function useInstallPrompt() {
     ? "none"
     : deferredPrompt
       ? "prompt"
-      : (ios ?? "none")
+      : (ios ?? (isAndroid ? "android-manual" : "none"))
 
   return {
     canInstall: platform === "prompt",
