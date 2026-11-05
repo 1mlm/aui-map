@@ -32,6 +32,11 @@ import { pinCounterScale, useMapPanZoom } from "./useMapPanZoom"
 // hoisted into <head> by react during render, so the download starts before the image element
 // even mounts. The browser picks AVIF when it can, and this hint matches that choice
 function preloadMapImage() {
+  preload("/campus-map.svg", {
+    as: "image",
+    type: "image/svg+xml",
+    fetchPriority: "high",
+  })
   preload("/auimap-640.avif", {
     as: "image",
     type: "image/avif",
@@ -421,7 +426,18 @@ export function MapCanvas({
               Stays invisible until fully decoded (crossfading with the blurred placeholder above)
               -- otherwise the browser paints whatever's streamed in so far on a slow connection,
               which for a big image shows as scanline-y decode garbage instead of a clean reveal */}
-            {/* three layers, each fading in over the last: the inlined blur above, a 36KB 640px AVIF
+            {/* the hand drawn campus (buildings, roads, paths), 6KB. It paints with the first response,
+              long before any photo, and follows light / dark mode by itself. The photos fade in over it */}
+            {/* biome-ignore lint/performance/noImgElement: a tiny static svg, next/image adds nothing */}
+            <img
+              src="/campus-map.svg"
+              alt=""
+              aria-hidden
+              fetchPriority="high"
+              draggable={false}
+              className="pointer-events-none absolute inset-0 size-full object-cover"
+            />
+            {/* four layers, each over the last: the inlined blur, the svg above, a 36KB 640px AVIF
               that lands almost at once, then the full 168KB one. The full one only starts once the
               small one has arrived (it's mounted by lowLoaded), so the two never fight for
               bandwidth. Plain <img>s inside <picture> instead of next/image: its priority preload
