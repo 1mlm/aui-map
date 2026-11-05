@@ -237,3 +237,11 @@ model PageView {
   @@index([createdAt])
   @@index([visitorId])
 }
+
+// the hand drawn campus (buildings, roads, paths, zones), one row, edited in /admin/map. Seeded
+// from src/map/campusShapes.json until the first save. The public /campus-map.svg is built from it
+model CampusMap {
+  id        Int      @id
+  data      Json
+  updatedAt DateTime @updatedAt
+}

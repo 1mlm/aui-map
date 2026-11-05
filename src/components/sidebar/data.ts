@@ -10,6 +10,7 @@ export const APP_HEADER: AppNavBrand = {
 export const NAV_ITEMS: AppNavItem[] = [
   { href: "/admin/pins", label: "Pins", icon: ICONS.place, countKey: "pins" },
   { href: "/admin/tags", label: "Tags", icon: ICONS.tag, countKey: "tags" },
+  { href: "/admin/map", label: "Campus drawing", icon: ICONS.place },
   { href: "/admin/analytics", label: "Analytics", icon: ICONS.analytics },
   {
     href: "/admin/comments",
