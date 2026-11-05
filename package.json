@@ -1,6 +1,6 @@
 {
   "name": "aui-map",
-  "version": "0.1.70",
+  "version": "0.1.71",
   "private": true,
   "packageManager": "pnpm@11.6.0",
   "scripts": {
@@ -18,8 +18,6 @@
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "@toolwind/corner-shape": "0.0.8-3",
-    "@vercel/analytics": "^2.0.1",
-    "@vercel/speed-insights": "^2.0.0",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
     "cloudinary": "^2.11.0",

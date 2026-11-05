@@ -25,6 +25,7 @@ import { AttachmentCarousel, AttachmentStrip } from "./AttachmentCarousel"
 import { formatCoordinates } from "./geo"
 import { TagChipIcon, tagChipClassName } from "./MapTagFilter"
 import { UNDOCKED_PANEL_WIDTH } from "./panelWidth"
+import { PinCommentButton } from "./PinCommentButton"
 import { ShareMenu } from "./ShareMenu"
 import { tagColorStyle } from "./tagColor"
 import type { MapItem, MapItemAttachment, MapItemTag, PinLink } from "./types"
@@ -220,6 +221,7 @@ export function MapDetailPanel({
             <DateCell date={item.updatedAt} />
           </div>
           <MapsMenuButton {...{ item }} />
+          <PinCommentButton pinId={item.id} pinTitle={item.title} />
         </div>
       </m.div>
 

@@ -7,7 +7,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/Tooltip"
 import { ICONS } from "@/icons"
 import { cn } from "@/shadcn/utils"
 import { SearchField, type SearchProps } from "./MapSearch"
-import { MobileMenu } from "./MobileMenu"
 import type { CompassPermission } from "./useCompassHeading"
 import { useInstallPrompt } from "./useInstallPrompt"
 import { type LocationStatus, VAGUE_ACCURACY_METERS } from "./useUserLocation"
@@ -205,9 +204,14 @@ export function MapControls({
           language top to bottom */}
       <div className="map-controls-compact pointer-events-auto absolute inset-x-3 top-3 flex items-center gap-2">
         <SearchField big {...props} />
-        <MobileMenu
-          onOpenAbout={onOpenAbout}
-          onInstall={canInstall ? promptInstall : undefined}
+        <IconButton
+          icon={ICONS.notice}
+          aria-label="About"
+          tone="floating"
+          shape="corner-superellipse/1.2"
+          iconClassName="size-5"
+          className="size-12 shrink-0 shadow-lg drop-shadow-black/40"
+          onClick={onOpenAbout}
         />
       </div>
 

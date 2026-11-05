@@ -29,7 +29,7 @@ function MobileLogoutButton() {
   )
 }
 
-export type NavCounts = Record<"pins" | "tags" | "searchMisses", number>
+export type NavCounts = Record<"pins" | "tags" | "searchMisses" | "comments", number>
 
 export function AppShell({
   counts,

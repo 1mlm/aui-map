@@ -1,7 +1,7 @@
 import { SerwistProvider } from "@serwist/turbopack/react"
 import type { Metadata, Viewport } from "next"
 import { Outfit } from "next/font/google"
-import { DeferredAnalytics } from "@/components/DeferredAnalytics"
+import { PageViewBeacon } from "@/components/PageViewBeacon"
 import "@/shadcn/styles/globals.css"
 import { NuqsAdapter } from "nuqs/adapters/next/app"
 import type { PropsWithChildren } from "react"
@@ -74,7 +74,7 @@ export default function RootLayout({ children }: PropsWithChildren) {
           disable={process.env.NODE_ENV === "development"}
         >
           <NuqsAdapter>{children}</NuqsAdapter>
-          <DeferredAnalytics />
+          <PageViewBeacon />
         </SerwistProvider>
       </body>
     </html>

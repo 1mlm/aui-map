@@ -1,5 +1,6 @@
 import {
   AcuteIcon,
+  Analytics01Icon,
   AlignLeftIcon,
   ArrowDown01Icon,
   ArrowDown02Icon,
@@ -10,6 +11,7 @@ import {
   Atm01Icon,
   Briefcase01Icon,
   CallIcon,
+  Comment01Icon,
   Cancel01Icon,
   CaptionsIcon,
   CheckIcon,
@@ -86,6 +88,8 @@ export const ICONS = {
   copy: Copy01Icon,
   copied: CopyCheckIcon,
   download: Download01Icon,
+  comment: Comment01Icon,
+  analytics: Analytics01Icon,
   share: Share08Icon,
   qrCode: QrCodeIcon,
   // the little caret on a control that opens a menu rather than acting on its own

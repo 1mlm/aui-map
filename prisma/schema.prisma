@@ -117,6 +117,10 @@ model Submission {
   status      SubmissionStatus @default(PENDING)
   submittedAt DateTime         @default(now())
   reviewedAt  DateTime?
+  // the anonymous first-party visitor cookie (see PageView), only used to rate limit comments
+  visitorId   String?
+
+  @@index([status, submittedAt])
 }
 
 // a trackable QR/short-link instance for a pin — separate from Pin.id (which also works as a
@@ -216,4 +220,20 @@ model SearchMiss {
   lastSeen  DateTime @default(now())
 
   @@index([count])
+}
+
+// one row per page load of the public map, written by the beacon in components/PageViewBeacon.tsx.
+// visitorId is a random id kept in a first-party cookie (no ip, no fingerprint), it's only there to
+// tell new visitors from returning ones. source is where they came from: a ?s= tag on the link,
+// else the referrer's host, else "direct"
+model PageView {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  path      String
+  source    String
+  visitorId String
+  isNew     Boolean
+
+  @@index([createdAt])
+  @@index([visitorId])
 }
