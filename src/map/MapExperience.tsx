@@ -4,7 +4,8 @@ import { AnimatePresence, LazyMotion } from "motion/react"
 import dynamic from "next/dynamic"
 import { useEffect, useRef, useState } from "react"
 import { triggerHaptic } from "@/utils/haptics"
-import { latLongToPosition } from "./geo"
+import { CoordinateResult } from "./CoordinateResult"
+import { latLongToPosition, parseCoordinateQuery } from "./geo"
 import { LocateFloatingButton } from "./LocateFloatingButton"
 import { MapBrand } from "./MapBrand"
 import { MapCanvas, type MapCanvasHandle } from "./MapCanvas"
@@ -78,6 +79,8 @@ const SEARCH_FILLER_WORDS = new Set([
 
 function matchesSearch(item: MapItem, query: string) {
   if (!query.trim()) return true
+  // a coordinates search is about a place, not a pin: it hides nothing
+  if (parseCoordinateQuery(query)) return true
   const haystack = [item.id, item.title, ...item.aliases].map(
     normalizeForSearch,
   )
@@ -227,6 +230,30 @@ export function MapExperience({
     return () => clearTimeout(timer)
   }, [search, effectiveItems])
 
+  // typing coordinates (people do) marks that spot, flies there and offers it to a maps app
+  const searchedCoordinates = parseCoordinateQuery(search)
+  const searchedPosition = searchedCoordinates
+    ? latLongToPosition(
+        searchedCoordinates.latitude,
+        searchedCoordinates.longitude,
+      )
+    : null
+  const searchedOnCampus =
+    searchedPosition !== null &&
+    searchedPosition[0] > -0.03 &&
+    searchedPosition[0] < 1.03 &&
+    searchedPosition[1] > -0.03 &&
+    searchedPosition[1] < 1.03
+  const searchedKey = searchedCoordinates
+    ? `${searchedCoordinates.latitude},${searchedCoordinates.longitude}`
+    : null
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only a different place should fly the map, not every render
+  useEffect(() => {
+    if (!searchedPosition || !searchedOnCampus) return
+    triggerHaptic("success")
+    mapCanvasRef.current?.centerOn(searchedPosition)
+  }, [searchedKey])
+
   // once a search narrows the map down to a single pin there's nothing left to browse, so open
   // it straight away and jump the map there too -- instead of making "which one did I mean" or
   // "where actually is that" separate steps once typing has already said so unambiguously
@@ -264,11 +291,19 @@ export function MapExperience({
               location.isOffCampus ? location.rawPosition : null
             }
             compassHeading={compass.heading}
+            searchedPosition={searchedOnCampus ? searchedPosition : null}
             {...{ selectedId, hoveredTagId, tuning, sizeTuning }}
           />
 
           <MapBrand />
           <NetworkStatusBanner />
+          {searchedCoordinates && (
+            <CoordinateResult
+              {...searchedCoordinates}
+              onCampus={searchedOnCampus}
+              onClose={() => setSearch("")}
+            />
+          )}
 
           <MapControls
             onSearchChange={setSearch}

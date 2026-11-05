@@ -58,16 +58,27 @@ const MAP_IMAGE_PLACEHOLDER =
 
 // a marker for wherever the map's context menu was opened — never a real place, just a way to
 // see exactly which point the menu's coordinates/directions refer to
-function DroppedPinMarker({ position }: { position: NormalizedPosition }) {
+function DroppedPinMarker({
+  position,
+  strong,
+}: {
+  position: NormalizedPosition
+  // a place someone searched for by coordinates: in the brand colour and fully visible, instead of
+  // the faint cue used for a right click
+  strong?: boolean
+}) {
   // white rather than one of the tag colors, and half-see-through — this isn't a real place, just
   // a faint "you clicked here" cue, so it shouldn't compete with the actual pins around it
-  const fill = "white"
+  const fill = strong ? "var(--primary)" : "white"
   const outline = "white"
-  const glow = "white"
+  const glow = strong ? "var(--primary)" : "white"
 
   return (
     <div
-      className="pointer-events-none absolute opacity-25"
+      className={cn(
+        "pointer-events-none absolute",
+        strong ? "z-[900]" : "opacity-25",
+      )}
       style={{
         ...positionToStyle(position),
         transform: `translate(-50%, ${-PIN_TIP_FRACTION * 100}%)`,
@@ -216,6 +227,7 @@ export function MapCanvas({
   offCampusPosition,
   compassHeading,
   hoveredTagId,
+  searchedPosition,
   tuning,
   sizeTuning = DEFAULT_PIN_SIZE_TUNING,
   ref,
@@ -228,6 +240,8 @@ export function MapCanvas({
   offCampusPosition: UserLocation["rawPosition"]
   compassHeading: number | null
   hoveredTagId: string | null
+  // where a coordinates search points, drawn as a marker until the search is cleared
+  searchedPosition?: NormalizedPosition | null
   // only ever overridden by the dev-only TagColorPlayground — real visitors always get the default
   tuning?: CrayonTuning
   // only ever overridden by the dev-only PinTuningPlayground — real visitors always get the default
@@ -508,6 +522,9 @@ export function MapCanvas({
             ))}
             {contextMenuPosition && (
               <DroppedPinMarker position={contextMenuPosition} />
+            )}
+            {searchedPosition && (
+              <DroppedPinMarker position={searchedPosition} strong />
             )}
           </div>
         </m.div>

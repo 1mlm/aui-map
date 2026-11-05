@@ -142,3 +142,23 @@ export function clampToMapEdge(position: NormalizedPosition) {
   const bearingDeg = (Math.atan2(dx, -dy) * (180 / Math.PI) + 360) % 360
   return { edgePosition, bearingDeg }
 }
+
+// "33.541022, -5.107031" as someone types it in the search bar: with a comma, a space or a semicolon,
+// maybe degree signs, N/S/E/W letters or a stray asterisk. Both numbers must have decimals, so a
+// plain "47 12" (a pin and a number) is never mistaken for a place
+export function parseCoordinateQuery(
+  text: string,
+): { latitude: number; longitude: number } | null {
+  const cleaned = text.trim()
+  if (!/^[\d\s.,;°*+\-NSEWnsew]+$/.test(cleaned)) return null
+  const numbers = cleaned.match(/-?\d+\.\d+/g)
+  if (numbers?.length !== 2) return null
+  // nothing else of substance may be left once the two numbers are taken out
+  if (/\d/.test(cleaned.replace(/-?\d+\.\d+/g, ""))) return null
+  let [latitude, longitude] = numbers.map(Number)
+  // "33.54 N, 5.10 W": south and west are the negative sides
+  if (/S/i.test(cleaned)) latitude = -Math.abs(latitude)
+  if (/W/i.test(cleaned)) longitude = -Math.abs(longitude)
+  if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null
+  return { latitude, longitude }
+}
