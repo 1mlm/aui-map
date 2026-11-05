@@ -33,6 +33,10 @@ const loadDetailPanel = () => import("./MapDetailPanel")
 const MapDetailPanel = dynamic(() =>
   loadDetailPanel().then((m) => m.MapDetailPanel),
 )
+const InstallNudge = dynamic(
+  () => import("./InstallNudge").then((m) => m.InstallNudge),
+  { ssr: false },
+)
 const About = dynamic(() => import("./About").then((m) => m.About), {
   ssr: false,
 })
@@ -299,6 +303,7 @@ export function MapExperience({
             )}
           </AnimatePresence>
 
+          <InstallNudge />
           <MapFilterBar
             reservedRight={
               selected && !space.docksPanel ? UNDOCKED_PANEL_WIDTH : "0rem"
