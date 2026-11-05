@@ -5,7 +5,11 @@ import dynamic from "next/dynamic"
 import { useEffect, useRef, useState } from "react"
 import { triggerHaptic } from "@/utils/haptics"
 import { CoordinateResult } from "./CoordinateResult"
-import { latLongToPosition, parseCoordinateQuery } from "./geo"
+import {
+  latLongToPosition,
+  parseCoordinateQuery,
+  positionToLatLong,
+} from "./geo"
 import { LocateFloatingButton } from "./LocateFloatingButton"
 import { MapBrand } from "./MapBrand"
 import { MapCanvas, type MapCanvasHandle } from "./MapCanvas"
@@ -14,6 +18,8 @@ import { DEFAULT_PIN_SIZE_TUNING, type PinSizeTuning } from "./MapPin"
 import { MapFilterBar } from "./MapTagFilter"
 import { NetworkStatusBanner } from "./NetworkStatusBanner"
 import { UNDOCKED_PANEL_WIDTH } from "./panelWidth"
+import { SearchSuggestions, type SuggestionRow } from "./SearchSuggestions"
+import { searchPlaces } from "./searchEngine"
 import { recordSearchMiss } from "./searchMissActions"
 import { DEFAULT_CRAYON_TUNING, type TagColorName } from "./tagColor"
 import type { MapItem, MapItemTag } from "./types"
@@ -56,50 +62,36 @@ const PinTuningPlayground = dynamic(
   { ssr: false },
 )
 
-// strips everything but letters/digits before comparing, so "aud17" matches both the id
-// ("aud17") and the title ("AUD 17") -- spaces, hyphens, whatever punctuation someone's aliases
-// happen to use shouldn't be a reason a real match doesn't show up
-function normalizeForSearch(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]/g, "")
-}
+// the places people go most, offered when the search box is empty or nothing matched. Any that
+// don't exist on the current map are skipped
+const POPULAR_IDS = [
+  "m6l",
+  "cossa",
+  "health-center",
+  "main-gate",
+  "gym",
+  "bookstore",
+  "registrar",
+  "post-office",
+  "mosque",
+]
+const RECENT_KEY = "aui_recent_places"
 
-// words people prepend out of habit ("aui b8", "akhawayn library", "building 12") that say nothing
-// about which pin they want -- every pin is at AUI, so they'd only make the match fail
-const SEARCH_FILLER_WORDS = new Set([
-  "aui",
-  "akhawayn",
-  "alakhawayn",
-  "university",
-  "al",
-  "the",
-  "building",
-  "bldg",
-  "campus",
-])
-
-function matchesSearch(item: MapItem, query: string) {
-  if (!query.trim()) return true
-  // a coordinates search is about a place, not a pin: it hides nothing
-  if (parseCoordinateQuery(query)) return true
-  const haystack = [item.id, item.title, ...item.aliases].map(
-    normalizeForSearch,
-  )
-  const tokens = query
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((token) => token && !SEARCH_FILLER_WORDS.has(token))
-    .map(normalizeForSearch)
-    .filter(Boolean)
-  // the whole query was filler ("aui"): don't hide everything, fall back to the plain compare
-  if (tokens.length === 0) {
-    const whole = normalizeForSearch(query)
-    return haystack.some((value) => value.includes(whole))
-  }
-  // every word has to hit something on the pin, in any order
-  return tokens.every((token) =>
-    haystack.some((value) => value.includes(token)),
-  )
+// straight-line meters between two spots on the map (haversine)
+function metersBetween(a: [number, number], b: [number, number]) {
+  const [p, q] = [positionToLatLong(a), positionToLatLong(b)]
+  const rad = (d: number) => (d * Math.PI) / 180
+  const h =
+    Math.sin(rad(q.latitude - p.latitude) / 2) ** 2 +
+    Math.cos(rad(p.latitude)) *
+      Math.cos(rad(q.latitude)) *
+      Math.sin(rad(q.longitude - p.longitude) / 2) ** 2
+  return 2 * 6371000 * Math.asin(Math.sqrt(h))
 }
+const distanceLabel = (meters: number) =>
+  meters < 1000
+    ? `${Math.max(10, Math.round(meters / 10) * 10)} m`
+    : `${(meters / 1000).toFixed(1)} km`
 
 // long enough that it only fires once someone's actually done typing, not on every keystroke
 const ZERO_RESULT_SEARCH_TRACK_DELAY_MS = 800
@@ -199,9 +191,16 @@ export function MapExperience({
   }))
 
   const selected = effectiveItems.find((item) => item.id === selectedId) ?? null
+  // what the search bar understood: the places (or group of places) to show. When nothing matched
+  // the map is left alone instead of going blank, and the suggestions say so
+  const coordinateSearch = parseCoordinateQuery(search) !== null
+  const outcome = searchPlaces(coordinateSearch ? "" : search, effectiveItems)
+  const matchedIds = outcome.hits.length
+    ? new Set(outcome.hits.map((hit) => hit.item.id))
+    : null
   const visibleItems = effectiveItems.filter(
     (item) =>
-      matchesSearch(item, search) &&
+      (matchedIds === null || matchedIds.has(item.id)) &&
       (activeTagIds.size === 0 || activeTagIds.has(item.tag.id)),
   )
 
@@ -222,10 +221,11 @@ export function MapExperience({
     const query = search.trim()
     if (!query) return
     const timer = setTimeout(() => {
-      const matchesSomething = effectiveItems.some((item) =>
-        matchesSearch(item, query),
+      if (
+        !parseCoordinateQuery(query) &&
+        searchPlaces(query, effectiveItems).mode === "none"
       )
-      if (!matchesSomething) recordSearchMiss(query)
+        recordSearchMiss(query)
     }, ZERO_RESULT_SEARCH_TRACK_DELAY_MS)
     return () => clearTimeout(timer)
   }, [search, effectiveItems])
@@ -259,7 +259,7 @@ export function MapExperience({
   // "where actually is that" separate steps once typing has already said so unambiguously
   useEffect(() => {
     if (!search.trim()) return
-    if (visibleItems.length !== 1) return
+    if (outcome.mode !== "places" || visibleItems.length !== 1) return
     const [onlyMatch] = visibleItems
     if (onlyMatch.id === selectedId) return
     // a tap in the hand, so a phone user feels the jump even with the keyboard covering half the map
@@ -268,7 +268,120 @@ export function MapExperience({
     mapCanvasRef.current?.centerOn(
       latLongToPosition(onlyMatch.latitude, onlyMatch.longitude),
     )
-  }, [search, visibleItems, selectedId, setSelectedId])
+  }, [search, visibleItems, selectedId, setSelectedId, outcome.mode])
+
+  // ---- the suggestions under the search bar ----
+  const [searchFocused, setSearchFocused] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(-1)
+  const [recentIds, setRecentIds] = useState<string[]>([])
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]")
+      if (Array.isArray(saved))
+        setRecentIds(saved.filter((id) => typeof id === "string"))
+    } catch {}
+  }, [])
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new word starts from the top of the list again
+  useEffect(() => setActiveIndex(-1), [search])
+
+  const searchQuery = search.trim()
+  const nothingTyped = !searchQuery || coordinateSearch
+  const distanceOf = (item: MapItem) =>
+    location.position
+      ? metersBetween(
+          location.position,
+          latLongToPosition(item.latitude, item.longitude),
+        )
+      : undefined
+  const popular = POPULAR_IDS.map((id) =>
+    effectiveItems.find((item) => item.id === id),
+  ).filter((item): item is MapItem => Boolean(item))
+  const recent = recentIds
+    .map((id) => effectiveItems.find((item) => item.id === id))
+    .filter((item): item is MapItem => Boolean(item))
+    .slice(0, 3)
+  let rowItems: MapItem[]
+  let recentCount = 0
+  if (nothingTyped) {
+    recentCount = recent.length
+    rowItems = [
+      ...recent,
+      ...popular.filter((item) => !recent.includes(item)),
+    ].slice(0, 6)
+  } else if (outcome.mode === "none") rowItems = popular.slice(0, 4)
+  else {
+    let hits = outcome.hits.map((hit) => hit.item)
+    // "food" / "doctor": the nearest first, when the visitor's position is known
+    if (outcome.mode === "concept" && location.position)
+      hits = [...hits].sort(
+        (a, b) => (distanceOf(a) ?? 0) - (distanceOf(b) ?? 0),
+      )
+    rowItems = hits.slice(0, outcome.mode === "concept" ? 8 : 6)
+  }
+  const suggestionRows: SuggestionRow[] = rowItems.map((item) => {
+    const meters = distanceOf(item)
+    return {
+      item,
+      distance: meters === undefined ? undefined : distanceLabel(meters),
+    }
+  })
+  const showSuggestions =
+    searchFocused &&
+    !coordinateSearch &&
+    // a single place that is already open needs no list
+    !(
+      outcome.mode === "places" &&
+      suggestionRows.length === 1 &&
+      suggestionRows[0].item.id === selectedId
+    )
+
+  const blurSearch = () =>
+    (document.activeElement as HTMLElement | null)?.blur()
+  function pickItem(item: MapItem) {
+    triggerHaptic("selection")
+    setSelectedId(item.id)
+    mapCanvasRef.current?.centerOn(
+      latLongToPosition(item.latitude, item.longitude),
+    )
+    setSearch("")
+    setRecentIds((previous) => {
+      const next = [item.id, ...previous.filter((id) => id !== item.id)].slice(
+        0,
+        5,
+      )
+      try {
+        localStorage.setItem(RECENT_KEY, JSON.stringify(next))
+      } catch {}
+      return next
+    })
+    blurSearch()
+  }
+  function pickTag(tag: MapItemTag) {
+    triggerHaptic("selection")
+    setActiveTagIds(new Set([tag.id]))
+    setSearch("")
+    blurSearch()
+  }
+  // arrows move through the list, Enter opens the highlighted place (or the first one)
+  function handleSearchKey(key: "up" | "down" | "enter" | "escape") {
+    if (key === "escape") {
+      blurSearch()
+      return true
+    }
+    if (key === "down" || key === "up") {
+      if (!suggestionRows.length) return false
+      const step = key === "down" ? 1 : -1
+      setActiveIndex(
+        (i) => (i + step + suggestionRows.length) % suggestionRows.length,
+      )
+      return true
+    }
+    if (nothingTyped || outcome.mode === "none") return false
+    const row = suggestionRows[activeIndex >= 0 ? activeIndex : 0]
+    if (!row) return false
+    pickItem(row.item)
+    return true
+  }
 
   return (
     <LazyMotion features={loadMotionFeatures}>
@@ -317,8 +430,26 @@ export function MapExperience({
             onLocate={handleLocate}
             compassPermission={compass.permission}
             onRequestCompass={compass.requestPermission}
+            onFocusChange={setSearchFocused}
+            onSearchKey={handleSearchKey}
             {...{ search }}
           />
+          {showSuggestions && (
+            <SearchSuggestions
+              className="absolute inset-x-3 top-[4.25rem] z-40 max-h-[min(30rem,calc(100dvh-7rem))] sm:inset-x-auto sm:top-[3.75rem] sm:right-3 sm:w-96"
+              query={search}
+              mode={nothingTyped ? "empty" : outcome.mode}
+              concept={outcome.concept}
+              rows={suggestionRows}
+              recentCount={recentCount}
+              tags={effectiveTags}
+              activeIndex={activeIndex}
+              totalMatches={outcome.hits.length}
+              onPick={pickItem}
+              onPickTag={pickTag}
+              onNearest={location.position ? undefined : handleLocate}
+            />
+          )}
           <AnimatePresence>
             {!locateButtonDone && (
               <LocateFloatingButton

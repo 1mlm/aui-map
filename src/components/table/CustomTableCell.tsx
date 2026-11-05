@@ -95,11 +95,13 @@ export function DateCell({ date }: { date: Date | undefined }) {
         <TooltipContent sideOffset={6} className="flex-col items-start gap-1">
           <span className="inline-flex items-center gap-1.5">
             <Icon icon={Calendar04Icon} />
-            {formatExactDate(date)}
+            {/* the server's timezone and clock differ from the browser's, so these two texts never match
+                at hydration. The browser's value is the right one, React just must not complain */}
+            <span suppressHydrationWarning>{formatExactDate(date)}</span>
           </span>
           <span className="inline-flex items-center gap-1.5">
             <Icon icon={Forward02Icon} />
-            {formatDetailedDuration(date)}
+            <span suppressHydrationWarning>{formatDetailedDuration(date)}</span>
           </span>
           <span className="inline-flex items-center gap-1.5">
             <Icon icon={CodeIcon} />
