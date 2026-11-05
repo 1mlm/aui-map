@@ -22,6 +22,7 @@ export function BottomDrawer({
   description,
   footer,
   className,
+  modal = true,
   children,
 }: {
   open: boolean
@@ -30,10 +31,12 @@ export function BottomDrawer({
   description?: string
   footer?: ReactNode
   className?: string
+  // false leaves whatever is behind it usable (the map can still be dragged and zoomed)
+  modal?: boolean
   children: ReactNode
 }) {
   return (
-    <Drawer {...{ open, onOpenChange }}>
+    <Drawer {...{ open, onOpenChange, modal }}>
       <DrawerContent
         aria-describedby={undefined}
         className="border-none! bg-transparent p-2 [&>div:first-child]:hidden"
@@ -47,7 +50,9 @@ export function BottomDrawer({
           <span className="mx-auto h-1 w-10 shrink-0 rounded-full bg-foreground/20" />
           <div className="flex shrink-0 items-center justify-between">
             <span className="leading-tight">
-              <DrawerTitle className="text-sm font-semibold">{title}</DrawerTitle>
+              <DrawerTitle className="text-sm font-semibold">
+                {title}
+              </DrawerTitle>
               {description && (
                 <DrawerDescription className="text-xs">
                   {description}

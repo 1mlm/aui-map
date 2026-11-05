@@ -9,6 +9,7 @@ import { IconPicker } from "@/components/IconPicker"
 import { ICONS } from "@/icons"
 import { type IconName, resolveIcon } from "@/map/iconRegistry"
 import { CURATED_TAG_COLORS, tagSolidColor } from "@/map/tagColor"
+import { DETAIL_PIN_SCALE } from "@/map/types"
 import { Input } from "@/shadcn/ui/input"
 import {
   Select,
@@ -36,7 +37,7 @@ export type AdminTag = {
 }
 
 const INPUT_CLASS = "corner-squircle"
-// only two tiers, not a free numeric range — a pin either reads as a building or as something
+// a few tiers, not a free numeric range — a pin either reads as a building or as something
 // smaller inside/next to one, so there's no real use case in between
 const SMALL_PIN_SCALE = 0.8
 
@@ -215,9 +216,21 @@ export function TagDialog({
             Pin size
           </FieldLabel>
           <Select
-            value={sizeScale === 1 ? "normal" : "small"}
+            value={
+              sizeScale === 1
+                ? "normal"
+                : sizeScale <= DETAIL_PIN_SCALE
+                  ? "tiny"
+                  : "small"
+            }
             onValueChange={(value) =>
-              setSizeScale(value === "small" ? SMALL_PIN_SCALE : 1)
+              setSizeScale(
+                value === "tiny"
+                  ? DETAIL_PIN_SCALE
+                  : value === "small"
+                    ? SMALL_PIN_SCALE
+                    : 1,
+              )
             }
           >
             <SelectTrigger id="tag-size" className={INPUT_CLASS}>
@@ -227,6 +240,9 @@ export function TagDialog({
               <SelectItem value="normal">Normal — buildings</SelectItem>
               <SelectItem value="small">
                 Small — sits inside/next to a building
+              </SelectItem>
+              <SelectItem value="tiny">
+                Tiny — restrooms, printers. Shows once zoomed in
               </SelectItem>
             </SelectContent>
           </Select>

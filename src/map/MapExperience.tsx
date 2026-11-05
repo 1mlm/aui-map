@@ -11,7 +11,7 @@ import { MapBrand } from "./MapBrand"
 import { MapCanvas, type MapCanvasHandle } from "./MapCanvas"
 import { MapControls } from "./MapControls"
 import { DEFAULT_PIN_SIZE_TUNING, type PinSizeTuning } from "./MapPin"
-import { MapFilterBar } from "./MapTagFilter"
+import { FilterDrawer, MapFilterBar } from "./MapTagFilter"
 import { NetworkStatusBanner } from "./NetworkStatusBanner"
 import { UNDOCKED_PANEL_WIDTH } from "./panelWidth"
 import { SearchSuggestions } from "./SearchSuggestions"
@@ -113,7 +113,11 @@ export function MapExperience({
   }, [])
 
   const [search, setSearch] = useState("")
-  const [activeTagIds, setActiveTagIds] = useState<Set<string>>(new Set())
+  // which categories are on the map. null = everything (the default)
+  const [shownTagIds, setShownTagIds] = useState<Set<string> | null>(null)
+  const [filterOpen, setFilterOpen] = useState(false)
+  // the drawer stays mounted once opened, so closing it can still animate out
+  const [filterMounted, setFilterMounted] = useState(false)
   const [hoveredTagId, setHoveredTagId] = useState<string | null>(null)
   const [aboutOpen, setAboutOpen] = useState(false)
   // About stays mounted once it has been opened, so closing it can still animate out
@@ -166,17 +170,19 @@ export function MapExperience({
   const visibleItems = effectiveItems.filter(
     (item) =>
       (matchedIds === null || matchedIds.has(item.id)) &&
-      (activeTagIds.size === 0 || activeTagIds.has(item.tag.id)),
+      (shownTagIds === null || shownTagIds.has(item.tag.id)),
   )
 
+  // the desktop pills: picking one from "everything" shows only that one, unpicking the last one
+  // goes back to everything
   const toggleTag = (tagId: string) =>
-    setActiveTagIds((previous) => {
+    setShownTagIds((previous) => {
       const next = new Set(previous)
       if (next.has(tagId)) next.delete(tagId)
       else next.add(tagId)
-      return next
+      return next.size ? next : null
     })
-  const clearTags = () => setActiveTagIds(new Set())
+  const clearTags = () => setShownTagIds(null)
 
   // finds missing pins/aliases from real usage: a search term matching nothing anywhere on the
   // map (checked against the whole map, not visibleItems, so an active tag filter can't produce
@@ -335,6 +341,7 @@ export function MapExperience({
             searchedPosition={
               searchedOnCampus ? searchedPosition : previewPosition
             }
+            pickedTagIds={shownTagIds}
             {...{ selectedId, hoveredTagId, tuning, sizeTuning }}
           />
 
@@ -350,6 +357,11 @@ export function MapExperience({
 
           <MapControls
             onSearchChange={setSearch}
+            onOpenFilter={() => {
+              setFilterMounted(true)
+              setFilterOpen(true)
+            }}
+            filtered={shownTagIds !== null}
             onOpenAbout={() => {
               setAboutMounted(true)
               setAboutOpen(true)
@@ -407,8 +419,18 @@ export function MapExperience({
             onToggle={toggleTag}
             onClearAll={clearTags}
             onHoverTag={setHoveredTagId}
-            {...{ activeTagIds, hoveredTagId }}
+            activeTagIds={shownTagIds ?? new Set()}
+            {...{ hoveredTagId }}
           />
+          {filterMounted && (
+            <FilterDrawer
+              open={filterOpen}
+              onOpenChange={setFilterOpen}
+              tags={effectiveTags}
+              shownTagIds={shownTagIds}
+              onChange={setShownTagIds}
+            />
+          )}
           {aboutMounted && (
             <About open={aboutOpen} onOpenChange={setAboutOpen} />
           )}

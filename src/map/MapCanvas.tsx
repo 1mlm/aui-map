@@ -231,6 +231,7 @@ export function MapCanvas({
   offCampusPosition,
   compassHeading,
   hoveredTagId,
+  pickedTagIds = null,
   searchedPosition,
   tuning,
   sizeTuning = DEFAULT_PIN_SIZE_TUNING,
@@ -244,6 +245,8 @@ export function MapCanvas({
   offCampusPosition: UserLocation["rawPosition"]
   compassHeading: number | null
   hoveredTagId: string | null
+  // categories picked on their own in the filter. Their tiny pins show at any zoom
+  pickedTagIds?: Set<string> | null
   // where a coordinates search points, drawn as a marker until the search is cleared
   searchedPosition?: NormalizedPosition | null
   // only ever overridden by the dev-only TagColorPlayground — real visitors always get the default
@@ -532,7 +535,8 @@ export function MapCanvas({
                 (item) =>
                   item.minZoom == null ||
                   zoomStep >= item.minZoom ||
-                  item.id === selectedId,
+                  item.id === selectedId ||
+                  pickedTagIds?.has(item.tag.id),
               )
               .map((item) => (
                 <MapPin

@@ -1,7 +1,13 @@
 import type { Prisma, Tag } from "@/generated/prisma/client"
 import { resolveIcon } from "./iconRegistry"
 import type { TagColorName } from "./tagColor"
-import { type MapItem, type MapItemTag, parsePinLinks } from "./types"
+import {
+  DETAIL_MIN_ZOOM,
+  isDetailTag,
+  type MapItem,
+  type MapItemTag,
+  parsePinLinks,
+} from "./types"
 
 type PinWithAttachments = Prisma.PinGetPayload<{
   include: { attachments: true }
@@ -34,7 +40,7 @@ export function pinRowToMapItem(
     title: pin.title,
     aliases: pin.aliases,
     keywords: pin.keywords ?? [],
-    minZoom: pin.minZoom ?? null,
+    minZoom: pin.minZoom ?? (isDetailTag(tag) ? DETAIL_MIN_ZOOM : null),
     shortestName: getShortestName([pin.title, ...pin.aliases]),
     description: pin.description ?? undefined,
     latitude: pin.latitude,

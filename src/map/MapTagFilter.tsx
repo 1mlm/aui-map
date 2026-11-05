@@ -2,9 +2,11 @@
 
 import { m } from "motion/react"
 import { useEffect, useRef, useState } from "react"
+import { BottomDrawer } from "@/components/BottomDrawer"
 import { Icon } from "@/components/Icon"
 import { SquircleFuserContainer } from "@/components/SquircleFuser"
 import { ICONS } from "@/icons"
+import { Checkbox } from "@/shadcn/ui/checkbox"
 import { cn } from "@/shadcn/utils"
 import { triggerHaptic } from "@/utils/haptics"
 import { HIDE_SCROLLBAR } from "@/utils/styles"
@@ -173,52 +175,6 @@ function useScrollFadeMask() {
   return { stripRef, maskImage: scrollFadeMask(overflow.left, overflow.right) }
 }
 
-// mobile: a floating inset pill over the map itself, docked right under the searchbar/install
-// row rather than a full-width strip -- half-transparent so there's still map showing through
-// behind the chips, matching the rest of the floating-over-the-map chrome instead of reading as a
-// separate docked toolbar. top offset is search row's own top-3 + its h-12 height + this row's gap
-function CompactFilterBar(props: FilterProps) {
-  const { stripRef, maskImage } = useScrollFadeMask()
-  const { activeTagIds, onClearAll } = props
-
-  return (
-    <div className="map-filter-bar-compact map-live-blur pointer-events-auto absolute inset-x-3 top-[4.25rem] flex items-center gap-2 rounded-full corner-superellipse/1.2 bg-background/70 px-3.5 py-2.5 shadow-lg drop-shadow-black/40 backdrop-blur-md">
-      {/* sits outside the scrolling strip -- inside, it'd scroll away with the chips it's meant to
-          always be reachable from. Hangs off the bottom edge, not the top: the top edge butts
-          right up against the searchbar row above it, with no room to spare for anything sticking
-          up past it, while the map below is wide open */}
-      {activeTagIds.size > 0 && (
-        <button
-          type="button"
-          onClick={() => {
-            triggerHaptic()
-            onClearAll()
-          }}
-          className="absolute -bottom-3 left-2 flex shrink-0 items-center gap-1 rounded-full corner-superellipse/1.2 bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground shadow-md"
-        >
-          <Icon icon={ICONS.reopen} className="size-3" />
-          Clear filter
-        </button>
-      )}
-      <Icon
-        icon={ICONS.filter}
-        aria-hidden
-        className="size-4 shrink-0 text-muted-foreground"
-      />
-      <div
-        ref={stripRef}
-        className={cn(
-          "flex gap-1.5 overflow-x-auto scroll-smooth",
-          HIDE_SCROLLBAR,
-        )}
-        style={{ maskImage }}
-      >
-        <TagPills {...props} />
-      </div>
-    </div>
-  )
-}
-
 // wide dock for the map's roomy layout — replaced the decorative credit line that used to sit
 // here, which said nothing the About dialog doesn't already say
 function FullFilterBar({
@@ -263,10 +219,103 @@ function FullFilterBar({
 // container query (globals.css's .map-filter-bar-compact / .map-filter-bar-full rules), matching
 // how MapControls splits into its own compact/full pair
 export function MapFilterBar(props: FilterProps & { reservedRight: string }) {
+  return <FullFilterBar {...props} />
+}
+
+// phones: a drawer of checkboxes behind the filter button. Everything is ticked by default.
+// Unticking "Everything" clears the map so one or two categories can be picked on their own.
+// It doesn't block the map, so it can stay open while you look around
+export function FilterDrawer({
+  open,
+  onOpenChange,
+  tags,
+  shownTagIds,
+  onChange,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  tags: MapItemTag[]
+  // null = everything
+  shownTagIds: Set<string> | null
+  onChange: (shown: Set<string> | null) => void
+}) {
+  const everything = shownTagIds === null
+  const isShown = (tagId: string) => everything || shownTagIds.has(tagId)
+
+  function toggle(tagId: string) {
+    const next = new Set(everything ? tags.map((tag) => tag.id) : shownTagIds)
+    if (next.has(tagId)) next.delete(tagId)
+    else next.add(tagId)
+    onChange(next.size === tags.length ? null : next)
+  }
+
   return (
-    <>
-      <CompactFilterBar {...props} />
-      <FullFilterBar {...props} />
-    </>
+    <BottomDrawer
+      modal={false}
+      title="Show on the map"
+      {...{ open, onOpenChange }}
+    >
+      <div className="flex flex-col">
+        <FilterRow
+          checked={everything}
+          onToggle={() => onChange(everything ? new Set() : null)}
+          label="Everything"
+        />
+        <span className="my-1 h-px bg-border" />
+        {/* two columns, so the drawer stays short and most of the map is still in view */}
+        <div className="grid grid-cols-2 gap-x-2">
+          {tags.map((tag) => (
+            <FilterRow
+              key={tag.id}
+              checked={isShown(tag.id)}
+              onToggle={() => toggle(tag.id)}
+              label={tag.label}
+              tag={tag}
+            />
+          ))}
+        </div>
+      </div>
+    </BottomDrawer>
+  )
+}
+
+function FilterRow({
+  checked,
+  onToggle,
+  label,
+  tag,
+}: {
+  checked: boolean
+  onToggle: () => void
+  label: string
+  tag?: MapItemTag
+}) {
+  return (
+    // biome-ignore lint/a11y/noLabelWithoutControl: the Checkbox inside is the control
+    <label className="flex cursor-pointer items-center gap-2.5 rounded-xl corner-squircle px-1.5 py-1.5 active:bg-foreground/5">
+      {tag ? (
+        <span
+          className="grid size-8 shrink-0 place-items-center rounded-[0.7rem] corner-squircle"
+          style={tagColorStyle(tag.color, false)}
+        >
+          <Icon icon={tag.icon} className="size-4" />
+        </span>
+      ) : (
+        <span className="grid size-8 shrink-0 place-items-center rounded-[0.7rem] corner-squircle bg-foreground/10">
+          <Icon icon={ICONS.filter} className="size-4 text-foreground/70" />
+        </span>
+      )}
+      <span className="min-w-0 flex-1 truncate text-sm font-medium">
+        {label}
+      </span>
+      <Checkbox
+        checked={checked}
+        onCheckedChange={() => {
+          triggerHaptic()
+          onToggle()
+        }}
+        className="size-5 rounded-md corner-squircle"
+      />
+    </label>
   )
 }

@@ -39,6 +39,8 @@ type MapControl = {
 
 export function MapControls({
   onOpenAbout,
+  onOpenFilter,
+  filtered,
   locationStatus,
   isOffCampus,
   accuracy,
@@ -48,6 +50,9 @@ export function MapControls({
   ...props
 }: SearchProps & {
   onOpenAbout: () => void
+  // phones only: opens the category drawer. filtered = some categories are hidden right now
+  onOpenFilter: () => void
+  filtered: boolean
   locationStatus: LocationStatus
   isOffCampus: boolean
   accuracy: number | null
@@ -204,6 +209,20 @@ export function MapControls({
           language top to bottom */}
       <div className="map-controls-compact pointer-events-auto absolute inset-x-3 top-3 flex items-center gap-2">
         <SearchField big {...props} />
+        <span className="relative shrink-0">
+          <IconButton
+            icon={ICONS.filter}
+            aria-label="Filter"
+            tone="floating"
+            shape="corner-superellipse/1.2"
+            iconClassName="size-5"
+            className="size-12 shadow-lg drop-shadow-black/40"
+            onClick={onOpenFilter}
+          />
+          {filtered && (
+            <span className="pointer-events-none absolute top-2 right-2 size-2.5 rounded-full corner-squircle bg-primary ring-2 ring-black/70" />
+          )}
+        </span>
         <IconButton
           icon={ICONS.notice}
           aria-label="About"

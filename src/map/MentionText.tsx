@@ -3,15 +3,14 @@
 import type { ReactNode } from "react"
 import { Icon } from "@/components/Icon"
 import { ICONS } from "@/icons"
-import { tagColorStyle } from "./tagColor"
 import type { MapItem } from "./types"
 
 // @some-pin-id inside a description, e.g. "bring cash to the @atms first"
 const MENTION = /@([a-z0-9][a-z0-9-]*)/gi
 
-// a description where @mentions of other places become small tappable chips with the place's icon.
-// Hovering one slides the map to that place (and back when the pointer leaves), an arrow appears at
-// its top right, and clicking opens that place. An @ that isn't a real place stays plain text
+// a description where @mentions of other places become quiet grey inline chips with the place's
+// icon. Hovering one slides the map to that place (and back when the pointer leaves) and an arrow
+// slides in after the name. Clicking opens that place. An @ that isn't a real place stays plain text
 export function MentionText({
   text,
   places,
@@ -46,13 +45,19 @@ export function MentionText({
         }
         onFocus={() => onPreview(place)}
         onBlur={() => onPreview(null)}
-        className="group/mention relative mx-0.5 inline-flex items-center gap-1 rounded-[0.6rem] corner-squircle px-1.5 py-0.5 align-baseline font-medium leading-snug transition-[filter] hover:brightness-95"
-        style={tagColorStyle(place.tag.color, true)}
+        className="group/mention inline-flex items-baseline rounded-[0.45em] corner-squircle bg-foreground/[0.07] px-[0.3em] align-baseline font-medium text-foreground transition-colors hover:bg-foreground/[0.14] focus-visible:bg-foreground/[0.14] focus-visible:outline-none"
       >
-        <Icon icon={place.tag.icon} className="size-3.5 shrink-0" />
+        <Icon
+          icon={place.tag.icon}
+          className="mr-[0.25em] size-[0.95em] shrink-0 self-center text-foreground/55"
+        />
         {place.title}
-        <span className="absolute -top-2 -right-2 grid size-4 scale-0 place-items-center rounded-[0.4rem] corner-squircle bg-foreground text-background transition-transform group-hover/mention:scale-100 group-focus-visible/mention:scale-100 [@media(hover:none)]:scale-100">
-          <Icon icon={ICONS.externalLink} className="size-2.5" />
+        {/* slides in on hover. Phones have no hover, so it's always there */}
+        <span className="inline-grid w-0 self-center overflow-hidden opacity-0 transition-[width,margin,opacity] duration-200 ease-out group-hover/mention:ml-[0.15em] group-hover/mention:w-[0.8em] group-hover/mention:opacity-100 group-focus-visible/mention:ml-[0.15em] group-focus-visible/mention:w-[0.8em] group-focus-visible/mention:opacity-100 [@media(hover:none)]:ml-[0.15em] [@media(hover:none)]:w-[0.8em] [@media(hover:none)]:opacity-100">
+          <Icon
+            icon={ICONS.externalLink}
+            className="size-[0.8em] text-foreground/55"
+          />
         </span>
       </button>,
     )

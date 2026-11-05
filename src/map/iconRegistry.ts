@@ -18,6 +18,7 @@ import {
   OfficeIcon,
   PlazaIcon,
   Presentation01Icon,
+  PrinterIcon,
   Restaurant02Icon,
   SparkleIcon,
   SportShoeIcon,
@@ -25,6 +26,7 @@ import {
   StarIcon,
   TennisBallIcon,
   TheaterIcon,
+  Toilet01Icon,
 } from "@hugeicons/core-free-icons"
 import type { HugeIcon } from "@/components/Icon"
 
@@ -61,6 +63,7 @@ export const ICON_REGISTRY = {
   OfficeIcon,
   PlazaIcon,
   Presentation01Icon,
+  PrinterIcon,
   Restaurant02Icon,
   SparkleIcon,
   SportShoeIcon,
@@ -68,6 +71,7 @@ export const ICON_REGISTRY = {
   StarIcon,
   TennisBallIcon,
   TheaterIcon,
+  Toilet01Icon,
 } satisfies Record<string, HugeIcon>
 
 export type IconName = keyof typeof ICON_REGISTRY

@@ -1,6 +1,13 @@
 import type { HugeIcon } from "@/components/Icon"
 import type { TagColorName } from "./tagColor"
 
+// tiny categories (restrooms, printers) are drawn smaller and only once the map is zoomed in a
+// little, unless someone picks that category in the filter
+export const DETAIL_PIN_SCALE = 0.6
+export const DETAIL_MIN_ZOOM = 1.8
+export const isDetailTag = (tag: { sizeScale: number }) =>
+  tag.sizeScale <= DETAIL_PIN_SCALE
+
 export type MapItemTag = {
   id: string
   label: string
