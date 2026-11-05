@@ -1,4 +1,4 @@
-// biome-ignore-all lint/suspicious/noArrayIndexKey: shapes, parts and points have no ids, their position is their identity
+// biome-ignore-all lint/suspicious/noArrayIndexKey: buildings and points have no ids, their position is their identity
 "use client"
 
 import {
@@ -7,18 +7,15 @@ import {
   Copy01Icon,
   Cursor02Icon,
   Delete02Icon,
+  Edit02Icon,
   FloppyDiskIcon,
-  FootprintsIcon,
   Image01Icon,
   Link01Icon,
-  MagnetIcon,
   MapPinIcon,
   Maximize01Icon,
   Pentagon01Icon,
-  Road01Icon,
   SquareIcon,
   Tick02Icon,
-  Tree01Icon,
   Undo02Icon,
 } from "@hugeicons/core-free-icons"
 import { useEffect, useRef, useState } from "react"
@@ -26,47 +23,24 @@ import { type HugeIcon, Icon } from "@/components/Icon"
 import {
   type Building,
   type CampusShapes,
-  PATH_KINDS,
   type Point,
   type Rect,
-  smoothPath,
-  ZONE_KINDS,
+  rectToPolygon,
 } from "@/map/campusShapes"
 import { saveCampusShapes } from "./actions"
 
 type Pin = { id: string; title: string; x: number; y: number }
-type Layer = "buildings" | "roads" | "paths" | "zones"
-type LineLayer = "roads" | "paths"
-type Part = { k: "r" | "p"; j: number }
-type Sel = { layer: Layer; i: number; part?: Part; v?: number }
-type Tool = "select" | "poly" | "road" | "path" | "zone"
+type Sel = { i: number; v?: number }
+type Tool = "select" | "poly"
 type View = { x: number; y: number; s: number }
-type Snap = {
-  pt: Point
-  kind: "vertex" | "segment"
-  layer: LineLayer
-  i: number
-  seg: number
-}
 type Drag =
   | { kind: "pan"; start: [number, number]; view: View; moved: boolean }
-  | { kind: "move"; start: Point; orig: CampusShapes; sel: Sel; whole: boolean }
-  | { kind: "vertex"; sel: Sel & { v: number } }
-  | {
-      kind: "rect"
-      i: number
-      j: number
-      sx: -1 | 0 | 1
-      sy: -1 | 0 | 1
-      orig: Rect
-    }
-  | { kind: "rotate"; i: number; j: number }
+  | { kind: "move"; start: Point; orig: CampusShapes; i: number }
+  | { kind: "vertex"; i: number; v: number }
+  | { kind: "rect"; i: number; sx: -1 | 0 | 1; sy: -1 | 0 | 1; orig: Rect }
+  | { kind: "rotate"; i: number }
 
 const SIZE = 1312
-// roads, paths and zones are put aside while the buildings get perfected. Flip this to bring their
-// drawing tools back (their data, and the public map, are untouched either way)
-const EDIT_LINES = false
-const MIN_POINTS = { roads: 2, paths: 2, zones: 3, poly: 3 } as const
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value))
 const dist = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b[1])
 
@@ -77,7 +51,7 @@ function axes(a: number) {
     uy: [-Math.sin(rad), Math.cos(rad)],
   }
 }
-// a point given in a rectangle's own frame (x along its width, y along its height) in the drawing
+// a point given in a rectangle's own frame (x along its width, y along its height), in the drawing
 function toWorld(rect: Rect, lx: number, ly: number): Point {
   const { ux, uy } = axes(rect[4])
   return [rect[0] + ux[0] * lx + uy[0] * ly, rect[1] + ux[1] * lx + uy[1] * ly]
@@ -117,77 +91,62 @@ function resizeRect(orig: Rect, p: Point, sx: number, sy: number): Rect {
   ]
 }
 
-function rectToPolygon(rect: Rect): Point[] {
-  const [, , w, h] = rect
-  return [
-    toWorld(rect, -w / 2, -h / 2),
-    toWorld(rect, w / 2, -h / 2),
-    toWorld(rect, w / 2, h / 2),
-    toWorld(rect, -w / 2, h / 2),
-  ]
+// the smallest rotated rectangle around some points (for "back to a rectangle")
+function fitRect(points: Point[]): Rect {
+  const pts = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  const cross = (o: Point, a: Point, b: Point) =>
+    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+  const half = (list: Point[]) => {
+    const out: Point[] = []
+    for (const q of list) {
+      while (
+        out.length >= 2 &&
+        cross(out[out.length - 2], out[out.length - 1], q) <= 0
+      )
+        out.pop()
+      out.push(q)
+    }
+    return out.slice(0, -1)
+  }
+  const hull = [...half(pts), ...half([...pts].reverse())]
+  let best: Rect | null = null
+  let bestArea = Number.POSITIVE_INFINITY
+  hull.forEach((q, k) => {
+    const next = hull[(k + 1) % hull.length]
+    const angle = (Math.atan2(next[1] - q[1], next[0] - q[0]) * 180) / Math.PI
+    const { ux, uy } = axes(angle)
+    const us = hull.map((h) => h[0] * ux[0] + h[1] * ux[1])
+    const vs = hull.map((h) => h[0] * uy[0] + h[1] * uy[1])
+    const w = Math.max(...us) - Math.min(...us)
+    const h = Math.max(...vs) - Math.min(...vs)
+    if (w * h < bestArea) {
+      bestArea = w * h
+      const mu = (Math.max(...us) + Math.min(...us)) / 2
+      const mv = (Math.max(...vs) + Math.min(...vs)) / 2
+      best = [
+        mu * ux[0] + mv * uy[0],
+        mu * ux[1] + mv * uy[1],
+        w,
+        h,
+        (angle + 360) % 180,
+      ]
+    }
+  })
+  return best ?? [0, 0, 10, 10, 0]
 }
 
-// the middle of a building's outline, where its name goes
-function buildingCenter(b: Building): Point {
-  const all: Point[] = [
-    ...b.r.flatMap((r) => rectToPolygon(r)),
-    ...(b.p ?? []).flat(),
-  ]
-  const xs = all.map((q) => q[0])
-  const ys = all.map((q) => q[1])
+const outlineOf = (b: Building): Point[] =>
+  b.r ? rectToPolygon(b.r) : (b.p ?? [])
+// the middle of a building, where its name goes
+function centerOf(b: Building): Point {
+  const pts = outlineOf(b)
+  const xs = pts.map((q) => q[0])
+  const ys = pts.map((q) => q[1])
   return [
     (Math.min(...xs) + Math.max(...xs)) / 2,
     (Math.min(...ys) + Math.max(...ys)) / 2,
   ]
 }
-
-function pointsOf(shapes: CampusShapes, sel: Sel): Point[] | null {
-  if (sel.layer === "buildings")
-    return shapes.buildings[sel.i]?.p?.[sel.part?.j ?? -1] ?? null
-  return shapes[sel.layer][sel.i]?.p ?? null
-}
-const isClosed = (sel: Sel) =>
-  sel.layer === "zones" || sel.layer === "buildings"
-const minPointsFor = (sel: Sel) =>
-  sel.layer === "buildings" ? 3 : MIN_POINTS[sel.layer]
-
-const ALL_TOOLS: { tool: Tool; icon: HugeIcon; label: string; hint: string }[] =
-  [
-    {
-      tool: "select",
-      icon: Cursor02Icon,
-      label: "Select",
-      hint: "Click a shape to edit it",
-    },
-    {
-      tool: "poly",
-      icon: Pentagon01Icon,
-      label: "Polygon building",
-      hint: "Click each corner. Double-click, Enter or the tick finishes",
-    },
-    {
-      tool: "road",
-      icon: Road01Icon,
-      label: "Road",
-      hint: "Click points. Start or end on another road to connect. Double-click finishes",
-    },
-    {
-      tool: "path",
-      icon: FootprintsIcon,
-      label: "Path",
-      hint: "Click points. Start or end on a road or path to connect. Double-click finishes",
-    },
-    {
-      tool: "zone",
-      icon: Tree01Icon,
-      label: "Zone",
-      hint: "Click each corner of the field, court or parking. Double-click finishes",
-    },
-  ]
-
-const TOOLS = EDIT_LINES
-  ? ALL_TOOLS
-  : ALL_TOOLS.filter((t) => t.tool === "select" || t.tool === "poly")
 
 function IconBtn({
   icon,
@@ -242,21 +201,17 @@ export function MapEditor({
   const [tool, setTool] = useState<Tool>("select")
   const [draft, setDraft] = useState<Point[]>([])
   const [cursor, setCursor] = useState<Point | null>(null)
-  const [snapOn, setSnapOn] = useState(true)
-  const [snapView, setSnapView] = useState<Snap | null>(null)
   const [view, setView] = useState<View>({ x: 0, y: 0, s: SIZE })
   const [history, setHistory] = useState<CampusShapes[]>([])
   const [satOpacity, setSatOpacity] = useState(0.8)
   const [showPins, setShowPins] = useState(true)
   // names inside buildings: only where they fit (auto), everywhere, or not at all
-  const [names, _setNames] = useState<"auto" | "all" | "off">("auto")
+  const [names, setNames] = useState<"auto" | "all" | "off">("auto")
   const [status, setStatus] = useState("")
   const [saving, setSaving] = useState(false)
   const [pxWidth, setPxWidth] = useState(800)
   const svgRef = useRef<SVGSVGElement>(null)
   const drag = useRef<Drag | null>(null)
-  const snapRef = useRef<Snap | null>(null)
-  const downAt = useRef<[number, number] | null>(null)
 
   const dirty = JSON.stringify(shapes) !== saved
   // one screen pixel in drawing units, so handles keep their size at any zoom
@@ -279,7 +234,12 @@ export function MapEditor({
     function onWheel(event: WheelEvent) {
       event.preventDefault()
       const at = toSvg(event)
-      zoomAt(at, event.deltaY > 0 ? 1.15 : 1 / 1.15)
+      const factor = event.deltaY > 0 ? 1.15 : 1 / 1.15
+      setView((v) => {
+        const s = Math.min(SIZE * 1.2, Math.max(60, v.s * factor))
+        const k = s / v.s
+        return { s, x: at[0] - (at[0] - v.x) * k, y: at[1] - (at[1] - v.y) * k }
+      })
     }
     el.addEventListener("wheel", onWheel, { passive: false })
     return () => el.removeEventListener("wheel", onWheel)
@@ -295,9 +255,8 @@ export function MapEditor({
       } else if (event.key === "Escape") {
         if (tool !== "select") cancelDraw()
         else setSel(null)
-      } else if (event.key === "Enter" && tool !== "select") {
-        finishDraw()
-      } else if (event.key === "Delete" || event.key === "Backspace") {
+      } else if (event.key === "Enter" && tool !== "select") finishDraw()
+      else if (event.key === "Delete" || event.key === "Backspace") {
         event.preventDefault()
         if (tool !== "select") setDraft((d) => d.slice(0, -1))
         else removeSelected()
@@ -325,14 +284,6 @@ export function MapEditor({
     return [p.x, p.y]
   }
 
-  function zoomAt(at: Point, factor: number) {
-    setView((v) => {
-      const s = Math.min(SIZE * 1.2, Math.max(60, v.s * factor))
-      const k = s / v.s
-      return { s, x: at[0] - (at[0] - v.x) * k, y: at[1] - (at[1] - v.y) * k }
-    })
-  }
-
   function remember() {
     setHistory((h) => [...h.slice(-59), clone(shapes)])
   }
@@ -355,162 +306,54 @@ export function MapEditor({
     })
   }
 
-  // ---- connecting roads and paths ----
-  // the nearest existing road or path point (or spot along one) to where the pointer is
-  function findSnap(
-    p: Point,
-    exclude?: { layer: LineLayer; i: number; v: number },
-  ): Snap | null {
-    if (!snapOn) return null
-    const reach = px * 10
-    let best: Snap | null = null
-    let bestDist = reach
-    for (const layer of ["roads", "paths"] as const) {
-      shapes[layer].forEach((line, i) => {
-        line.p.forEach((q, v) => {
-          if (
-            exclude &&
-            exclude.layer === layer &&
-            exclude.i === i &&
-            exclude.v === v
-          )
-            return
-          const d = dist(p, q)
-          if (d < bestDist) {
-            bestDist = d
-            best = { pt: q, kind: "vertex", layer, i, seg: v }
-          }
-        })
-      })
-    }
-    if (best) return best
-    bestDist = reach * 0.8
-    for (const layer of ["roads", "paths"] as const) {
-      shapes[layer].forEach((line, i) => {
-        for (let seg = 0; seg < line.p.length - 1; seg++) {
-          if (exclude && exclude.layer === layer && exclude.i === i) continue
-          const a = line.p[seg]
-          const b = line.p[seg + 1]
-          const len2 = (b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2 || 1
-          const t = Math.max(
-            0,
-            Math.min(
-              1,
-              ((p[0] - a[0]) * (b[0] - a[0]) + (p[1] - a[1]) * (b[1] - a[1])) /
-                len2,
-            ),
-          )
-          const q: Point = [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])]
-          const d = dist(p, q)
-          if (d < bestDist) {
-            bestDist = d
-            best = { pt: q, kind: "segment", layer, i, seg }
-          }
-        }
-      })
-    }
-    return best
-  }
-
-  // ---- drawing ----
-  function startTool(next: Tool) {
+  // ---- drawing a polygon building ----
+  function startPoly() {
     setDraft([])
-    setSnapView(null)
-    setTool(next)
+    setTool("poly")
     setSel(null)
   }
   function cancelDraw() {
     setDraft([])
-    setSnapView(null)
     setTool("select")
   }
   function finishDraw() {
     // a double click already added the point twice
     const pts = draft.filter(
-      (q, i) => i === 0 || dist(q, draft[i - 1]) > px * 2,
+      (q, k) => k === 0 || dist(q, draft[k - 1]) > px * 2,
     )
-    const need = tool === "road" || tool === "path" ? 2 : 3
-    if (tool === "select" || pts.length < need) {
+    if (pts.length < 3) {
       cancelDraw()
       return
     }
-    remember()
-    // a road that ends on the middle of another road joins it for real: that road gets the point too
-    const joins = [findSnap(pts[0]), findSnap(pts[pts.length - 1])].filter(
-      (s): s is Snap => !!s && s.kind === "segment",
-    )
-    const next = clone(shapes)
-    if (tool === "road") next.roads.push({ w: 6, p: pts })
-    else if (tool === "path") next.paths.push({ w: 4, kind: "walk", p: pts })
-    else if (tool === "zone") next.zones.push({ kind: "field", p: pts })
-    else next.buildings.push({ r: [], p: [pts] })
-    if (tool === "road" || tool === "path")
-      for (const j of joins) insertJunction(next, j)
-    setShapes(next)
-    setSel(
-      tool === "road"
-        ? { layer: "roads", i: next.roads.length - 1 }
-        : tool === "path"
-          ? { layer: "paths", i: next.paths.length - 1 }
-          : tool === "zone"
-            ? { layer: "zones", i: next.zones.length - 1 }
-            : {
-                layer: "buildings",
-                i: next.buildings.length - 1,
-                part: { k: "p", j: 0 },
-              },
-    )
+    change((d) => d.buildings.push({ p: pts }))
+    setSel({ i: shapes.buildings.length })
     cancelDraw()
   }
-  function insertJunction(target: CampusShapes, snap: Snap) {
-    const pts = target[snap.layer][snap.i].p
-    if (!pts.some((q) => dist(q, snap.pt) < 0.5))
-      pts.splice(snap.seg + 1, 0, [snap.pt[0], snap.pt[1]])
-  }
 
-  function addRect(to?: number) {
-    const rect: Rect = [view.x + view.s / 2, view.y + view.s / 2, 24, 16, 0]
-    remember()
-    setShapes((current) => {
-      const next = clone(current)
-      if (to === undefined) {
-        next.buildings.push({ r: [rect] })
-      } else {
-        const base = next.buildings[to].r[0] ?? next.buildings[to].p?.[0]?.[0]
-        if (base && Array.isArray(base) && base.length === 5) {
-          rect[0] = base[0] + 12
-          rect[1] = base[1] + 12
-        }
-        next.buildings[to].r.push(rect)
-      }
-      return next
-    })
-    const index = to ?? shapes.buildings.length
-    const j = to === undefined ? 0 : shapes.buildings[to].r.length
-    setSel({ layer: "buildings", i: index, part: { k: "r", j } })
+  function addRect() {
+    change((d) =>
+      d.buildings.push({
+        r: [view.x + view.s / 2, view.y + view.s / 2, 24, 16, 0],
+      }),
+    )
+    setSel({ i: shapes.buildings.length })
   }
 
   function removeSelected() {
     if (!sel) return
-    if (sel.v !== undefined) {
-      const pts = pointsOf(shapes, sel)
-      if (pts && pts.length > minPointsFor(sel)) {
-        change((d) => {
-          const target = pointsOf(d, sel)
-          target?.splice(sel.v as number, 1)
-        })
-        setSel({ ...sel, v: undefined })
-        return
-      }
+    const b = shapes.buildings[sel.i]
+    if (sel.v !== undefined && b?.p && b.p.length > 3) {
+      change((d) => d.buildings[sel.i].p?.splice(sel.v as number, 1))
+      setSel({ i: sel.i })
+      return
     }
-    change((d) => (d[sel.layer] as unknown[]).splice(sel.i, 1))
+    change((d) => d.buildings.splice(sel.i, 1))
     setSel(null)
   }
 
   // ---- pointer handling ----
   function onBackgroundDown(event: React.PointerEvent) {
     ;(svgRef.current as SVGSVGElement).setPointerCapture(event.pointerId)
-    downAt.current = [event.clientX, event.clientY]
     drag.current = {
       kind: "pan",
       start: [event.clientX, event.clientY],
@@ -519,19 +362,13 @@ export function MapEditor({
     }
   }
 
-  function startMove(event: React.PointerEvent, next: Sel) {
+  function startMove(event: React.PointerEvent, i: number) {
     if (tool !== "select") return
     event.stopPropagation()
     ;(svgRef.current as SVGSVGElement).setPointerCapture(event.pointerId)
     remember()
-    setSel(next)
-    drag.current = {
-      kind: "move",
-      start: toSvg(event),
-      orig: clone(shapes),
-      sel: next,
-      whole: event.shiftKey,
-    }
+    setSel({ i })
+    drag.current = { kind: "move", start: toSvg(event), orig: clone(shapes), i }
   }
 
   function startHandle(event: React.PointerEvent, d: Drag) {
@@ -544,11 +381,7 @@ export function MapEditor({
   function onPointerMove(event: React.PointerEvent) {
     const d = drag.current
     const p = toSvg(event)
-    if (tool !== "select") {
-      const snap = tool === "road" || tool === "path" ? findSnap(p) : null
-      setSnapView(snap)
-      setCursor(snap ? snap.pt : p)
-    }
+    if (tool !== "select") setCursor(p)
     if (!d) return
     if (d.kind === "pan") {
       if (
@@ -562,62 +395,41 @@ export function MapEditor({
         x: d.view.x - (event.clientX - d.start[0]) * k,
         y: d.view.y - (event.clientY - d.start[1]) * k,
       })
-      return
-    }
-    if (d.kind === "move") {
+    } else if (d.kind === "move") {
       const dx = p[0] - d.start[0]
       const dy = p[1] - d.start[1]
       const next = clone(d.orig)
-      const { layer, i, part } = d.sel
-      if (layer === "buildings") {
-        const b = next.buildings[i]
-        const moveRect = (r: Rect) => {
-          r[0] += dx
-          r[1] += dy
-        }
-        const movePoly = (pts: Point[]) => {
-          for (const q of pts) {
-            q[0] += dx
-            q[1] += dy
-          }
-        }
-        if (d.whole || !part) {
-          b.r.forEach(moveRect)
-          b.p?.forEach(movePoly)
-        } else if (part.k === "r") moveRect(b.r[part.j])
-        else if (b.p) movePoly(b.p[part.j])
+      const b = next.buildings[d.i]
+      if (b.r) {
+        b.r[0] += dx
+        b.r[1] += dy
       } else {
-        for (const q of next[layer][i].p) {
+        for (const q of b.p ?? []) {
           q[0] += dx
           q[1] += dy
         }
       }
       setShapes(next)
     } else if (d.kind === "vertex") {
-      const { layer, i, v } = d.sel
-      const isLine = layer === "roads" || layer === "paths"
-      const snap = isLine ? findSnap(p, { layer, i, v }) : null
-      snapRef.current = snap
-      setSnapView(snap)
-      const at = snap ? snap.pt : p
       setShapes((current) => {
         const next = clone(current)
-        const pts = pointsOf(next, d.sel)
-        if (pts) pts[v] = [at[0], at[1]]
+        const pts = next.buildings[d.i].p
+        if (pts) pts[d.v] = [p[0], p[1]]
         return next
       })
     } else if (d.kind === "rect") {
       setShapes((current) => {
         const next = clone(current)
-        next.buildings[d.i].r[d.j] = resizeRect(d.orig, p, d.sx, d.sy)
+        next.buildings[d.i].r = resizeRect(d.orig, p, d.sx, d.sy)
         return next
       })
     } else if (d.kind === "rotate") {
       setShapes((current) => {
         const next = clone(current)
-        const rect = next.buildings[d.i].r[d.j]
-        rect[4] =
-          (Math.atan2(p[1] - rect[1], p[0] - rect[0]) * 180) / Math.PI + 90
+        const rect = next.buildings[d.i].r
+        if (rect)
+          rect[4] =
+            (Math.atan2(p[1] - rect[1], p[0] - rect[0]) * 180) / Math.PI + 90
         return next
       })
     }
@@ -630,32 +442,12 @@ export function MapEditor({
       // a plain click on empty space
       if (tool === "select") setSel(null)
       else {
-        const p = toSvg(event)
-        const snap = tool === "road" || tool === "path" ? findSnap(p) : null
-        const at = snap ? snap.pt : p
-        // clicking the first corner again closes a polygon
-        if (
-          draft.length >= 3 &&
-          tool !== "road" &&
-          tool !== "path" &&
-          dist(at, draft[0]) < px * 10
-        )
-          finishDraw()
-        else setDraft((current) => [...current, [at[0], at[1]]])
+        const at = toSvg(event)
+        // clicking the first corner again closes the shape
+        if (draft.length >= 3 && dist(at, draft[0]) < px * 10) finishDraw()
+        else setDraft((current) => [...current, at])
       }
     }
-    if (d?.kind === "vertex") {
-      const snap = snapRef.current
-      // dropped on the middle of another road: that road gets a point there too, so they really join
-      if (snap && snap.kind === "segment")
-        setShapes((current) => {
-          const next = clone(current)
-          insertJunction(next, snap)
-          return next
-        })
-    }
-    snapRef.current = null
-    setSnapView(null)
   }
 
   async function save() {
@@ -671,7 +463,7 @@ export function MapEditor({
   }
 
   function linkPin(pinId: string) {
-    if (sel?.layer !== "buildings") return
+    if (!sel) return
     change((d) => {
       // a pin is one building: take it from any other first
       for (const b of d.buildings) if (b.id === pinId) delete b.id
@@ -680,42 +472,24 @@ export function MapEditor({
     })
   }
 
-  const building: Building | null =
-    sel?.layer === "buildings" ? (shapes.buildings[sel.i] ?? null) : null
-  const selectedRect: Rect | null =
-    building && sel?.part?.k === "r" ? (building.r[sel.part.j] ?? null) : null
+  const building = sel ? (shapes.buildings[sel.i] ?? null) : null
   const linkedIds = new Set(shapes.buildings.map((b) => b.id).filter(Boolean))
   const unlinkedPins = pins.filter((pin) => !linkedIds.has(pin.id))
-  const activeTool = TOOLS.find((t) => t.tool === tool)
 
   function setRectField(index: number, value: number) {
-    if (!sel || !selectedRect || Number.isNaN(value)) return
+    if (!sel || Number.isNaN(value)) return
     change((d) => {
-      const r = d.buildings[sel.i].r[(sel.part as Part).j]
-      r[index] = index === 2 || index === 3 ? Math.max(2, value) : value
+      const r = d.buildings[sel.i].r
+      if (r) r[index] = index === 2 || index === 3 ? Math.max(2, value) : value
     })
   }
 
-  function partChips() {
-    if (!building) return []
-    return [
-      ...building.r.map((_, j) => ({
-        part: { k: "r", j } as Part,
-        label: `Rect ${j + 1}`,
-      })),
-      ...(building.p ?? []).map((_, j) => ({
-        part: { k: "p", j } as Part,
-        label: `Shape ${j + 1}`,
-      })),
-    ]
-  }
-
-  // ---- drawing the handles of whatever is selected ----
-  function rectHandles(i: number, j: number, rect: Rect) {
+  // ---- handles ----
+  function rectHandles(i: number, rect: Rect) {
     const [, , w, h, a] = rect
     const edge = (lx: number, ly: number, sx: -1 | 0 | 1, sy: -1 | 0 | 1) => {
       const [x, y] = toWorld(rect, lx, ly)
-      const horizontal = sy !== 0 // top / bottom edges are wide, left / right edges are tall
+      const horizontal = sy !== 0 // top and bottom edges are wide, left and right edges are tall
       return (
         <rect
           key={`e${sx}${sy}`}
@@ -730,7 +504,7 @@ export function MapEditor({
           strokeWidth={stroke}
           style={{ cursor: horizontal ? "ns-resize" : "ew-resize" }}
           onPointerDown={(e) =>
-            startHandle(e, { kind: "rect", i, j, sx, sy, orig: clone(rect) })
+            startHandle(e, { kind: "rect", i, sx, sy, orig: clone(rect) })
           }
         />
       )
@@ -748,7 +522,7 @@ export function MapEditor({
           strokeWidth={stroke}
           style={{ cursor: "nwse-resize" }}
           onPointerDown={(e) =>
-            startHandle(e, { kind: "rect", i, j, sx, sy, orig: clone(rect) })
+            startHandle(e, { kind: "rect", i, sx, sy, orig: clone(rect) })
           }
         />
       )
@@ -781,21 +555,17 @@ export function MapEditor({
           stroke="#fff"
           strokeWidth={stroke}
           style={{ cursor: "grab" }}
-          onPointerDown={(e) => startHandle(e, { kind: "rotate", i, j })}
+          onPointerDown={(e) => startHandle(e, { kind: "rotate", i })}
         />
       </g>
     )
   }
 
-  function pointHandles(s: Sel) {
-    const pts = pointsOf(shapes, s)
-    if (!pts) return null
-    const closed = isClosed(s)
+  function pointHandles(i: number, pts: Point[]) {
     return (
       <g>
         {pts.map((q, v) => {
-          const next = pts[v + 1] ?? (closed ? pts[0] : null)
-          if (!next) return null
+          const next = pts[(v + 1) % pts.length]
           const mid: Point = [(q[0] + next[0]) / 2, (q[1] + next[1]) / 2]
           return (
             <circle
@@ -809,20 +579,19 @@ export function MapEditor({
               strokeWidth={stroke}
               style={{ cursor: "copy" }}
               onPointerDown={(e) => {
-                // a new point in the middle of that stretch, picked up straight away
+                // a new corner in the middle of that side, picked up straight away
                 e.stopPropagation()
                 remember()
                 setShapes((current) => {
                   const next2 = clone(current)
-                  pointsOf(next2, s)?.splice(v + 1, 0, mid)
+                  next2.buildings[i].p?.splice(v + 1, 0, mid)
                   return next2
                 })
                 ;(svgRef.current as SVGSVGElement).setPointerCapture(
                   e.pointerId,
                 )
-                const picked = { ...s, v: v + 1 }
-                drag.current = { kind: "vertex", sel: picked }
-                setSel(picked)
+                drag.current = { kind: "vertex", i, v: v + 1 }
+                setSel({ i, v: v + 1 })
               }}
             />
           )
@@ -833,14 +602,13 @@ export function MapEditor({
             cx={q[0]}
             cy={q[1]}
             r={handleR}
-            fill={s.v === v ? "#f43f5e" : "#06b6d4"}
+            fill={sel?.v === v ? "#f43f5e" : "#06b6d4"}
             stroke="#fff"
             strokeWidth={stroke}
             style={{ cursor: "grab" }}
             onPointerDown={(e) => {
-              const picked = { ...s, v }
-              setSel(picked)
-              startHandle(e, { kind: "vertex", sel: picked })
+              setSel({ i, v })
+              startHandle(e, { kind: "vertex", i, v })
             }}
             onDoubleClick={() => removeSelected()}
           />
@@ -850,28 +618,30 @@ export function MapEditor({
   }
 
   const draftPoints = cursor && draft.length ? [...draft, cursor] : draft
-  const selectedStroke = "#06b6d4"
 
   return (
     <div className="flex h-[calc(100dvh-1rem)] flex-col gap-2 p-2 lg:flex-row">
       <div className="flex min-h-0 flex-1 flex-col gap-2">
-        {/* tools */}
         <div className="flex flex-wrap items-center gap-1.5">
-          {TOOLS.map((t) => (
-            <IconBtn
-              key={t.tool}
-              icon={t.icon}
-              label={t.label}
-              showLabel
-              active={tool === t.tool}
-              onClick={() => startTool(t.tool)}
-            />
-          ))}
+          <IconBtn
+            icon={Cursor02Icon}
+            label="Select"
+            showLabel
+            active={tool === "select"}
+            onClick={cancelDraw}
+          />
+          <IconBtn
+            icon={Pentagon01Icon}
+            label="Draw a building"
+            showLabel
+            active={tool === "poly"}
+            onClick={startPoly}
+          />
           <IconBtn
             icon={SquareIcon}
-            label="Rectangle building"
+            label="Add a rectangle"
             showLabel
-            onClick={() => addRect()}
+            onClick={addRect}
           />
           <span className="mx-1 h-6 w-px bg-border" />
           <IconBtn
@@ -880,19 +650,28 @@ export function MapEditor({
             onClick={undo}
             disabled={history.length === 0}
           />
-          {EDIT_LINES && (
-            <IconBtn
-              icon={MagnetIcon}
-              label="Snap roads together"
-              active={snapOn}
-              onClick={() => setSnapOn((v) => !v)}
-            />
-          )}
           <IconBtn
             icon={MapPinIcon}
             label="Show pins"
             active={showPins}
             onClick={() => setShowPins((v) => !v)}
+          />
+          <IconBtn
+            icon={Edit02Icon}
+            label={
+              names === "auto"
+                ? "Names: where they fit"
+                : names === "all"
+                  ? "Names: all"
+                  : "Names: off"
+            }
+            showLabel
+            active={names !== "off"}
+            onClick={() =>
+              setNames((n) =>
+                n === "auto" ? "all" : n === "all" ? "off" : "auto",
+              )
+            }
           />
           <IconBtn
             icon={Maximize01Icon}
@@ -958,132 +737,49 @@ export function MapEditor({
               pointerEvents="none"
             />
 
-            {EDIT_LINES && (
-              <>
-                {shapes.zones.map((zone, i) => (
-                  <polygon
-                    key={i}
-                    points={zone.p.map((q) => q.join(",")).join(" ")}
-                    fill={
-                      zone.kind === "court"
-                        ? "#d98a68"
-                        : zone.kind === "parking"
-                          ? "#c9ccd0"
-                          : "#a9d18f"
-                    }
-                    fillOpacity={0.55}
-                    stroke={
-                      sel?.layer === "zones" && sel.i === i
-                        ? selectedStroke
-                        : "#ffffff"
-                    }
-                    strokeWidth={stroke}
-                    onPointerDown={(e) => startMove(e, { layer: "zones", i })}
-                  />
-                ))}
-                {(["paths", "roads"] as const).map((layer) =>
-                  shapes[layer].map((line, i) => {
-                    const selected = sel?.layer === layer && sel.i === i
-                    const d = smoothPath(line.p)
-                    return (
-                      <g key={`${layer}${i}`}>
-                        <path
-                          d={d}
-                          fill="none"
-                          stroke={
-                            selected
-                              ? selectedStroke
-                              : layer === "roads"
-                                ? "#ffffff"
-                                : "#f0d9a8"
-                          }
-                          strokeOpacity={0.9}
-                          strokeWidth={Math.max(line.w, px * 5)}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          pointerEvents="none"
-                        />
-                        {/* a wider invisible stroke, so a thin road is easy to grab */}
-                        <path
-                          d={d}
-                          fill="none"
-                          stroke="transparent"
-                          strokeWidth={Math.max(line.w, px * 16)}
-                          strokeLinecap="round"
-                          pointerEvents="stroke"
-                          onPointerDown={(e) => startMove(e, { layer, i })}
-                        />
-                      </g>
-                    )
-                  }),
-                )}
-              </>
-            )}
             {shapes.buildings.map((b, i) => {
-              const selected = sel?.layer === "buildings" && sel.i === i
-              const fill = b.id ? "#ff7a45" : "#facc15"
-              const partStroke = (k: "r" | "p", j: number) =>
-                selected && sel?.part?.k === k && sel.part.j === j
-                  ? stroke * 2.4
-                  : stroke
-              return (
-                <g
+              const selected = sel?.i === i
+              const common = {
+                fill: b.id ? "#ff7a45" : "#facc15",
+                fillOpacity: 0.55,
+                stroke: selected ? "#06b6d4" : "#ffffff",
+                strokeWidth: selected ? stroke * 2.2 : stroke,
+                onPointerDown: (e: React.PointerEvent) => startMove(e, i),
+              }
+              return b.r ? (
+                <rect
                   key={i}
-                  fill={fill}
-                  fillOpacity={0.55}
-                  stroke={selected ? selectedStroke : "#ffffff"}
-                >
-                  {b.r.map((rect, j) => (
-                    <rect
-                      key={`r${j}`}
-                      x={-rect[2] / 2}
-                      y={-rect[3] / 2}
-                      width={rect[2]}
-                      height={rect[3]}
-                      transform={`translate(${rect[0]} ${rect[1]}) rotate(${rect[4]})`}
-                      strokeWidth={partStroke("r", j)}
-                      onPointerDown={(e) =>
-                        startMove(e, {
-                          layer: "buildings",
-                          i,
-                          part: { k: "r", j },
-                        })
-                      }
-                    />
-                  ))}
-                  {(b.p ?? []).map((pts, j) => (
-                    <polygon
-                      key={`p${j}`}
-                      points={pts.map((q) => q.join(",")).join(" ")}
-                      strokeWidth={partStroke("p", j)}
-                      onPointerDown={(e) =>
-                        startMove(e, {
-                          layer: "buildings",
-                          i,
-                          part: { k: "p", j },
-                        })
-                      }
-                    />
-                  ))}
-                </g>
+                  x={-b.r[2] / 2}
+                  y={-b.r[3] / 2}
+                  width={b.r[2]}
+                  height={b.r[3]}
+                  transform={`translate(${b.r[0]} ${b.r[1]}) rotate(${b.r[4]})`}
+                  {...common}
+                />
+              ) : (
+                <polygon
+                  key={i}
+                  points={(b.p ?? []).map((q) => q.join(",")).join(" ")}
+                  {...common}
+                />
               )
             })}
 
             {/* every building says which pin it is, right inside it */}
             {shapes.buildings.map((b, i) => {
               if (names === "off") return null
-              const [cx, cy] = buildingCenter(b)
+              const [cx, cy] = centerOf(b)
               const title = b.id
                 ? (pins.find((pin) => pin.id === b.id)?.title ?? b.id)
                 : "no pin"
               const shown = title.length > 20 ? `${title.slice(0, 19)}…` : title
               // in auto, a name only shows once its building is big enough on screen to hold it
-              const xs = b.r
-                .flatMap((r) => rectToPolygon(r))
-                .concat((b.p ?? []).flat())
-                .map((q) => q[0])
-              const widthPx = (Math.max(...xs) - Math.min(...xs)) / px
-              if (names === "auto" && widthPx < shown.length * 5.6) return null
+              const xs = outlineOf(b).map((q) => q[0])
+              if (
+                names === "auto" &&
+                (Math.max(...xs) - Math.min(...xs)) / px < shown.length * 5.6
+              )
+                return null
               return (
                 <text
                   key={`label${i}`}
@@ -1109,14 +805,15 @@ export function MapEditor({
                 <g
                   key={pin.id}
                   onPointerDown={(e) => {
-                    if (sel?.layer === "buildings" && tool === "select") {
+                    if (sel && tool === "select") {
                       e.stopPropagation()
                       linkPin(pin.id)
                     }
                   }}
-                  style={{
-                    cursor: sel?.layer === "buildings" ? "pointer" : "default",
-                  }}
+                  // a linked pin sits in the middle of its own building: it must not steal the click that
+                  // selects that building. Only pins still waiting for a building can be clicked to link
+                  pointerEvents={linkedIds.has(pin.id) ? "none" : "auto"}
+                  style={{ cursor: sel ? "pointer" : "default" }}
                 >
                   <circle
                     cx={pin.x}
@@ -1143,27 +840,17 @@ export function MapEditor({
                 </g>
               ))}
 
-            {/* the thing being drawn */}
-            {tool !== "select" && draftPoints.length > 0 && (
+            {/* the building being drawn */}
+            {tool === "poly" && draftPoints.length > 0 && (
               <g pointerEvents="none">
-                {tool === "road" || tool === "path" ? (
-                  <polyline
-                    points={draftPoints.map((q) => q.join(",")).join(" ")}
-                    fill="none"
-                    stroke="#06b6d4"
-                    strokeWidth={stroke * 2}
-                    strokeDasharray={`${px * 6} ${px * 4}`}
-                  />
-                ) : (
-                  <polygon
-                    points={draftPoints.map((q) => q.join(",")).join(" ")}
-                    fill="#06b6d4"
-                    fillOpacity={0.2}
-                    stroke="#06b6d4"
-                    strokeWidth={stroke * 2}
-                    strokeDasharray={`${px * 6} ${px * 4}`}
-                  />
-                )}
+                <polygon
+                  points={draftPoints.map((q) => q.join(",")).join(" ")}
+                  fill="#06b6d4"
+                  fillOpacity={0.2}
+                  stroke="#06b6d4"
+                  strokeWidth={stroke * 2}
+                  strokeDasharray={`${px * 6} ${px * 4}`}
+                />
                 {draft.map((q, k) => (
                   <circle
                     key={k}
@@ -1178,29 +865,15 @@ export function MapEditor({
               </g>
             )}
 
-            {/* handles of the selection */}
+            {/* handles of the selected building: a rectangle has edges and corners, plain vertices have points */}
             {tool === "select" &&
-              sel?.layer === "buildings" &&
-              sel.part?.k === "r" &&
-              selectedRect &&
-              rectHandles(sel.i, sel.part.j, selectedRect)}
-            {tool === "select" &&
+              building?.r &&
               sel &&
-              !(sel.layer === "buildings" && sel.part?.k !== "p") &&
-              pointHandles(sel)}
-
-            {/* a junction about to be made */}
-            {snapView && (
-              <circle
-                cx={snapView.pt[0]}
-                cy={snapView.pt[1]}
-                r={handleR * 1.5}
-                fill="none"
-                stroke="#22c55e"
-                strokeWidth={stroke * 2.5}
-                pointerEvents="none"
-              />
-            )}
+              rectHandles(sel.i, building.r)}
+            {tool === "select" &&
+              building?.p &&
+              sel &&
+              pointHandles(sel.i, building.p)}
             {/* while drawing, everything underneath is out of the way */}
             {tool !== "select" && (
               <rect
@@ -1214,18 +887,17 @@ export function MapEditor({
             )}
           </svg>
 
-          {/* what to do next, right on the drawing */}
           <div className="pointer-events-none absolute right-2 bottom-2 left-2 flex items-end justify-between gap-2">
             <p className="pointer-events-auto rounded-xl bg-black/70 px-3 py-1.5 text-white text-xs">
-              {tool !== "select"
-                ? (activeTool?.hint ?? "")
-                : sel
-                  ? sel.layer === "buildings"
-                    ? "Drag to move (Shift moves the whole building). Edges and corners resize, the orange dot rotates. Click a pin dot to link it"
-                    : "Drag a blue dot to move it, a white dot to add a point. Drop an end on another road to connect"
-                  : "Click a shape to edit it. Drag empty space to move around, scroll to zoom"}
+              {tool === "poly"
+                ? "Click each corner of the building. Click the first one, double-click or press Enter to finish"
+                : building?.r
+                  ? "Drag a side or corner to resize only that side, the orange dot rotates. Use Edit as vertices when a rectangle isn't enough"
+                  : building
+                    ? "Drag a blue dot to move a corner, a white dot to add one. Double-click a corner to remove it"
+                    : "Click a building to edit it. Drag empty space to move around, scroll to zoom"}
             </p>
-            {tool !== "select" && (
+            {tool === "poly" && (
               <span className="pointer-events-auto flex gap-1.5">
                 <IconBtn
                   icon={Tick02Icon}
@@ -1251,14 +923,12 @@ export function MapEditor({
           <section className="space-y-2">
             <h2 className="flex items-center gap-1.5 font-medium">
               <Icon
-                icon={
-                  building.p?.length && !building.r.length
-                    ? Pentagon01Icon
-                    : SquareIcon
-                }
+                icon={building.r ? SquareIcon : Pentagon01Icon}
                 className="size-4"
               />
-              Building
+              {building.r
+                ? "Rectangle"
+                : `Free shape, ${building.p?.length} corners`}
             </h2>
             <label className="block space-y-1">
               <span className="flex items-center gap-1.5 text-muted-foreground">
@@ -1282,20 +952,7 @@ export function MapEditor({
               </select>
             </label>
 
-            <div className="flex flex-wrap gap-1">
-              {partChips().map(({ part, label }) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => setSel({ layer: "buildings", i: sel.i, part })}
-                  className={`rounded-full px-2.5 py-0.5 text-xs ${sel.part?.k === part.k && sel.part.j === part.j ? "bg-foreground text-background" : "bg-foreground/10"}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {selectedRect && (
+            {building.r && (
               <div className="grid grid-cols-5 gap-1">
                 {(["x", "y", "width", "height", "angle"] as const).map(
                   (label, index) => (
@@ -1307,7 +964,9 @@ export function MapEditor({
                       <input
                         type="number"
                         step="0.5"
-                        value={Math.round(selectedRect[index] * 10) / 10}
+                        value={
+                          Math.round((building.r as Rect)[index] * 10) / 10
+                        }
                         onChange={(e) =>
                           setRectField(index, Number(e.target.value))
                         }
@@ -1320,46 +979,30 @@ export function MapEditor({
             )}
 
             <div className="flex flex-wrap gap-1.5">
-              <IconBtn
-                icon={SquareIcon}
-                label="Add rectangle"
-                showLabel
-                onClick={() => addRect(sel.i)}
-              />
-              {selectedRect && sel.part && (
+              {building.r ? (
                 <IconBtn
                   icon={Pentagon01Icon}
-                  label="Make it a polygon"
+                  label="Edit as vertices"
                   showLabel
                   onClick={() => {
-                    const poly = rectToPolygon(selectedRect)
-                    const partJ = (sel.part as Part).j
+                    const rect = building.r as Rect
                     change((d) => {
-                      const b = d.buildings[sel.i]
-                      b.r.splice(partJ, 1)
-                      b.p = [...(b.p ?? []), poly]
-                    })
-                    setSel({
-                      layer: "buildings",
-                      i: sel.i,
-                      part: { k: "p", j: (building.p ?? []).length },
+                      d.buildings[sel.i].p = rectToPolygon(rect)
+                      delete d.buildings[sel.i].r
                     })
                   }}
                 />
-              )}
-              {partChips().length > 1 && sel.part && (
+              ) : (
                 <IconBtn
-                  icon={Cancel01Icon}
-                  label="Remove this part"
+                  icon={SquareIcon}
+                  label="Back to a rectangle"
                   showLabel
                   onClick={() => {
-                    const part = sel.part as Part
+                    const fitted = fitRect(building.p ?? [])
                     change((d) => {
-                      const b = d.buildings[sel.i]
-                      if (part.k === "r") b.r.splice(part.j, 1)
-                      else b.p?.splice(part.j, 1)
+                      d.buildings[sel.i].r = fitted
+                      delete d.buildings[sel.i].p
                     })
-                    setSel({ layer: "buildings", i: sel.i })
                   }}
                 />
               )}
@@ -1370,119 +1013,45 @@ export function MapEditor({
                 onClick={() => {
                   const copy = clone(building)
                   delete copy.id
-                  for (const r of copy.r) {
-                    r[0] += 12
-                    r[1] += 12
+                  if (copy.r) {
+                    copy.r[0] += 12
+                    copy.r[1] += 12
                   }
-                  for (const pts of copy.p ?? [])
-                    for (const q of pts) {
-                      q[0] += 12
-                      q[1] += 12
-                    }
+                  for (const q of copy.p ?? []) {
+                    q[0] += 12
+                    q[1] += 12
+                  }
                   change((d) => d.buildings.push(copy))
-                  setSel({ layer: "buildings", i: shapes.buildings.length })
+                  setSel({ i: shapes.buildings.length })
+                }}
+              />
+              {sel.v !== undefined && (building.p?.length ?? 0) > 3 && (
+                <IconBtn
+                  icon={Cancel01Icon}
+                  label="Delete corner"
+                  showLabel
+                  onClick={removeSelected}
+                />
+              )}
+              <IconBtn
+                icon={Delete02Icon}
+                label="Delete building"
+                showLabel
+                tone="danger"
+                onClick={() => {
+                  change((d) => d.buildings.splice(sel.i, 1))
+                  setSel(null)
                 }}
               />
             </div>
           </section>
         )}
 
-        {sel && sel.layer !== "buildings" && shapes[sel.layer][sel.i] && (
-          <section className="space-y-2">
-            <h2 className="flex items-center gap-1.5 font-medium capitalize">
-              <Icon
-                icon={
-                  sel.layer === "roads"
-                    ? Road01Icon
-                    : sel.layer === "paths"
-                      ? FootprintsIcon
-                      : Tree01Icon
-                }
-                className="size-4"
-              />
-              {sel.layer.slice(0, -1)}
-            </h2>
-            {sel.layer !== "zones" && (
-              <label className="block space-y-1">
-                <span className="text-muted-foreground">Width</span>
-                <input
-                  type="number"
-                  step="0.5"
-                  min={1}
-                  value={(shapes[sel.layer][sel.i] as { w: number }).w}
-                  onChange={(e) => {
-                    const layer = sel.layer as LineLayer
-                    change((d) => {
-                      d[layer][sel.i].w = Math.max(1, Number(e.target.value))
-                    })
-                  }}
-                  className="w-full rounded-lg border bg-background px-2 py-1.5"
-                />
-              </label>
-            )}
-            {(sel.layer === "paths" || sel.layer === "zones") && (
-              <label className="block space-y-1">
-                <span className="text-muted-foreground">Kind</span>
-                <select
-                  value={(shapes[sel.layer][sel.i] as { kind: string }).kind}
-                  onChange={(e) => {
-                    const layer = sel.layer as "paths" | "zones"
-                    change((d) => {
-                      ;(d[layer][sel.i] as { kind: string }).kind =
-                        e.target.value
-                    })
-                  }}
-                  className="w-full rounded-lg border bg-background px-2 py-1.5"
-                >
-                  {(sel.layer === "paths" ? PATH_KINDS : ZONE_KINDS).map(
-                    (kind) => (
-                      <option key={kind}>{kind}</option>
-                    ),
-                  )}
-                </select>
-              </label>
-            )}
-          </section>
-        )}
-
-        {sel && (
-          <div className="flex flex-wrap gap-1.5">
-            {sel.v !== undefined &&
-              pointsOf(shapes, sel) &&
-              (pointsOf(shapes, sel) as Point[]).length > minPointsFor(sel) && (
-                <IconBtn
-                  icon={Delete02Icon}
-                  label="Delete point"
-                  showLabel
-                  onClick={removeSelected}
-                />
-              )}
-            <IconBtn
-              icon={Delete02Icon}
-              label={
-                sel.layer === "buildings" ? "Delete building" : "Delete shape"
-              }
-              showLabel
-              tone="danger"
-              onClick={() => {
-                change((d) =>
-                  (d[(sel as Sel).layer] as unknown[]).splice(
-                    (sel as Sel).i,
-                    1,
-                  ),
-                )
-                setSel(null)
-              }}
-            />
-          </div>
-        )}
-
         {!sel && (
           <p className="text-muted-foreground">
-            Orange buildings are linked to a pin, yellow ones aren't. Pins
-            without a building are red dots. Some buildings are rectangles,
-            others are free polygons: use <b>Polygon building</b> to draw one
-            corner by corner.
+            Every building is one shape. Orange ones are linked to a pin, yellow
+            ones aren't, red dots are pins without a building. Most are
+            rectangles, switch one to vertices whenever you need more control.
           </p>
         )}
 
@@ -1500,13 +1069,9 @@ export function MapEditor({
                   type="button"
                   title="Jump there"
                   onClick={() => {
-                    const [cx, cy] = buildingCenter(b)
+                    const [cx, cy] = centerOf(b)
                     setView({ x: cx - 80, y: cy - 80, s: 160 })
-                    setSel({
-                      layer: "buildings",
-                      i,
-                      part: b.r.length ? { k: "r", j: 0 } : { k: "p", j: 0 },
-                    })
+                    setSel({ i })
                   }}
                   className="rounded-full bg-yellow-500/20 px-2 py-0.5 text-xs"
                 >

@@ -1,16 +1,17 @@
+import polygonClipping from "polygon-clipping"
 import bundled from "./campusShapes.json"
 
 // the hand drawn campus, in the pixel space of the satellite image (1312 x 1312)
 export type Point = [number, number]
-// a building is one or more parts, glued into one shape. A part is a rotated rectangle (centre x,
-// centre y, width, height, angle in degrees) or, when a rectangle won't do, a free polygon
+// a building is ONE continuous shape: either a rectangle shortcut (centre x, centre y, width, height,
+// angle in degrees) or, when a rectangle won't do, a plain polygon of vertices. Never several pieces
 export type Rect = [cx: number, cy: number, w: number, h: number, a: number]
 export type Building = {
   // the pin this building is, when it is one. Plenty of buildings have no pin
   id?: string
-  r: Rect[]
-  // polygon parts (3+ points each), for the buildings that aren't made of rectangles
-  p?: Point[][]
+  // exactly one of these two is set
+  r?: Rect
+  p?: Point[]
 }
 export type Road = { w: number; p: Point[] }
 export type Path = { w: number; kind: "walk" | "dirt"; p: Point[] }
@@ -26,7 +27,49 @@ export type CampusShapes = {
 export const ZONE_KINDS = ["field", "court", "parking"] as const
 export const PATH_KINDS = ["walk", "dirt"] as const
 
-export const BUNDLED_SHAPES = bundled as unknown as CampusShapes
+export function rectToPolygon([cx, cy, w, h, a]: Rect): Point[] {
+  const rad = (a * Math.PI) / 180
+  const ux = [Math.cos(rad), Math.sin(rad)]
+  const uy = [-Math.sin(rad), Math.cos(rad)]
+  const at = (lx: number, ly: number): Point => [
+    cx + ux[0] * lx + uy[0] * ly,
+    cy + ux[1] * lx + uy[1] * ly,
+  ]
+  return [
+    at(-w / 2, -h / 2),
+    at(w / 2, -h / 2),
+    at(w / 2, h / 2),
+    at(-w / 2, h / 2),
+  ]
+}
+
+// the outline of several overlapping pieces as one polygon (what older saves, made of glued
+// rectangles, turn into). Pieces that don't touch fall back to one outline around all of them
+function unite(parts: Point[][]): Point[] | null {
+  try {
+    const [first, ...rest] = parts.map((pts) => [pts] as [Point[]])
+    const merged = polygonClipping.union(first as never, ...(rest as never[]))
+    if (merged.length === 1) return merged[0][0].slice(0, -1) as Point[]
+  } catch {}
+  // not one piece: the convex outline of everything
+  const all = parts.flat().sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  const cross = (o: Point, a: Point, b: Point) =>
+    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+  const half = (list: Point[]) => {
+    const out: Point[] = []
+    for (const q of list) {
+      while (
+        out.length >= 2 &&
+        cross(out[out.length - 2], out[out.length - 1], q) <= 0
+      )
+        out.pop()
+      out.push(q)
+    }
+    return out.slice(0, -1)
+  }
+  const hull = [...half(all), ...half([...all].reverse())]
+  return hull.length >= 3 ? hull : null
+}
 
 const finite = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value)
@@ -47,32 +90,67 @@ export function sanitizeShapes(input: unknown): CampusShapes | null {
   const round = (value: number) => Math.round(value * 10) / 10
 
   const buildings: Building[] = []
+  const asRect = (value: unknown): Rect | null => {
+    if (!Array.isArray(value) || value.length !== 5 || !value.every(finite))
+      return null
+    const [cx, cy, w, h, a] = value as number[]
+    return w > 0 && h > 0
+      ? [round(cx), round(cy), round(w), round(h), round(a)]
+      : null
+  }
   for (const item of list("buildings")) {
     const entry = item as { id?: unknown; r?: unknown; p?: unknown }
-    const rawRects = Array.isArray(entry?.r) ? entry.r : []
-    const rawPolys = Array.isArray(entry?.p) ? entry.p : []
+    // the shapes a building has been saved as: a rectangle, a polygon, or (older saves) lists of
+    // rectangles and polygons glued together, which become one outline
+    const pieces: Point[][] = []
+    let rect: Rect | null = null
     if (
-      rawRects.length + rawPolys.length < 1 ||
-      rawRects.length + rawPolys.length > 12
-    )
-      return null
-    const r: Rect[] = []
-    for (const rect of rawRects) {
-      if (!Array.isArray(rect) || rect.length !== 5 || !rect.every(finite))
-        return null
-      const [cx, cy, w, h, a] = rect as number[]
-      if (w <= 0 || h <= 0) return null
-      r.push([round(cx), round(cy), round(w), round(h), round(a)])
-    }
-    const building: Building = { r }
-    if (rawPolys.length) {
-      const polys: Point[][] = []
-      for (const poly of rawPolys) {
-        const pts = points(poly, 3)
-        if (!pts) return null
-        polys.push(pts.map(([x, y]) => [round(x), round(y)]))
+      Array.isArray(entry?.r) &&
+      entry.r.length === 5 &&
+      entry.r.every(finite)
+    ) {
+      rect = asRect(entry.r)
+      if (!rect) return null
+    } else if (
+      Array.isArray(entry?.r) &&
+      entry.r.length === 1 &&
+      !(Array.isArray(entry.p) && entry.p.length)
+    ) {
+      // an older save with a single rectangle: still a rectangle shortcut
+      rect = asRect(entry.r[0])
+      if (!rect) return null
+    } else if (Array.isArray(entry?.r)) {
+      for (const part of entry.r) {
+        const r = asRect(part)
+        if (!r) return null
+        pieces.push(rectToPolygon(r))
       }
-      building.p = polys
+    }
+    if (Array.isArray(entry?.p)) {
+      if (
+        entry.p.length &&
+        Array.isArray(entry.p[0]) &&
+        Array.isArray((entry.p[0] as unknown[])[0])
+      ) {
+        for (const poly of entry.p) {
+          const pts = points(poly, 3)
+          if (!pts) return null
+          pieces.push(pts)
+        }
+      } else {
+        const pts = points(entry.p, 3)
+        if (!pts) return null
+        pieces.push(pts)
+      }
+    }
+    const building: Building = {}
+    if (rect && pieces.length === 0) building.r = rect
+    else {
+      if (rect) pieces.push(rectToPolygon(rect))
+      if (pieces.length === 0) return null
+      const outline = pieces.length === 1 ? pieces[0] : unite(pieces)
+      if (!outline) return null
+      building.p = outline.map(([x, y]) => [round(x), round(y)])
     }
     if (typeof entry.id === "string" && entry.id)
       building.id = entry.id.slice(0, 80)
@@ -158,16 +236,21 @@ export function buildCampusSvg(
     body += `<path class="rr" stroke-width="${road.w}" d="${smoothPath(road.p)}"/>`
   for (const building of shapes.buildings) {
     const tag = building.id ? tagByPinId[building.id] : undefined
-    const rects = building.r
-      .map(
-        ([cx, cy, w, h, a]) =>
-          `<rect x="${n(-w / 2)}" y="${n(-h / 2)}" width="${n(w)}" height="${n(h)}" rx="1.2" transform="translate(${n(cx)} ${n(cy)}) rotate(${n(a)})"/>`,
-      )
-      .join("")
-    const polys = (building.p ?? [])
-      .map((pts) => `<path d="${polygon(pts)}"/>`)
-      .join("")
-    body += `<g class="${tag ? `b b-${tag}` : "b"}">${rects}${polys}</g>`
+    const cls = tag ? `b b-${tag}` : "b"
+    if (building.r) {
+      const [cx, cy, w, h, a] = building.r
+      body += `<rect class="${cls}" x="${n(-w / 2)}" y="${n(-h / 2)}" width="${n(w)}" height="${n(h)}" rx="1.2" transform="translate(${n(cx)} ${n(cy)}) rotate(${n(a)})"/>`
+    } else if (building.p)
+      body += `<path class="${cls}" d="${polygon(building.p)}"/>`
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${shapes.size} ${shapes.size}" width="${shapes.size}" height="${shapes.size}"><style>${STYLE}</style>${body}</svg>\n`
+}
+
+// the drawing that ships with the code, used until the first save
+export const BUNDLED_SHAPES: CampusShapes = sanitizeShapes(bundled) ?? {
+  size: 1312,
+  buildings: [],
+  roads: [],
+  paths: [],
+  zones: [],
 }
