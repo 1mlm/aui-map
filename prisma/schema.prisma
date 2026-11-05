@@ -39,6 +39,8 @@ model Pin {
   // a small detail (a bathroom, a printer...) that would crowd the map: null shows it always,
   // otherwise it only appears once the map is zoomed in this far (1 = fully zoomed out, 5 = closest)
   minZoom      Float?
+  // what the place has, ticked in the admin: keys from src/map/amenities.ts ("printer", "restroom"...)
+  amenities    String[] @default([])
   latitude     Float
   longitude    Float
   // curated place link (reviews/photos) some pins get by hand — overrides the

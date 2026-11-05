@@ -1,4 +1,5 @@
 import type { Prisma, Tag } from "@/generated/prisma/client"
+import { amenityById } from "./amenities"
 import { resolveIcon } from "./iconRegistry"
 import type { TagColorName } from "./tagColor"
 import {
@@ -35,11 +36,20 @@ export function pinRowToMapItem(
   pin: PinWithAttachments,
   tag: MapItemTag,
 ): MapItem {
+  const amenities = (pin.amenities ?? []).flatMap((id) => {
+    const amenity = amenityById(id)
+    return amenity ? [amenity] : []
+  })
   return {
     id: pin.id,
     title: pin.title,
     aliases: pin.aliases,
-    keywords: pin.keywords ?? [],
+    // a place with a printer is found by "print": the amenity's words join the hidden keywords
+    keywords: [
+      ...(pin.keywords ?? []),
+      ...amenities.flatMap((amenity) => amenity.words),
+    ],
+    amenities: amenities.map((amenity) => amenity.id),
     minZoom: pin.minZoom ?? (isDetailTag(tag) ? DETAIL_MIN_ZOOM : null),
     shortestName: getShortestName([pin.title, ...pin.aliases]),
     description: pin.description ?? undefined,

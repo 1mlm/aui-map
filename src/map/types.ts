@@ -50,6 +50,8 @@ export type MapItem = {
   keywords: string[]
   // only drawn once the map is zoomed in this far, null = always. See Pin.minZoom
   minZoom: number | null
+  // what the place has (printer, restrooms...), ids from amenities.ts. See Pin.amenities
+  amenities: string[]
   shortestName: string
   description?: string
   latitude: number

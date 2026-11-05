@@ -1,0 +1,1 @@
+ALTER TABLE "Pin" ADD COLUMN "amenities" TEXT[] DEFAULT ARRAY[]::TEXT[];

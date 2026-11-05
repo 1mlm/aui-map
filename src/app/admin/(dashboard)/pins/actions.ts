@@ -17,6 +17,7 @@ export type PinInput = {
   aliases: string[]
   keywords: string[]
   minZoom: number | null
+  amenities: string[]
   description: string | null
   latitude: number
   longitude: number
@@ -89,6 +90,7 @@ export async function upsertPin(
     aliases: input.aliases,
     keywords: input.keywords,
     minZoom: input.minZoom,
+    amenities: input.amenities,
     description: input.description,
     latitude: input.latitude,
     longitude: input.longitude,

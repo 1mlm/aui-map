@@ -458,6 +458,7 @@ export const MAP_ITEMS: MapItem[] = rawMapItems.map(
     aliases,
     keywords: [],
     minZoom: null,
+    amenities: [],
     shortestName: getShortestName([title, ...aliases]),
     description,
     mapsUrl: null,

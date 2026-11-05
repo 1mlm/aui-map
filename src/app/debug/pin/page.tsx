@@ -23,6 +23,7 @@ const items: MapItem[] = SURVEYED.map(({ title, coord, tag }, index) => ({
   aliases: [],
   keywords: [],
   minZoom: null,
+  amenities: [],
   shortestName: title,
   mapsUrl: null,
   hours: null,

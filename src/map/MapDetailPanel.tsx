@@ -1,5 +1,6 @@
 "use client"
 
+import { Navigation03Icon } from "@hugeicons/core-free-icons"
 import { m, type PanInfo } from "motion/react"
 import Image from "next/image"
 import { useState } from "react"
@@ -21,6 +22,7 @@ import { triggerHaptic } from "@/utils/haptics"
 import { isImageMimeType } from "@/utils/mimeType"
 import { useCopyFeedback } from "@/utils/useCopyFeedback"
 import { useIsPhone } from "@/utils/useIsPhone"
+import { amenityById } from "./amenities"
 import { AttachmentCarousel, AttachmentStrip } from "./AttachmentCarousel"
 import { formatCoordinates } from "./geo"
 import { TagChipIcon, tagChipClassName } from "./MapTagFilter"
@@ -237,6 +239,7 @@ export function MapDetailPanel({
             Last updated
             <DateCell date={item.updatedAt} />
           </div>
+          <DirectionsButton {...{ item }} />
           <MapsMenuButton {...{ item }} />
           <PinCommentButton pinId={item.id} pinTitle={item.title} />
         </div>
@@ -424,7 +427,13 @@ function LinkRow({ link }: { link: PinLink }) {
 }
 
 function ContactInfo({ item }: { item: MapItem }) {
-  if (!item.hours && !item.phone && !item.email && item.links.length === 0)
+  if (
+    !item.hours &&
+    !item.phone &&
+    !item.email &&
+    item.links.length === 0 &&
+    item.amenities.length === 0
+  )
     return null
 
   return (
@@ -453,7 +462,49 @@ function ContactInfo({ item }: { item: MapItem }) {
       {item.links.map((link) => (
         <LinkRow key={link.url} {...{ link }} />
       ))}
+      {item.amenities.length > 0 && (
+        <ul className="flex flex-wrap gap-1.5 pt-0.5">
+          {item.amenities.map((id) => {
+            const amenity = amenityById(id)
+            return (
+              amenity && (
+                <li
+                  key={id}
+                  className="flex items-center gap-1.5 rounded-lg corner-squircle bg-foreground/[0.07] px-2 py-1 text-xs font-medium"
+                >
+                  <Icon icon={amenity.icon} className="size-3.5 opacity-70" />
+                  {amenity.label}
+                </li>
+              )
+            )
+          })}
+        </ul>
+      )}
     </div>
+  )
+}
+
+// phones only: one tap to walking directions in the maps app people actually have. Apple Maps on
+// an iPhone, Google Maps everywhere else
+function DirectionsButton({ item }: { item: MapItem }) {
+  const isPhone = useIsPhone()
+  if (!isPhone) return null
+  const destination = `${item.latitude},${item.longitude}`
+  const isApple = /iPhone|iPad|iPod/.test(navigator.userAgent)
+  const href = isApple
+    ? `https://maps.apple.com/?daddr=${destination}&dirflg=w`
+    : `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=walking`
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={() => triggerHaptic()}
+      className="flex w-full items-center justify-center gap-2 rounded-full corner-squircle bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground"
+    >
+      <Icon icon={Navigation03Icon} />
+      Directions
+    </a>
   )
 }
 

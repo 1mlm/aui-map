@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { cache, Suspense } from "react"
 import { getMapData } from "@/map/getMapData"
+import { amenityById } from "@/map/amenities"
 import { placeNames } from "@/map/aliases"
 import { MapExperience } from "@/map/MapExperience"
 import type { MapItem } from "@/map/types"
@@ -60,8 +61,10 @@ function getPinDescription(pin: MapItem) {
     ?.replace(/@([a-z0-9-]+)/gi, (_, id: string) => id)
     .replace(/\s+/g, " ")
     .trim()
+  const has = pin.amenities.flatMap((id) => amenityById(id)?.label ?? [])
   const facts = [
     pin.hours && `Opening hours: ${pin.hours}.`,
+    has.length > 0 && `Has: ${has.join(", ")}.`,
     pin.phone && `Phone: ${pin.phone}.`,
     pin.email && `Email: ${pin.email}.`,
   ]
@@ -217,6 +220,18 @@ function getPinStructuredData(pin: MapItem) {
         // hours are free text ("8:30 to 17:00..."), kept as written
         openingHours: pin.hours ?? undefined,
         sameAs: pin.links.map(({ url }) => url),
+        amenityFeature: pin.amenities.flatMap((id) => {
+          const amenity = amenityById(id)
+          return amenity
+            ? [
+                {
+                  "@type": "LocationFeatureSpecification",
+                  name: amenity.label,
+                  value: true,
+                },
+              ]
+            : []
+        }),
         isAccessibleForFree: true,
         publicAccess: true,
         containedInPlace: {
@@ -284,6 +299,14 @@ export default async function Page(props: PageProps) {
         <p>{getPinDescription(pin)}</p>
         {pin.hours && <p>Opening hours: {pin.hours}</p>}
         {pin.phone && <p>Phone: {pin.phone}</p>}
+        {pin.amenities.length > 0 && (
+          <p>
+            Has:{" "}
+            {pin.amenities
+              .flatMap((id) => amenityById(id)?.label ?? [])
+              .join(", ")}
+          </p>
+        )}
         {pin.email && <p>Email: {pin.email}</p>}
         {namesOf(pin).length > 0 && (
           <p>Also called: {namesOf(pin).join(", ")}</p>

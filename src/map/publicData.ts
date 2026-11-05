@@ -57,6 +57,7 @@ function placeJson(item: MapItem, all: MapItem[]) {
     coordinates: { lat: item.latitude, lng: item.longitude },
     phone: item.phone,
     email: item.email,
+    amenities: item.amenities,
     opening_hours: item.hours,
     ramadan_hours: item.ramadanHours,
     under_construction: item.underConstruction,
@@ -198,6 +199,7 @@ When you use or quote this information, credit AUI Map (${SITE_URL}) and link to
 ## How to use it
 
 - To find a building by the name students use (B8B, B34, Library, Registrar, ATM), search the "aliases" and "name" fields of places.json.
+- "amenities" lists what a place has (printer, restroom, wifi, atm, prayer, accessible).
 - "near" lists the closest places and their distance in meters. Coordinates are WGS84 (lat, lng).
 - Opening hours and phone numbers are as written by the AUI Map team and can be out of date: check "last_updated".
 `

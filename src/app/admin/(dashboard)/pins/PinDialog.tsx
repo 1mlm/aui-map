@@ -8,6 +8,7 @@ import { FormDialog } from "@/components/FormDialog"
 import { Icon } from "@/components/Icon"
 import { EnumBadge } from "@/components/table/CustomTableCell"
 import { ICONS } from "@/icons"
+import { AMENITIES } from "@/map/amenities"
 import type { MapItemTag, PinLink } from "@/map/types"
 import { Button } from "@/shadcn/ui/button"
 import { Checkbox } from "@/shadcn/ui/checkbox"
@@ -40,6 +41,8 @@ export type AdminPin = {
   keywords: string[]
   // null = always on the map, otherwise only once zoomed in this far
   minZoom: number | null
+  // what the place has, ids from map/amenities.ts
+  amenities: string[]
   description: string | null
   latitude: number
   longitude: number
@@ -138,6 +141,7 @@ export function PinDialog({
   const [aliasesText, setAliasesText] = useState(pin.aliases.join(", "))
   const [keywordsText, setKeywordsText] = useState(pin.keywords.join(", "))
   const [minZoom, setMinZoom] = useState<number | null>(pin.minZoom)
+  const [amenities, setAmenities] = useState<string[]>(pin.amenities)
   const [description, setDescription] = useState(pin.description ?? "")
   const [mapsUrl, setMapsUrl] = useState(pin.mapsUrl ?? "")
   const [hours, setHours] = useState(pin.hours ?? "")
@@ -191,6 +195,7 @@ export function PinDialog({
             .map((word) => word.trim().toLowerCase())
             .filter(Boolean),
           minZoom,
+          amenities,
           description: description || null,
           mapsUrl: mapsUrl.trim() || null,
           hours: hours.trim() || null,
@@ -404,6 +409,37 @@ export function PinDialog({
             />
           </div>
         )}
+
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel icon={ICONS.place} htmlFor="pin-amenities">
+            What it has
+          </FieldLabel>
+          <div id="pin-amenities" className="flex flex-wrap gap-1.5">
+            {AMENITIES.map(({ id, label, icon }) => {
+              const on = amenities.includes(id)
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() =>
+                    setAmenities((current) =>
+                      on ? current.filter((x) => x !== id) : [...current, id],
+                    )
+                  }
+                  className={`inline-flex items-center gap-1.5 rounded-xl corner-squircle px-2.5 py-1.5 text-sm transition-colors ${
+                    on
+                      ? "bg-primary font-medium text-primary-foreground"
+                      : "bg-foreground/10 hover:bg-foreground/15"
+                  }`}
+                >
+                  <Icon icon={icon} className="size-4" />
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
 
         <div className="flex flex-col gap-1.5">
           <FieldLabel icon={ICONS.size} htmlFor="pin-minzoom">

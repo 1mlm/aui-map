@@ -28,6 +28,7 @@ const emptyPin = (): AdminPin => ({
   aliases: [],
   keywords: [],
   minZoom: null,
+  amenities: [],
   description: null,
   mapsUrl: null,
   hours: null,
