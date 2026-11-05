@@ -4,6 +4,8 @@ import { prisma } from "@/utils/prisma"
 import {
   type AnalyticsData,
   AnalyticsView,
+  CHART_TYPES,
+  type ChartType,
   RANGES,
   type RangeKey,
   UNITS,
@@ -15,7 +17,6 @@ export const dynamic = "force-dynamic"
 
 const TZ = "Africa/Casablanca"
 const MS = { hour: 3_600_000, day: 86_400_000, week: 604_800_000 }
-const MAX_SOURCES = 9
 
 type Row = Record<string, string | number | bigint>
 const num = (value: unknown) => Number(value ?? 0)
@@ -79,7 +80,7 @@ function mondayOf(ymd: string) {
 export default async function AdminAnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string; by?: string }>
+  searchParams: Promise<{ range?: string; by?: string; chart?: string }>
 }) {
   const params = await searchParams
   const range: RangeKey =
@@ -130,31 +131,16 @@ export default async function AdminAnalyticsPage({
         group by 1 having count(distinct date_trunc('day', "createdAt" at time zone ${tz})) >= 3) t`,
     ])
 
-  // the biggest sources keep their own colour, the long tail is one "other" slice
+  // every source keeps its own name, nothing is folded into an "other"
   const sourceRows = sources.map((row) => ({
     name: String(row.source),
     views: num(row.views),
     visitors: num(row.visitors),
   }))
-  const top = sourceRows.slice(0, MAX_SOURCES)
-  const rest = sourceRows.slice(MAX_SOURCES)
-  const merged = rest.length
-    ? [
-        ...top,
-        {
-          name: "other",
-          views: rest.reduce((s, r) => s + r.views, 0),
-          visitors: 0,
-        },
-      ]
-    : top
-  const topNames = new Set(top.map((source) => source.name))
 
   const byKey = new Map<string, Record<string, number>>()
   for (const row of series) {
-    const source = topNames.has(String(row.source))
-      ? String(row.source)
-      : "other"
+    const source = String(row.source)
     const entry = byKey.get(String(row.key)) ?? {}
     entry[source] = (entry[source] ?? 0) + num(row.views)
     byKey.set(String(row.key), entry)
@@ -165,7 +151,7 @@ export default async function AdminAnalyticsPage({
       ...bucket,
       by: byKey.get(bucket.key) ?? {},
     })),
-    sources: merged,
+    sources: sourceRows,
     pages: pages.map((row) => ({
       path: String(row.path),
       views: num(row.views),
@@ -184,5 +170,10 @@ export default async function AdminAnalyticsPage({
     ),
   }
 
-  return <AnalyticsView {...{ data, range, unit }} />
+  const chart: ChartType = (CHART_TYPES as readonly string[]).includes(
+    params.chart ?? "",
+  )
+    ? (params.chart as ChartType)
+    : "bars"
+  return <AnalyticsView {...{ data, range, unit, chart }} />
 }

@@ -9,6 +9,8 @@ export const RANGES = {
   "365": 365,
 } as const
 export type RangeKey = keyof typeof RANGES
+export const CHART_TYPES = ["bars", "area", "lines"] as const
+export type ChartType = (typeof CHART_TYPES)[number]
 export const UNITS = ["hour", "day", "week", "month"] as const
 export type Unit = (typeof UNITS)[number]
 
@@ -32,19 +34,49 @@ export type AnalyticsData = {
   byWeekday: number[]
 }
 
-const PALETTE = [
-  "#16a34a",
-  "#2563eb",
-  "#f59e0b",
-  "#db2777",
-  "#7c3aed",
-  "#0891b2",
-  "#ea580c",
-  "#65a30d",
-  "#e11d48",
-  "#64748b",
-]
-const colorFor = (index: number) => PALETTE[index % PALETTE.length]
+// any number of sources gets its own colour: hues spread by the golden angle so neighbours differ
+const colorFor = (index: number) =>
+  `hsl(${Math.round((index * 137.508 + 140) % 360)} 62% 48%)`
+
+// friendly source names back to the site they stand for, for the little icon. Anything that's
+// already a host name (an unknown referrer) is its own domain
+const DOMAIN_BY_NAME: Record<string, string> = {
+  instagram: "instagram.com",
+  facebook: "facebook.com",
+  whatsapp: "whatsapp.com",
+  x: "x.com",
+  linkedin: "linkedin.com",
+  tiktok: "tiktok.com",
+  reddit: "reddit.com",
+  discord: "discord.com",
+  google: "google.com",
+  bing: "bing.com",
+  duckduckgo: "duckduckgo.com",
+  sharepoint: "sharepoint.com",
+  "aui portal": "my.aui.ma",
+  "aui website": "aui.ma",
+  email: "mail.google.com",
+}
+function SourceIcon({ name, color }: { name: string; color: string }) {
+  const domain = DOMAIN_BY_NAME[name] ?? (name.includes(".") ? name : null)
+  if (!domain)
+    return (
+      <span
+        className="size-3 shrink-0 rounded-full"
+        style={{ background: color }}
+      />
+    )
+  return (
+    // biome-ignore lint/performance/noImgElement: tiny favicon, admin only
+    <img
+      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
+      alt=""
+      width={14}
+      height={14}
+      className="shrink-0 rounded-sm"
+    />
+  )
+}
 const BAR_WIDTH: Record<Unit, number> = {
   hour: 12,
   day: 22,
@@ -66,17 +98,33 @@ function StackedChart({
   data,
   unit,
   sourceOrder,
+  chart,
 }: {
   data: AnalyticsData["buckets"]
   unit: Unit
   sourceOrder: string[]
+  chart: ChartType
 }) {
   const barWidth = BAR_WIDTH[unit]
   const totals = data.map((bucket) =>
     Object.values(bucket.by).reduce((sum, value) => sum + value, 0),
   )
-  const max = Math.max(1, ...totals)
+  const max =
+    chart === "lines"
+      ? Math.max(1, ...data.flatMap((bucket) => Object.values(bucket.by)))
+      : Math.max(1, ...totals)
   const width = data.length * barWidth
+  const yOf = (value: number) => CHART_HEIGHT - (value / max) * CHART_HEIGHT
+  const xMid = (index: number) => index * barWidth + barWidth / 2
+  // running stack height under each source, per bucket, for the area chart
+  const stacks = data.map((bucket) => {
+    let running = 0
+    return sourceOrder.map((source) => {
+      const from = running
+      running += bucket.by[source] ?? 0
+      return [from, running] as const
+    })
+  })
   // a label under a bar only when there's room for it
   const labelEvery = unit === "hour" ? 6 : unit === "day" ? 1 : 1
   return (
@@ -108,6 +156,36 @@ function StackedChart({
               strokeOpacity={0.12}
             />
           ))}
+          {chart === "area" &&
+            sourceOrder.map((source, sourceIndex) => {
+              const top = data.map(
+                (_, i) => `${xMid(i)},${yOf(stacks[i][sourceIndex][1])}`,
+              )
+              const bottom = data
+                .map((_, i) => `${xMid(i)},${yOf(stacks[i][sourceIndex][0])}`)
+                .reverse()
+              return (
+                <polygon
+                  key={source}
+                  points={[...top, ...bottom].join(" ")}
+                  fill={colorFor(sourceIndex)}
+                  fillOpacity={0.85}
+                />
+              )
+            })}
+          {chart === "lines" &&
+            sourceOrder.map((source, sourceIndex) => (
+              <polyline
+                key={source}
+                fill="none"
+                stroke={colorFor(sourceIndex)}
+                strokeWidth={2}
+                strokeLinejoin="round"
+                points={data
+                  .map((b, i) => `${xMid(i)},${yOf(b.by[source] ?? 0)}`)
+                  .join(" ")}
+              />
+            ))}
           {data.map((bucket, index) => {
             let y = CHART_HEIGHT
             const x = index * barWidth
@@ -115,23 +193,24 @@ function StackedChart({
             return (
               <g key={bucket.key}>
                 <title>{`${bucket.sub} ${bucket.label}: ${totals[index]}`}</title>
-                {sourceOrder.map((source, sourceIndex) => {
-                  const value = bucket.by[source] ?? 0
-                  if (!value) return null
-                  const h = (value / max) * CHART_HEIGHT
-                  y -= h
-                  return (
-                    <rect
-                      key={source}
-                      x={x + 1}
-                      y={y}
-                      width={barWidth - 2}
-                      height={h}
-                      rx={2}
-                      fill={colorFor(sourceIndex)}
-                    />
-                  )
-                })}
+                {chart === "bars" &&
+                  sourceOrder.map((source, sourceIndex) => {
+                    const value = bucket.by[source] ?? 0
+                    if (!value) return null
+                    const h = (value / max) * CHART_HEIGHT
+                    y -= h
+                    return (
+                      <rect
+                        key={source}
+                        x={x + 1}
+                        y={y}
+                        width={barWidth - 2}
+                        height={h}
+                        rx={2}
+                        fill={colorFor(sourceIndex)}
+                      />
+                    )
+                  })}
                 {newDay && (
                   <line
                     x1={x}
@@ -219,7 +298,7 @@ function Pie({
         )}
         <circle r={26} fill="var(--background)" />
       </svg>
-      <ul className="min-w-0 space-y-0.5 text-sm">
+      <ul className="max-h-40 min-w-0 space-y-0.5 overflow-y-auto text-sm">
         {slices.map((slice) => (
           <li key={slice.name} className="flex items-center gap-2">
             <span
@@ -293,10 +372,12 @@ export function AnalyticsView({
   data,
   range,
   unit,
+  chart,
 }: {
   data: AnalyticsData
   range: RangeKey
   unit: Unit
+  chart: ChartType
 }) {
   const sourceOrder = data.sources.map((source) => source.name)
   const regularsNote = data.totals.regulars
@@ -307,7 +388,9 @@ export function AnalyticsView({
         <Toggle
           options={Object.keys(RANGES) as RangeKey[]}
           current={range}
-          href={(option) => `/admin/analytics?range=${option}&by=${unit}`}
+          href={(option) =>
+            `/admin/analytics?range=${option}&by=${unit}&chart=${chart}`
+          }
           label={(option) =>
             option === "1" ? "24h" : option === "365" ? "1y" : `${option}d`
           }
@@ -315,7 +398,17 @@ export function AnalyticsView({
         <Toggle
           options={UNITS}
           current={unit}
-          href={(option) => `/admin/analytics?range=${range}&by=${option}`}
+          href={(option) =>
+            `/admin/analytics?range=${range}&by=${option}&chart=${chart}`
+          }
+          label={(option) => option}
+        />
+        <Toggle
+          options={CHART_TYPES}
+          current={chart}
+          href={(option) =>
+            `/admin/analytics?range=${range}&by=${unit}&chart=${option}`
+          }
           label={(option) => option}
         />
       </div>
@@ -332,6 +425,7 @@ export function AnalyticsView({
           data={data.buckets}
           unit={unit}
           sourceOrder={sourceOrder}
+          chart={chart}
         />
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
           {sourceOrder.map((name, index) => (
@@ -364,12 +458,12 @@ export function AnalyticsView({
               {
                 name: "First visit",
                 value: data.totals.newViews,
-                color: PALETTE[0],
+                color: colorFor(0),
               },
               {
                 name: "Came back",
                 value: data.totals.views - data.totals.newViews,
-                color: PALETTE[1],
+                color: colorFor(1),
               },
             ].filter((slice) => slice.value > 0)}
           />
