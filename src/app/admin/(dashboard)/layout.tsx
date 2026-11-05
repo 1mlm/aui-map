@@ -1,5 +1,6 @@
 import type { PropsWithChildren } from "react"
 import { AppShell } from "@/components/sidebar/AppShell"
+import { TooltipProvider } from "@/shadcn/ui/tooltip"
 import { prisma } from "@/utils/prisma"
 import { requireAuth } from "@/utils/requireAuth"
 
@@ -13,5 +14,11 @@ export default async function AdminLayout({ children }: PropsWithChildren) {
     prisma.submission.count({ where: { kind: "PIN_EDIT", status: "PENDING" } }),
   ])
 
-  return <AppShell counts={{ pins, tags, searchMisses, comments }}>{children}</AppShell>
+  return (
+    <TooltipProvider>
+      <AppShell counts={{ pins, tags, searchMisses, comments }}>
+        {children}
+      </AppShell>
+    </TooltipProvider>
+  )
 }
