@@ -3,7 +3,9 @@
 
 import {
   Add01Icon,
+  ArrowRight01Icon,
   Cancel01Icon,
+  CheckmarkBadge01Icon,
   Copy01Icon,
   Cursor02Icon,
   Delete02Icon,
@@ -15,9 +17,11 @@ import {
   MapPinIcon,
   Maximize01Icon,
   Pentagon01Icon,
+  Redo02Icon,
   SquareIcon,
   Tick02Icon,
   Undo02Icon,
+  ViewOffIcon,
 } from "@hugeicons/core-free-icons"
 import { useEffect, useRef, useState } from "react"
 import { type HugeIcon, Icon } from "@/components/Icon"
@@ -134,6 +138,40 @@ function fitRect(points: Point[]): Rect {
     }
   })
   return best ?? [0, 0, 10, 10, 0]
+}
+
+// a square view around everything drawn, so the buildings start out big instead of tiny
+function fitView(shapes: CampusShapes): View {
+  const pts = shapes.buildings.flatMap((b) =>
+    b.r ? rectToPolygon(b.r) : (b.p ?? []),
+  )
+  if (!pts.length) return { x: 0, y: 0, s: SIZE }
+  const xs = pts.map((q) => q[0])
+  const ys = pts.map((q) => q[1])
+  const pad = 40
+  const w = Math.max(...xs) - Math.min(...xs) + pad * 2
+  const h = Math.max(...ys) - Math.min(...ys) + pad * 2
+  const s = Math.min(SIZE * 1.2, Math.max(w, h))
+  return {
+    s,
+    x: (Math.min(...xs) + Math.max(...xs)) / 2 - s / 2,
+    y: (Math.min(...ys) + Math.max(...ys)) / 2 - s / 2,
+  }
+}
+
+// whether a point lies inside a polygon
+function insidePolygon(pt: Point, poly: Point[]): boolean {
+  let inside = false
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i]
+    const [xj, yj] = poly[j]
+    if (
+      yi > pt[1] !== yj > pt[1] &&
+      pt[0] < ((xj - xi) * (pt[1] - yi)) / (yj - yi) + xi
+    )
+      inside = !inside
+  }
+  return inside
 }
 
 const outlineOf = (b: Building): Point[] =>
@@ -262,10 +300,13 @@ export function MapEditor({
   const [tool, setTool] = useState<Tool>("select")
   const [draft, setDraft] = useState<Point[]>([])
   const [cursor, setCursor] = useState<Point | null>(null)
-  const [view, setView] = useState<View>({ x: 0, y: 0, s: SIZE })
+  const [view, setView] = useState<View>(() => fitView(initial))
   const [history, setHistory] = useState<CampusShapes[]>([])
+  const [future, setFuture] = useState<CampusShapes[]>([])
   const [satOpacity, setSatOpacity] = useState(0.8)
   const [showPins, setShowPins] = useState(true)
+  // only the drafts are left on the drawing, the confirmed ones are put away
+  const [hideDone, setHideDone] = useState(false)
   // snapping sides parallel to their neighbours (Alt held skips it for one drag)
   const [snapOn, setSnapOn] = useState(true)
   const [guides, setGuides] = useState<[Point, Point][]>([])
@@ -276,6 +317,9 @@ export function MapEditor({
   const [pxWidth, setPxWidth] = useState(800)
   const svgRef = useRef<SVGSVGElement>(null)
   const drag = useRef<Drag | null>(null)
+  // what the last press landed on: the pointer is captured on press, so a double click no longer
+  // reaches the shape, the drawing itself has to decide what it meant
+  const lastDown = useRef<"vertex" | "building" | "other">("other")
 
   const dirty = JSON.stringify(shapes) !== saved
   // one screen pixel in drawing units, so handles keep their size at any zoom
@@ -313,12 +357,27 @@ export function MapEditor({
     function onKey(event: KeyboardEvent) {
       if (/INPUT|SELECT|TEXTAREA/.test((event.target as HTMLElement).tagName))
         return
-      if ((event.ctrlKey || event.metaKey) && event.key === "z") {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
         event.preventDefault()
-        undo()
+        if (event.shiftKey) redo()
+        else undo()
+      } else if (
+        (event.ctrlKey || event.metaKey) &&
+        event.key.toLowerCase() === "y"
+      ) {
+        event.preventDefault()
+        redo()
       } else if (event.key === "Escape") {
         if (tool !== "select") cancelDraw()
         else setSel(null)
+      } else if (
+        event.key.toLowerCase() === "c" &&
+        tool === "select" &&
+        sel &&
+        !event.ctrlKey &&
+        !event.metaKey
+      ) {
+        toggleDone(sel.i)
       } else if (event.key === "Enter" && tool !== "select") finishDraw()
       else if (event.key === "Delete" || event.key === "Backspace") {
         event.preventDefault()
@@ -350,16 +409,23 @@ export function MapEditor({
 
   function remember() {
     setHistory((h) => [...h.slice(-59), clone(shapes)])
+    setFuture([])
   }
   function undo() {
-    setHistory((h) => {
-      const last = h[h.length - 1]
-      if (last) {
-        setShapes(last)
-        setSel(null)
-      }
-      return h.slice(0, -1)
-    })
+    const last = history[history.length - 1]
+    if (!last) return
+    setFuture((f) => [...f, clone(shapes)])
+    setHistory((h) => h.slice(0, -1))
+    setShapes(last)
+    setSel(null)
+  }
+  function redo() {
+    const next = future[future.length - 1]
+    if (!next) return
+    setHistory((h) => [...h, clone(shapes)])
+    setFuture((f) => f.slice(0, -1))
+    setShapes(next)
+    setSel(null)
   }
   function change(fn: (draft: CampusShapes) => void) {
     remember()
@@ -394,6 +460,28 @@ export function MapEditor({
     cancelDraw()
   }
 
+  function toggleDone(i: number) {
+    change((d) => {
+      if (d.buildings[i].done) delete d.buildings[i].done
+      else d.buildings[i].done = true
+    })
+  }
+
+  // the next building still in draft after the selected one (wrapping round), centred on screen
+  function nextDraft() {
+    const total = shapes.buildings.length
+    const from = sel ? sel.i : -1
+    for (let step = 1; step <= total; step++) {
+      const i = (from + step) % total
+      if (!shapes.buildings[i].done) {
+        const [cx, cy] = centerOf(shapes.buildings[i])
+        setView({ x: cx - 80, y: cy - 80, s: 160 })
+        setSel({ i })
+        return
+      }
+    }
+  }
+
   function addRect() {
     const centre: Point = [view.x + view.s / 2, view.y + view.s / 2]
     // a new rectangle starts out parallel to whatever is closest, so it is usually already lined up
@@ -414,6 +502,7 @@ export function MapEditor({
   function removeSelected() {
     if (!sel) return
     const b = shapes.buildings[sel.i]
+    if (b?.done) return
     if (sel.v !== undefined && b?.p && b.p.length > 3) {
       change((d) => d.buildings[sel.i].p?.splice(sel.v as number, 1))
       setSel({ i: sel.i })
@@ -425,6 +514,7 @@ export function MapEditor({
 
   // ---- pointer handling ----
   function onBackgroundDown(event: React.PointerEvent) {
+    lastDown.current = "other"
     ;(svgRef.current as SVGSVGElement).setPointerCapture(event.pointerId)
     drag.current = {
       kind: "pan",
@@ -436,7 +526,13 @@ export function MapEditor({
 
   function startMove(event: React.PointerEvent, i: number) {
     if (tool !== "select") return
+    lastDown.current = "building"
     event.stopPropagation()
+    // a confirmed building can be selected but not dragged by accident, reopen it to change it
+    if (shapes.buildings[i]?.done) {
+      setSel({ i })
+      return
+    }
     ;(svgRef.current as SVGSVGElement).setPointerCapture(event.pointerId)
     remember()
     setSel({ i })
@@ -444,6 +540,7 @@ export function MapEditor({
   }
 
   function startHandle(event: React.PointerEvent, d: Drag) {
+    lastDown.current = d.kind === "vertex" ? "vertex" : "other"
     event.stopPropagation()
     ;(svgRef.current as SVGSVGElement).setPointerCapture(event.pointerId)
     remember()
@@ -689,7 +786,38 @@ export function MapEditor({
 
   const building = sel ? (shapes.buildings[sel.i] ?? null) : null
   const linkedIds = new Set(shapes.buildings.map((b) => b.id).filter(Boolean))
-  const unlinkedPins = pins.filter((pin) => !linkedIds.has(pin.id))
+  const skipped = new Set(shapes.skipPins ?? [])
+  const unlinkedPins = pins.filter(
+    (pin) => !linkedIds.has(pin.id) && !skipped.has(pin.id),
+  )
+  // the unlinked pin closest to the selected building, when it is really close
+  const suggestion = (() => {
+    if (!building || building.id) return null
+    const c = centerOf(building)
+    let best: { pin: Pin; d: number } | null = null
+    for (const pin of unlinkedPins) {
+      const d = dist([pin.x, pin.y], c)
+      if (d < 45 && (!best || d < best.d)) best = { pin, d }
+    }
+    return best?.pin ?? null
+  })()
+  // pins that sit inside exactly one building, and that building has no pin yet: safe to link at once
+  const autoLinks = (() => {
+    const out: [number, string][] = []
+    const taken = new Set<number>()
+    for (const pin of unlinkedPins) {
+      const hits = shapes.buildings
+        .map((b, i) =>
+          !b.id && insidePolygon([pin.x, pin.y], outlineOf(b)) ? i : -1,
+        )
+        .filter((i) => i >= 0)
+      if (hits.length === 1 && !taken.has(hits[0])) {
+        taken.add(hits[0])
+        out.push([hits[0], pin.id])
+      }
+    }
+    return out
+  })()
 
   function setRectField(index: number, value: number) {
     if (!sel || Number.isNaN(value)) return
@@ -825,7 +953,6 @@ export function MapEditor({
               setSel({ i, v })
               startHandle(e, { kind: "vertex", i, v })
             }}
-            onDoubleClick={() => removeSelected()}
           />
         ))}
       </g>
@@ -859,11 +986,52 @@ export function MapEditor({
             onClick={addRect}
           />
           <span className="mx-1 h-6 w-px bg-border" />
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full bg-green-500/15 px-3 py-1.5 text-green-600 text-sm dark:text-green-400"
+            title="Confirmed buildings"
+          >
+            <Icon icon={CheckmarkBadge01Icon} className="size-4" />
+            {shapes.buildings.filter((b) => b.done).length} /{" "}
+            {shapes.buildings.length}
+          </span>
+          <IconBtn
+            icon={ArrowRight01Icon}
+            label="Next draft"
+            showLabel
+            onClick={nextDraft}
+          />
+          <IconBtn
+            icon={ViewOffIcon}
+            label="Hide confirmed"
+            active={hideDone}
+            onClick={() => setHideDone((v) => !v)}
+          />
+          <span className="ml-auto flex items-center gap-2">
+            {status && (
+              <span className="text-muted-foreground text-xs">{status}</span>
+            )}
+            <IconBtn
+              icon={FloppyDiskIcon}
+              label={saving ? "Saving…" : dirty ? "Save" : "Saved"}
+              showLabel
+              tone="primary"
+              onClick={save}
+              disabled={!dirty || saving}
+            />
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
           <IconBtn
             icon={Undo02Icon}
-            label="Undo"
+            label="Undo (Ctrl+Z)"
             onClick={undo}
             disabled={history.length === 0}
+          />
+          <IconBtn
+            icon={Redo02Icon}
+            label="Redo (Ctrl+Shift+Z)"
+            onClick={redo}
+            disabled={future.length === 0}
           />
           <IconBtn
             icon={MagnetIcon}
@@ -896,12 +1064,12 @@ export function MapEditor({
           />
           <IconBtn
             icon={Maximize01Icon}
-            label="Fit the whole map"
-            onClick={() => setView({ x: 0, y: 0, s: SIZE })}
+            label="Fit everything"
+            onClick={() => setView(fitView(shapes))}
           />
           <label
             className="flex items-center gap-1.5 px-1 text-sm"
-            title="Satellite photo"
+            title="How strong the satellite photo is"
           >
             <Icon icon={Image01Icon} className="size-4" />
             <input
@@ -914,19 +1082,6 @@ export function MapEditor({
               className="w-24"
             />
           </label>
-          <span className="ml-auto flex items-center gap-2">
-            {status && (
-              <span className="text-muted-foreground text-xs">{status}</span>
-            )}
-            <IconBtn
-              icon={FloppyDiskIcon}
-              label={saving ? "Saving…" : dirty ? "Save" : "Saved"}
-              showLabel
-              tone="primary"
-              onClick={save}
-              disabled={!dirty || saving}
-            />
-          </span>
         </div>
 
         <div className="relative min-h-0 flex-1">
@@ -945,7 +1100,17 @@ export function MapEditor({
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
-            onDoubleClick={() => tool !== "select" && finishDraw()}
+            onDoubleClick={() => {
+              if (tool !== "select") finishDraw()
+              else if (lastDown.current === "vertex") removeSelected()
+              else if (lastDown.current === "building" && sel) {
+                const b = shapes.buildings[sel.i]
+                if (b) {
+                  const [cx, cy] = centerOf(b)
+                  setView({ x: cx - 70, y: cy - 70, s: 140 })
+                }
+              }
+            }}
           >
             <title>Campus drawing</title>
             <rect
@@ -965,12 +1130,19 @@ export function MapEditor({
             />
 
             {shapes.buildings.map((b, i) => {
+              if (hideDone && b.done && sel?.i !== i) return null
               const selected = sel?.i === i
               const common = {
                 fill: b.id ? "#ff7a45" : "#facc15",
                 fillOpacity: 0.55,
-                stroke: selected ? "#06b6d4" : "#ffffff",
-                strokeWidth: selected ? stroke * 2.2 : stroke,
+                // confirmed: a solid green outline. Draft: a dashed white one
+                stroke: selected ? "#06b6d4" : b.done ? "#22c55e" : "#ffffff",
+                strokeWidth: selected
+                  ? stroke * 2.2
+                  : b.done
+                    ? stroke * 2
+                    : stroke,
+                strokeDasharray: b.done ? undefined : `${px * 5} ${px * 3}`,
                 onPointerDown: (e: React.PointerEvent) => startMove(e, i),
               }
               return b.r ? (
@@ -999,7 +1171,8 @@ export function MapEditor({
               const title = b.id
                 ? (pins.find((pin) => pin.id === b.id)?.title ?? b.id)
                 : "no pin"
-              const shown = title.length > 20 ? `${title.slice(0, 19)}…` : title
+              if (hideDone && b.done && sel?.i !== i) return null
+              const shown = `${b.done ? "✓ " : ""}${title.length > 20 ? `${title.slice(0, 19)}…` : title}`
               // in auto, a name only shows once its building is big enough on screen to hold it
               const xs = outlineOf(b).map((q) => q[0])
               if (
@@ -1050,7 +1223,7 @@ export function MapEditor({
                     stroke="#fff"
                     strokeWidth={stroke}
                   />
-                  {!linkedIds.has(pin.id) && (
+                  {!linkedIds.has(pin.id) && view.s < 650 && (
                     <text
                       x={pin.x + handleR}
                       y={pin.y + handleR * 0.4}
@@ -1110,10 +1283,12 @@ export function MapEditor({
             {/* handles of the selected building: a rectangle has edges and corners, plain vertices have points */}
             {tool === "select" &&
               building?.r &&
+              !building.done &&
               sel &&
               rectHandles(sel.i, building.r)}
             {tool === "select" &&
               building?.p &&
+              !building.done &&
               sel &&
               pointHandles(sel.i, building.p)}
             {/* while drawing, everything underneath is out of the way */}
@@ -1132,12 +1307,14 @@ export function MapEditor({
           <div className="pointer-events-none absolute right-2 bottom-2 left-2 flex items-end justify-between gap-2">
             <p className="pointer-events-auto rounded-xl bg-black/70 px-3 py-1.5 text-white text-xs">
               {tool === "poly"
-                ? "Click each corner of the building. Click the first one, double-click or press Enter to finish"
-                : building?.r
-                  ? "Drag a side or corner to resize only that side, the orange dot rotates. Use Edit as vertices when a rectangle isn't enough"
-                  : building
-                    ? "Drag a blue dot to move a corner, a white dot to add one. Double-click a corner to remove it"
-                    : "Click a building to edit it. Drag empty space to move around, scroll to zoom"}
+                ? "Click each corner of the building. Backspace removes the last corner. Click the first one, double-click or press Enter to finish"
+                : building?.done
+                  ? "This building is confirmed and locked. Reopen it in the panel to change it"
+                  : building?.r
+                    ? "Drag a side or corner to resize only that side, the orange dot rotates. Use Edit as vertices when a rectangle isn't enough"
+                    : building
+                      ? "Drag a blue dot to move a corner, a white dot to add one. Double-click a corner to remove it"
+                      : "Click a building to edit it. Drag empty space to move around, scroll to zoom"}
             </p>
             {tool === "poly" && (
               <span className="pointer-events-auto flex gap-1.5">
@@ -1172,6 +1349,28 @@ export function MapEditor({
                 ? "Rectangle"
                 : `Free shape, ${building.p?.length} corners`}
             </h2>
+            {building.done ? (
+              <div className="flex items-center justify-between gap-2 rounded-xl bg-green-500/15 px-3 py-2">
+                <span className="flex items-center gap-1.5 font-medium text-green-600 dark:text-green-400">
+                  <Icon icon={CheckmarkBadge01Icon} className="size-4" />
+                  Confirmed, locked
+                </span>
+                <IconBtn
+                  icon={Edit02Icon}
+                  label="Reopen"
+                  showLabel
+                  onClick={() => toggleDone(sel.i)}
+                />
+              </div>
+            ) : (
+              <IconBtn
+                icon={Tick02Icon}
+                label="Confirm this building (C)"
+                showLabel
+                tone="primary"
+                onClick={() => toggleDone(sel.i)}
+              />
+            )}
             <label className="block space-y-1">
               <span className="flex items-center gap-1.5 text-muted-foreground">
                 <Icon icon={Link01Icon} className="size-4" />
@@ -1194,8 +1393,16 @@ export function MapEditor({
               </select>
             </label>
 
+            {suggestion && (
+              <IconBtn
+                icon={Link01Icon}
+                label={`Link ${suggestion.title} (closest pin)`}
+                showLabel
+                onClick={() => linkPin(suggestion.id)}
+              />
+            )}
             {building.r && (
-              <div className="grid grid-cols-5 gap-1">
+              <div className="grid grid-cols-3 gap-1.5">
                 {(["x", "y", "width", "height", "angle"] as const).map(
                   (label, index) => (
                     <label
@@ -1212,7 +1419,8 @@ export function MapEditor({
                         onChange={(e) =>
                           setRectField(index, Number(e.target.value))
                         }
-                        className="w-full rounded-md border bg-background px-1 py-1 text-foreground text-sm"
+                        disabled={building.done}
+                        className="w-full rounded-md border bg-background px-1 py-1 text-foreground text-sm disabled:opacity-50"
                       />
                     </label>
                   ),
@@ -1226,6 +1434,7 @@ export function MapEditor({
                   icon={Pentagon01Icon}
                   label="Edit as vertices"
                   showLabel
+                  disabled={building.done}
                   onClick={() => {
                     const rect = building.r as Rect
                     change((d) => {
@@ -1239,6 +1448,7 @@ export function MapEditor({
                   icon={SquareIcon}
                   label="Back to a rectangle"
                   showLabel
+                  disabled={building.done}
                   onClick={() => {
                     const fitted = fitRect(building.p ?? [])
                     change((d) => {
@@ -1249,12 +1459,23 @@ export function MapEditor({
                 />
               )}
               <IconBtn
+                icon={Maximize01Icon}
+                label="Zoom to it"
+                showLabel
+                onClick={() => {
+                  const [cx, cy] = centerOf(building)
+                  setView({ x: cx - 60, y: cy - 60, s: 120 })
+                }}
+              />
+              <IconBtn
                 icon={Copy01Icon}
                 label="Duplicate"
                 showLabel
                 onClick={() => {
                   const copy = clone(building)
                   delete copy.id
+                  // a copy starts as a draft
+                  delete copy.done
                   if (copy.r) {
                     copy.r[0] += 12
                     copy.r[1] += 12
@@ -1280,6 +1501,7 @@ export function MapEditor({
                 label="Delete building"
                 showLabel
                 tone="danger"
+                disabled={building.done}
                 onClick={() => {
                   change((d) => d.buildings.splice(sel.i, 1))
                   setSel(null)
@@ -1324,26 +1546,79 @@ export function MapEditor({
           </div>
         </section>
 
-        <section className="space-y-1">
+        <section className="space-y-1.5">
           <h2 className="flex items-center gap-1.5 font-medium">
             <Icon icon={Add01Icon} className="size-4" />
             Pins without a building ({unlinkedPins.length})
           </h2>
+          {autoLinks.length > 0 && (
+            <IconBtn
+              icon={Link01Icon}
+              label={`Link ${autoLinks.length} pin${autoLinks.length === 1 ? " that sits" : "s that sit"} inside a building`}
+              showLabel
+              onClick={() =>
+                change((d) => {
+                  for (const [i, pinId] of autoLinks) d.buildings[i].id = pinId
+                })
+              }
+            />
+          )}
           <div className="flex flex-wrap gap-1">
             {unlinkedPins.map((pin) => (
-              <button
+              <span
                 key={pin.id}
-                type="button"
-                title={`${pin.title}: jump there`}
-                onClick={() =>
-                  setView({ x: pin.x - 100, y: pin.y - 100, s: 200 })
-                }
-                className="rounded-full bg-red-500/15 px-2 py-0.5 text-xs"
+                className="inline-flex items-center rounded-full bg-red-500/15 text-xs"
               >
-                {pin.id}
-              </button>
+                <button
+                  type="button"
+                  title={`${pin.title}: jump there`}
+                  onClick={() =>
+                    setView({ x: pin.x - 100, y: pin.y - 100, s: 200 })
+                  }
+                  className="rounded-full py-0.5 pr-1 pl-2"
+                >
+                  {pin.id}
+                </button>
+                <button
+                  type="button"
+                  title="This one needs no building (a field, a parking lot...)"
+                  aria-label={`${pin.title} needs no building`}
+                  onClick={() =>
+                    change((d) => {
+                      d.skipPins = [...(d.skipPins ?? []), pin.id]
+                    })
+                  }
+                  className="rounded-full py-0.5 pr-1.5 pl-0.5 opacity-60 hover:opacity-100"
+                >
+                  ×
+                </button>
+              </span>
             ))}
           </div>
+          {skipped.size > 0 && (
+            <details className="text-xs">
+              <summary className="cursor-pointer text-muted-foreground">
+                Needing no building ({skipped.size})
+              </summary>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {[...skipped].map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    title="Put it back in the list"
+                    onClick={() =>
+                      change((d) => {
+                        d.skipPins = (d.skipPins ?? []).filter((x) => x !== id)
+                      })
+                    }
+                    className="rounded-full bg-foreground/10 px-2 py-0.5"
+                  >
+                    {id}
+                  </button>
+                ))}
+              </div>
+            </details>
+          )}
         </section>
       </aside>
     </div>

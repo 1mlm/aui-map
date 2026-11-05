@@ -12,6 +12,9 @@ export type Building = {
   // exactly one of these two is set
   r?: Rect
   p?: Point[]
+  // confirmed (fully drawn and polished). Missing means still a draft, which is what everything is
+  // until someone confirms it in /admin/map
+  done?: boolean
 }
 export type Road = { w: number; p: Point[] }
 export type Path = { w: number; kind: "walk" | "dirt"; p: Point[] }
@@ -22,6 +25,9 @@ export type CampusShapes = {
   roads: Road[]
   paths: Path[]
   zones: Zone[]
+  // pins that are marked as not needing a building (a field, a parking lot...), so they stop
+  // showing up as "still to do" in /admin/map
+  skipPins?: string[]
 }
 
 export const ZONE_KINDS = ["field", "court", "parking"] as const
@@ -99,7 +105,12 @@ export function sanitizeShapes(input: unknown): CampusShapes | null {
       : null
   }
   for (const item of list("buildings")) {
-    const entry = item as { id?: unknown; r?: unknown; p?: unknown }
+    const entry = item as {
+      id?: unknown
+      r?: unknown
+      p?: unknown
+      done?: unknown
+    }
     // the shapes a building has been saved as: a rectangle, a polygon, or (older saves) lists of
     // rectangles and polygons glued together, which become one outline
     const pieces: Point[][] = []
@@ -154,6 +165,7 @@ export function sanitizeShapes(input: unknown): CampusShapes | null {
     }
     if (typeof entry.id === "string" && entry.id)
       building.id = entry.id.slice(0, 80)
+    if (entry.done === true) building.done = true
     buildings.push(building)
   }
 
@@ -190,7 +202,18 @@ export function sanitizeShapes(input: unknown): CampusShapes | null {
   }
   if (buildings.length + roads.length + paths.length + zones.length > 2000)
     return null
-  return { size: 1312, buildings, roads, paths, zones }
+  const skipPins = list("skipPins")
+    .filter((id): id is string => typeof id === "string" && id.length > 0)
+    .map((id) => id.slice(0, 80))
+    .slice(0, 300)
+  return {
+    size: 1312,
+    buildings,
+    roads,
+    paths,
+    zones,
+    ...(skipPins.length ? { skipPins } : {}),
+  }
 }
 
 // a smooth line through hand placed points (Catmull-Rom turned into cubic beziers)
