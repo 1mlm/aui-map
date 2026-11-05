@@ -254,3 +254,16 @@ model CampusMap {
   data      Json
   updatedAt DateTime @updatedAt
 }
+
+// a walk around campus recorded from a phone in /admin/walk: where the phone was and what height the
+// gps said, one point per fix. Used to work out ground heights and building edges for the 3d map.
+// points is a json array of [secondsSinceStart, lat, lng, accuracyM, altitudeM|null, altAccuracyM|null]
+model WalkTrack {
+  id        String   @id @default(cuid())
+  name      String
+  startedAt DateTime
+  createdAt DateTime @default(now())
+  points    Json
+  // named spots marked during the walk (a building corner, a door...)
+  marks     Json     @default("[]")
+}

@@ -235,7 +235,7 @@ export function smoothPath(pts: Point[]): string {
 }
 
 // the colours live in css so the picture follows the phone's light or dark setting, even as an <img>
-const STYLE = `:root{--ground:#d9e2c8;--field:#a9d18f;--court:#d98a68;--parking:#c9ccd0;--casing:#b8b3a4;--road:#fffdf6;--walk:#f6eed9;--dirt:#d8bf92;--roof:#d9805f;--roofline:#9c4f38;--aud:#c9a45b;--food:#d8636a;--sport:#6fb36b}@media (prefers-color-scheme:dark){:root{--ground:#1c271f;--field:#2f4a2b;--court:#8a4a36;--parking:#363a3f;--casing:#171c18;--road:#3b403b;--walk:#4a4a42;--dirt:#5b4d36;--roof:#a85a40;--roofline:#6e3626;--aud:#8c7237;--food:#9c444a;--sport:#3f7a3d}}.zf{fill:var(--field)}.zc{fill:var(--court)}.zp{fill:var(--parking)}.rc{fill:none;stroke:var(--casing);stroke-linecap:round;stroke-linejoin:round}.rr{fill:none;stroke:var(--road);stroke-linecap:round;stroke-linejoin:round}.pw{fill:none;stroke:var(--walk);stroke-linecap:round;stroke-linejoin:round}.pd{fill:none;stroke:var(--dirt);stroke-linecap:round;stroke-linejoin:round}.b{fill:var(--roof);stroke:var(--roofline);stroke-width:.8}.b-auditorium{fill:var(--aud)}.b-food{fill:var(--food)}.b-sports{fill:var(--sport)}`
+const STYLE = `:root{--ground:#d9e2c8;--field:#a9d18f;--court:#d98a68;--parking:#c9ccd0;--casing:#b8b3a4;--road:#fffdf6;--walk:#f6eed9;--dirt:#d8bf92;--roof:#d9805f;--roofline:#9c4f38;--aud:#c9a45b;--food:#d8636a;--sport:#6fb36b}@media (prefers-color-scheme:dark){:root{--ground:#1c271f;--field:#2f4a2b;--court:#8a4a36;--parking:#363a3f;--casing:#171c18;--road:#3b403b;--walk:#4a4a42;--dirt:#5b4d36;--roof:#a85a40;--roofline:#6e3626;--aud:#8c7237;--food:#9c444a;--sport:#3f7a3d}}.zf{fill:var(--field)}.zc{fill:var(--court)}.zp{fill:var(--parking)}.rc{fill:none;stroke:var(--casing);stroke-linecap:round;stroke-linejoin:round}.rr{fill:none;stroke:var(--road);stroke-linecap:round;stroke-linejoin:round}.pw{fill:none;stroke:var(--walk);stroke-linecap:round;stroke-linejoin:round}.pd{fill:none;stroke:var(--dirt);stroke-linecap:round;stroke-linejoin:round}.b{fill:var(--roof);stroke:var(--roofline);stroke-width:.8;stroke-linejoin:miter}.b-auditorium{fill:var(--aud)}.b-food{fill:var(--food)}.b-sports{fill:var(--sport)}`
 
 const ZONE_CLASS = { field: "zf", court: "zc", parking: "zp" } as const
 
@@ -260,11 +260,10 @@ export function buildCampusSvg(
   for (const building of shapes.buildings) {
     const tag = building.id ? tagByPinId[building.id] : undefined
     const cls = tag ? `b b-${tag}` : "b"
-    if (building.r) {
-      const [cx, cy, w, h, a] = building.r
-      body += `<rect class="${cls}" x="${n(-w / 2)}" y="${n(-h / 2)}" width="${n(w)}" height="${n(h)}" rx="1.2" transform="translate(${n(cx)} ${n(cy)}) rotate(${n(a)})"/>`
-    } else if (building.p)
-      body += `<path class="${cls}" d="${polygon(building.p)}"/>`
+    // always a plain outline with sharp corners: a rectangle is drawn as its four points, never as
+    // a <rect> with rounded corners
+    const outline = building.r ? rectToPolygon(building.r) : building.p
+    if (outline) body += `<path class="${cls}" d="${polygon(outline)}"/>`
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${shapes.size} ${shapes.size}" width="${shapes.size}" height="${shapes.size}"><style>${STYLE}</style>${body}</svg>\n`
 }

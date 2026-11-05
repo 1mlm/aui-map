@@ -30,7 +30,15 @@ export const metadata: Metadata = {
   ],
   alternates: {
     canonical: "/",
+    types: {
+      "application/json": "/data/places.json",
+      "application/geo+json": "/data/campus.geojson",
+    },
   },
+  authors: [{ name: "AUI Map", url: "https://auimap.ma" }],
+  creator: "AUI Map",
+  publisher: "AUI Map",
+  category: "education",
   openGraph: {
     title: HOME_TITLE,
     description: DESCRIPTION,

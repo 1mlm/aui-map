@@ -11,6 +11,9 @@ export const NAV_ITEMS: AppNavItem[] = [
   { href: "/admin/pins", label: "Pins", icon: ICONS.place, countKey: "pins" },
   { href: "/admin/tags", label: "Tags", icon: ICONS.tag, countKey: "tags" },
   { href: "/admin/map", label: "Campus drawing", icon: ICONS.place },
+  { href: "/admin/roads", label: "Roads", icon: ICONS.direction },
+  { href: "/admin/map-image", label: "Map image", icon: ICONS.photo },
+  { href: "/admin/walk", label: "Walk", icon: ICONS.locate },
   { href: "/admin/analytics", label: "Analytics", icon: ICONS.analytics },
   {
     href: "/admin/comments",
