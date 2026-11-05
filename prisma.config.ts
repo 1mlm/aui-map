@@ -6,12 +6,16 @@ export default defineConfig({
   migrations: {
     path: "prisma/migrations",
   },
-  // only feeds `prisma migrate`/CLI tooling — the app's own runtime connection (pooled,
-  // via the driver adapter in src/utils/prisma.ts) is separate and unaffected by this.
-  // Neon's docs recommend the unpooled url here since transaction-mode pgbouncer doesn't
-  // hold migrate's advisory lock, but empirically the direct hostname just times out from
-  // this environment while the pooled one has worked reliably all session — sticking with it
+  // only feeds `prisma migrate`/CLI tooling, the app's own runtime connection (pooled, via the
+  // driver adapter in src/utils/prisma.ts) is separate and unaffected by this.
+  // On Vercel, migrations must go over Neon's direct (unpooled) host: through the pooler, migrate's
+  // advisory lock stays held by an idle pooled connection after the build ends and every later build
+  // then times out waiting for it (P1002). Elsewhere (a laptop, the sandbox) the pooled url is kept,
+  // the direct host has been unreachable from there
   datasource: {
-    url: process.env.DATABASE_URL,
+    url: process.env.VERCEL
+      ? (process.env.DATABASE_URL_UNPOOLED ??
+        process.env.DATABASE_URL?.replace("-pooler", ""))
+      : process.env.DATABASE_URL,
   },
 })
