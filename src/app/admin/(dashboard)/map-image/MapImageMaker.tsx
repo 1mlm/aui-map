@@ -3,17 +3,29 @@
 import { Download01Icon } from "@hugeicons/core-free-icons"
 import { useEffect, useRef, useState } from "react"
 import { Icon } from "@/components/Icon"
+import {
+  buildCampusSvg,
+  type CampusShapes,
+  rectToPolygon,
+} from "@/map/campusShapes"
 import { latLongToPosition } from "@/map/geo"
 import { tagPinFillColor } from "@/map/tagColor"
 import type { MapItem, MapItemTag } from "@/map/types"
 import { DETAIL_PIN_SCALE } from "@/map/types"
 
+// Everything below is in the satellite picture's own pixels (1312 wide). The canvas draws it at
+// SCALE times that, the svg uses the same numbers as its units
 const BASE = 1312
-// the picture is drawn at twice the size of the stitched satellite image so pins and text stay sharp
 const SCALE = 2
-const W = BASE * SCALE
-// the Michlifen hotel sits in the bottom left, it is not part of the campus, so the legend covers it
+// the Michlifen hotel sits in the bottom left, it is not part of the campus: the picture fades out
+// around the campus, so it drops away instead of showing
 const HOTEL = { x: 0.02, y: 0.69, w: 0.47, h: 0.29 }
+// the same teardrop the map itself uses (hugeicons Location02, on a 24 grid, tip at y = 22)
+const PIN_D =
+  "M13.6177 21.367C13.1841 21.773 12.6044 22 12.0011 22C11.3978 22 10.8182 21.773 10.3845 21.367C6.41302 17.626 1.09076 13.4469 3.68627 7.37966C5.08963 4.09916 8.45834 2 12.0011 2C15.5439 2 18.9126 4.09916 20.316 7.37966C22.9082 13.4393 17.599 17.6389 13.6177 21.367Z"
+const PIN_PATH = new Path2D(PIN_D)
+const PIN_H = 27
+const LABEL_FONT = 10.5
 const COMPASS = [
   ["N", 0],
   ["NE", 45],
@@ -27,8 +39,258 @@ const COMPASS = [
 
 type Here = { x: number; y: number; angle: number }
 type IconNode = [string, Record<string, string>]
+type Rect = { x: number; y: number; w: number; h: number }
+type Style = "satellite" | "vector"
 
-// a hugeicons icon (a list of svg parts on a 24 grid) drawn with the canvas, centred on 0,0
+type Scene = {
+  crop: Rect
+  pins: { x: number; y: number; size: number; fill: string; icon: IconNode[] }[]
+  labels: { text: string; x: number; y: number }[]
+  legend: {
+    rect: Rect
+    rows: {
+      x: number
+      y: number
+      fill: string
+      icon: IconNode[]
+      text: string
+    }[]
+  } | null
+  footer: { rect: Rect; line1: string; line2: string; logo: Rect } | null
+  here: Here | null
+  ink: string
+  fade: boolean
+}
+
+const overlaps = (a: Rect, b: Rect) =>
+  a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
+
+const esc = (text: string) =>
+  text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+
+// a hugeicons icon (a list of svg parts on a 24 grid) as svg path data, one entry per part
+function iconParts(icon: IconNode[]) {
+  return icon.flatMap(([name, a]) => {
+    const n = (key: string) => Number(a[key] ?? 0)
+    let d: string | null = null
+    if (name === "path") d = a.d
+    else if (name === "circle")
+      d = `M${n("cx") - n("r")} ${n("cy")}a${n("r")} ${n("r")} 0 1 0 ${n("r") * 2} 0a${n("r")} ${n("r")} 0 1 0 ${-n("r") * 2} 0`
+    else if (name === "ellipse")
+      d = `M${n("cx") - n("rx")} ${n("cy")}a${n("rx")} ${n("ry")} 0 1 0 ${n("rx") * 2} 0a${n("rx")} ${n("ry")} 0 1 0 ${-n("rx") * 2} 0`
+    else if (name === "rect")
+      d = `M${n("x")} ${n("y")}h${n("width")}v${n("height")}h${-n("width")}Z`
+    else if (name === "line") d = `M${n("x1")} ${n("y1")}L${n("x2")} ${n("y2")}`
+    else if (name === "polyline" || name === "polygon")
+      d = `M${a.points}${name === "polygon" ? "Z" : ""}`
+    return d ? [{ d, width: Number(a.strokeWidth ?? 1.5) * 1.15 }] : []
+  })
+}
+
+// ---------------------------------------------------------------- the scene
+
+function measureText(font: string, text: string) {
+  const ctx = document.createElement("canvas").getContext("2d")
+  if (!ctx) return text.length * 6
+  ctx.font = font
+  return ctx.measureText(text).width
+}
+
+function buildScene({
+  items,
+  tags,
+  showPins,
+  showDetails,
+  showNames,
+  showLegend,
+  fade,
+  darkText,
+  here,
+  stamp,
+}: {
+  items: MapItem[]
+  tags: MapItemTag[]
+  showPins: boolean
+  showDetails: boolean
+  showNames: boolean
+  showLegend: boolean
+  fade: boolean
+  darkText: boolean
+  here: Here | null
+  stamp: Date
+}): Scene {
+  const pos = (item: MapItem) => {
+    const [nx, ny] = latLongToPosition(item.latitude, item.longitude)
+    return { x: nx * BASE, y: ny * BASE }
+  }
+  const main = items.filter((item) => item.tag.sizeScale > DETAIL_PIN_SCALE)
+  const visible = showDetails ? items : main
+
+  // the picture is cut to the campus: from the housing in the top left to the new field and the
+  // main entrance in the bottom right, with a little air around it
+  const xs = main.map((item) => pos(item).x)
+  const ys = main.map((item) => pos(item).y)
+  const x0 = Math.max(0, Math.floor(Math.min(...xs) - 80))
+  const y0 = Math.max(0, Math.floor(Math.min(...ys) - 90))
+  const x1 = Math.min(BASE, Math.ceil(Math.max(...xs) + 80))
+  const y1 = Math.min(BASE, Math.ceil(Math.max(...ys) + 110))
+  const crop: Rect = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
+
+  const ink = fade && darkText ? "#16231b" : "white"
+  const pinSize = (item: MapItem) => PIN_H * item.tag.sizeScale
+  const pins = showPins
+    ? [...visible]
+        // north to south, so a pin further down is drawn over the one behind it
+        .sort((a, b) => b.latitude - a.latitude)
+        .map((item) => ({
+          ...pos(item),
+          size: pinSize(item),
+          fill: tagPinFillColor(item.tag.color),
+          icon: item.tag.icon as unknown as IconNode[],
+        }))
+    : []
+
+  // the legend sits in the bottom left, where the hotel was: one pin per category with its name
+  const cols = tags.length > 5 ? 2 : 1
+  const perCol = Math.ceil(tags.length / cols)
+  const rowH = 31
+  const legendFont = "600 10.5px sans-serif"
+  const colW =
+    Math.max(...tags.map((tag) => measureText(legendFont, tag.label))) + 46
+  const legendRect: Rect = {
+    x: crop.x + 14,
+    y: crop.y + crop.h - 14 - (perCol * rowH + 16),
+    w: cols * colW + 8,
+    h: perCol * rowH + 16,
+  }
+  const legend = showLegend
+    ? {
+        rect: legendRect,
+        rows: tags.map((tag, k) => ({
+          x: legendRect.x + 16 + Math.floor(k / perCol) * colW,
+          y: legendRect.y + 8 + (k % perCol) * rowH + rowH / 2,
+          fill: tagPinFillColor(tag.color),
+          icon: tag.icon as unknown as IconNode[],
+          text: tag.label,
+        })),
+      }
+    : null
+
+  // the credit, bottom right: where the app lives and when this picture was made
+  const line1 = "Interactive app on auimap.ma"
+  const line2 = `Last generated: ${stamp.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}`
+  const textW = Math.max(
+    measureText("700 9.5px sans-serif", line1),
+    measureText("500 8px sans-serif", line2),
+  )
+  const footerH = 36
+  const footerW = textW + 14 + 22 + 12
+  const footerRect: Rect = {
+    x: crop.x + crop.w - 14 - footerW,
+    y: crop.y + crop.h - 14 - footerH,
+    w: footerW,
+    h: footerH,
+  }
+  const footer = {
+    rect: footerRect,
+    line1,
+    line2,
+    logo: { x: footerRect.x + 8, y: footerRect.y + 7, w: 22, h: 22 },
+  }
+
+  // names: each goes to the first side of its pin where it fits and is left out when nothing is
+  // free, so labels never pile up on each other, on the pins or on the legend
+  const labels: Scene["labels"] = []
+  if (showPins && showNames) {
+    const pinRects = visible.map((item) => {
+      const { x, y } = pos(item)
+      const s = pinSize(item)
+      return {
+        id: item.id,
+        rect: { x: x - s * 0.4, y: y - s, w: s * 0.8, h: s },
+      }
+    })
+    const taken: Rect[] = [footerRect]
+    if (showLegend) taken.push(legendRect)
+    if (here) taken.push({ x: here.x - 46, y: here.y - 9, w: 92, h: 42 })
+    const font = `600 ${LABEL_FONT}px sans-serif`
+    const order = [...visible].sort(
+      (a, b) =>
+        b.tag.sizeScale - a.tag.sizeScale ||
+        a.shortestName.length - b.shortestName.length,
+    )
+    for (const item of order) {
+      const { x, y } = pos(item)
+      const s = pinSize(item)
+      const tw = measureText(font, item.shortestName)
+      const th = LABEL_FONT * 1.15
+      const headY = y - s * 0.55
+      const gap = 3
+      const spots: Rect[] = [
+        { x: x + s * 0.42 + gap, y: headY - th / 2, w: tw, h: th },
+        { x: x - s * 0.42 - gap - tw, y: headY - th / 2, w: tw, h: th },
+        { x: x - tw / 2, y: y + gap, w: tw, h: th },
+        { x: x - tw / 2, y: y - s - gap - th, w: tw, h: th },
+      ]
+      const pad = 1.5
+      const free = spots.find((spot) => {
+        const box = {
+          x: spot.x - pad,
+          y: spot.y - pad,
+          w: spot.w + pad * 2,
+          h: spot.h + pad * 2,
+        }
+        return (
+          !taken.some((other) => overlaps(box, other)) &&
+          !pinRects.some(
+            ({ id, rect }) => id !== item.id && overlaps(box, rect),
+          )
+        )
+      })
+      if (!free) continue
+      taken.push(free)
+      labels.push({ text: item.shortestName, x: free.x, y: free.y + th / 2 })
+    }
+  }
+
+  return { crop, pins, labels, legend, footer, here, ink, fade }
+}
+
+// ------------------------------------------------------ the soft shape around the campus
+
+type MaskPiece = { pts: [number, number][]; fill: boolean; width: number }
+
+function maskPieces(shapes: CampusShapes): MaskPiece[] {
+  const k = BASE / shapes.size
+  const hotel = {
+    x0: HOTEL.x * BASE,
+    x1: (HOTEL.x + HOTEL.w) * BASE,
+    y0: HOTEL.y * BASE,
+    y1: (HOTEL.y + HOTEL.h) * BASE,
+  }
+  const scaled = (pts: [number, number][]) =>
+    pts.map(([x, y]) => [x * k, y * k] as [number, number])
+  const inHotel = (pts: [number, number][]) =>
+    pts.every(
+      ([x, y]) => x > hotel.x0 && x < hotel.x1 && y > hotel.y0 && y < hotel.y1,
+    )
+  const GROW = 46
+  const pieces: MaskPiece[] = []
+  const add = (pts: [number, number][], fill: boolean, width: number) => {
+    const p = scaled(pts)
+    if (p.length && !inHotel(p)) pieces.push({ pts: p, fill, width })
+  }
+  for (const b of shapes.buildings)
+    add(b.r ? rectToPolygon(b.r) : (b.p ?? []), true, GROW)
+  for (const z of shapes.zones) add(z.p, true, GROW)
+  for (const r of shapes.roads) add(r.p, false, GROW * 0.7 + r.w * k)
+  for (const p of shapes.paths) add(p.p, false, GROW * 0.7 + p.w * k)
+  return pieces
+}
+const MASK_BLUR = 34
+
+// -------------------------------------------------------------------- canvas renderer
+
 function drawIcon(
   ctx: CanvasRenderingContext2D,
   icon: IconNode[],
@@ -42,243 +304,387 @@ function drawIcon(
   ctx.strokeStyle = color
   ctx.lineCap = "round"
   ctx.lineJoin = "round"
-  for (const [name, a] of icon) {
-    ctx.lineWidth = Number(a.strokeWidth ?? 1.5) * 1.15
-    const n = (key: string) => Number(a[key] ?? 0)
-    let d: string | null = null
-    if (name === "path") d = a.d
-    else if (name === "circle")
-      d = `M${n("cx") - n("r")} ${n("cy")}a${n("r")} ${n("r")} 0 1 0 ${n("r") * 2} 0a${n("r")} ${n("r")} 0 1 0 ${-n("r") * 2} 0`
-    else if (name === "ellipse")
-      d = `M${n("cx") - n("rx")} ${n("cy")}a${n("rx")} ${n("ry")} 0 1 0 ${n("rx") * 2} 0a${n("rx")} ${n("ry")} 0 1 0 ${-n("rx") * 2} 0`
-    else if (name === "rect")
-      d = `M${n("x")} ${n("y")}h${n("width")}v${n("height")}h${-n("width")}Z`
-    else if (name === "line") d = `M${n("x1")} ${n("y1")}L${n("x2")} ${n("y2")}`
-    else if (name === "polyline" || name === "polygon")
-      d = `M${a.points}${name === "polygon" ? "Z" : ""}`
-    if (d) ctx.stroke(new Path2D(d))
+  for (const { d, width } of iconParts(icon)) {
+    ctx.lineWidth = width
+    ctx.stroke(new Path2D(d))
   }
   ctx.restore()
 }
 
-// a map pin standing on x,y: the teardrop, a white rim and the category icon inside
+// x,y is the tip of the pin, size its height
 function drawPin(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
-  r: number,
+  size: number,
   fill: string,
   icon: IconNode[],
 ) {
-  const cy = -1.75 * r
-  const a = Math.acos(r / (1.75 * r))
+  const k = size / 24
   ctx.save()
   ctx.translate(x, y)
-  ctx.fillStyle = "rgba(0,0,0,0.35)"
+  ctx.fillStyle = "rgba(0,0,0,0.32)"
   ctx.beginPath()
-  ctx.ellipse(0, 0, r * 0.9, r * 0.35, 0, 0, Math.PI * 2)
+  ctx.ellipse(0, 0, size * 0.28, size * 0.1, 0, 0, Math.PI * 2)
   ctx.fill()
-  ctx.beginPath()
-  ctx.moveTo(0, 0)
-  ctx.lineTo(r * Math.sin(a), cy + r * Math.cos(a))
-  ctx.arc(0, cy, r, Math.PI / 2 - a, Math.PI / 2 + a, true)
-  ctx.closePath()
+  ctx.translate(-12 * k, -22 * k)
+  ctx.scale(k, k)
   ctx.fillStyle = fill
-  ctx.fill()
-  ctx.lineWidth = r * 0.14
-  ctx.strokeStyle = "rgba(255,255,255,0.92)"
-  ctx.stroke()
-  ctx.translate(0, cy)
-  drawIcon(ctx, icon, r * 1.25, "white")
+  ctx.fill(PIN_PATH)
+  ctx.lineJoin = "round"
+  ctx.lineWidth = 1.6
+  ctx.strokeStyle = "rgba(255,255,255,0.95)"
+  ctx.stroke(PIN_PATH)
   ctx.restore()
+  if (icon.length) {
+    ctx.save()
+    ctx.translate(x, y - 12.5 * k)
+    drawIcon(ctx, icon, size * 0.42, "white")
+    ctx.restore()
+  }
 }
 
-function roundRect(
-  ctx: CanvasRenderingContext2D,
+function roundRect(ctx: CanvasRenderingContext2D, r: Rect, radius: number) {
+  ctx.beginPath()
+  ctx.roundRect(r.x, r.y, r.w, r.h, radius)
+}
+
+function drawCanvas(
+  canvas: HTMLCanvasElement,
+  scene: Scene,
+  image: HTMLImageElement,
+  logo: HTMLImageElement | null,
+  pieces: MaskPiece[],
+) {
+  const { crop } = scene
+  canvas.width = Math.round(crop.w * SCALE)
+  canvas.height = Math.round(crop.h * SCALE)
+  const ctx = canvas.getContext("2d")
+  if (!ctx) return
+  const base = [SCALE, 0, 0, SCALE, -crop.x * SCALE, -crop.y * SCALE] as const
+  ctx.setTransform(...base)
+  ctx.clearRect(crop.x, crop.y, crop.w, crop.h)
+
+  if (scene.fade) {
+    const mask = document.createElement("canvas")
+    mask.width = canvas.width
+    mask.height = canvas.height
+    const m = mask.getContext("2d")
+    const layer = document.createElement("canvas")
+    layer.width = canvas.width
+    layer.height = canvas.height
+    const l = layer.getContext("2d")
+    if (m && l) {
+      m.setTransform(...base)
+      m.filter = `blur(${MASK_BLUR * SCALE}px)`
+      m.fillStyle = "white"
+      m.strokeStyle = "white"
+      m.lineJoin = "round"
+      m.lineCap = "round"
+      for (const piece of pieces) {
+        m.beginPath()
+        piece.pts.forEach(([x, y], i) => {
+          if (i === 0) m.moveTo(x, y)
+          else m.lineTo(x, y)
+        })
+        if (piece.fill) {
+          m.closePath()
+          m.fill()
+        }
+        m.lineWidth = piece.width
+        m.stroke()
+      }
+      l.setTransform(...base)
+      l.drawImage(image, 0, 0, BASE, BASE)
+      l.setTransform(1, 0, 0, 1, 0, 0)
+      l.globalCompositeOperation = "destination-in"
+      l.drawImage(mask, 0, 0)
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
+      ctx.drawImage(layer, 0, 0)
+      ctx.setTransform(...base)
+    }
+  } else ctx.drawImage(image, 0, 0, BASE, BASE)
+
+  for (const pin of scene.pins)
+    drawPin(ctx, pin.x, pin.y, pin.size, pin.fill, pin.icon)
+
+  ctx.textBaseline = "middle"
+  ctx.font = `600 ${LABEL_FONT}px sans-serif`
+  for (const label of scene.labels) {
+    ctx.lineJoin = "round"
+    ctx.lineWidth = 2.6
+    ctx.strokeStyle = "rgba(10,20,14,0.55)"
+    ctx.strokeText(label.text, label.x, label.y)
+    ctx.fillStyle = "white"
+    ctx.fillText(label.text, label.x, label.y)
+  }
+
+  if (scene.legend) {
+    ctx.font = "600 10.5px sans-serif"
+    for (const row of scene.legend.rows) {
+      drawPin(ctx, row.x, row.y + 13, 24, row.fill, row.icon)
+      ctx.fillStyle = scene.ink
+      ctx.textAlign = "left"
+      ctx.fillText(row.text, row.x + 17, row.y)
+    }
+  }
+
+  // north arrow, top right
+  ctx.save()
+  ctx.translate(crop.x + crop.w - 34, crop.y + 34)
+  ctx.fillStyle = "rgba(255,255,255,0.94)"
+  ctx.beginPath()
+  ctx.arc(0, 0, 18, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = "#1f2a24"
+  ctx.beginPath()
+  ctx.moveTo(0, -13)
+  ctx.lineTo(5.4, 4.8)
+  ctx.lineTo(0, 1.2)
+  ctx.lineTo(-5.4, 4.8)
+  ctx.closePath()
+  ctx.fill()
+  ctx.font = "700 7px sans-serif"
+  ctx.textAlign = "center"
+  ctx.fillText("N", 0, 13)
+  ctx.restore()
+
+  if (scene.here) {
+    const { x, y, angle } = scene.here
+    const rad = ((angle - 90) * Math.PI) / 180
+    ctx.save()
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, 42)
+    grad.addColorStop(0, "rgba(37,99,235,0.75)")
+    grad.addColorStop(1, "rgba(37,99,235,0)")
+    ctx.fillStyle = grad
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    ctx.arc(x, y, 42, rad - 0.55, rad + 0.55)
+    ctx.closePath()
+    ctx.fill()
+    ctx.beginPath()
+    ctx.arc(x, y, 6.6, 0, Math.PI * 2)
+    ctx.fillStyle = "#2563eb"
+    ctx.fill()
+    ctx.lineWidth = 2.4
+    ctx.strokeStyle = "white"
+    ctx.stroke()
+    ctx.font = "700 10.8px sans-serif"
+    const text = "You are here"
+    const tw = ctx.measureText(text).width
+    roundRect(ctx, { x: x - tw / 2 - 7, y: y + 12, w: tw + 14, h: 19 }, 7)
+    ctx.fillStyle = "#2563eb"
+    ctx.fill()
+    ctx.fillStyle = "white"
+    ctx.textAlign = "center"
+    ctx.fillText(text, x, y + 22)
+    ctx.restore()
+  }
+
+  if (scene.footer) {
+    const { rect, line1, line2, logo: logoRect } = scene.footer
+    roundRect(ctx, rect, 10)
+    ctx.fillStyle = "rgba(18,30,22,0.86)"
+    ctx.fill()
+    if (logo) {
+      ctx.save()
+      roundRect(ctx, logoRect, 6)
+      ctx.clip()
+      ctx.drawImage(logo, logoRect.x, logoRect.y, logoRect.w, logoRect.h)
+      ctx.restore()
+    }
+    ctx.textAlign = "left"
+    ctx.fillStyle = "white"
+    ctx.font = "700 9.5px sans-serif"
+    ctx.fillText(line1, logoRect.x + logoRect.w + 8, rect.y + 13)
+    ctx.fillStyle = "rgba(255,255,255,0.7)"
+    ctx.font = "500 8px sans-serif"
+    ctx.fillText(line2, logoRect.x + logoRect.w + 8, rect.y + 26)
+  }
+}
+
+// ---------------------------------------------------------------------- svg renderer
+
+function svgIcon(icon: IconNode[], cx: number, cy: number, size: number) {
+  const parts = iconParts(icon)
+    .map(
+      ({ d, width }) =>
+        `<path d="${d}" fill="none" stroke="white" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"/>`,
+    )
+    .join("")
+  return `<g transform="translate(${cx} ${cy}) scale(${size / 24}) translate(-12 -12)">${parts}</g>`
+}
+
+function svgPin(
   x: number,
   y: number,
-  w: number,
-  h: number,
-  r: number,
+  size: number,
+  fill: string,
+  icon: IconNode[],
 ) {
-  ctx.beginPath()
-  ctx.roundRect(x, y, w, h, r)
+  const k = size / 24
+  return (
+    `<ellipse cx="${x}" cy="${y}" rx="${size * 0.28}" ry="${size * 0.1}" fill="rgba(0,0,0,0.32)"/>` +
+    `<g transform="translate(${x - 12 * k} ${y - 22 * k}) scale(${k})"><path d="${PIN_D}" fill="${fill}" stroke="rgba(255,255,255,0.95)" stroke-width="1.6" stroke-linejoin="round"/></g>` +
+    (icon.length ? svgIcon(icon, x, y - 12.5 * k, size * 0.42) : "")
+  )
 }
+
+function buildSvg(
+  scene: Scene,
+  shapes: CampusShapes,
+  tagByPinId: Record<string, string>,
+  pieces: MaskPiece[],
+  logoUrl: string | null,
+) {
+  const { crop } = scene
+  const n = (v: number) => Math.round(v * 10) / 10
+  const campus = buildCampusSvg(shapes, tagByPinId)
+  // the drawing's own svg wrapper is dropped and its light colours are kept, whatever the viewer's
+  // dark mode says
+  const inner = campus
+    .replace(/^<svg[^>]*>/, "")
+    .replace(/<\/svg>\s*$/, "")
+    .replace(/@media\s*\(prefers-color-scheme:dark\)\{:root\{[^}]*\}\}/, "")
+  const maskShapes = pieces
+    .map((piece) => {
+      const d = `M${piece.pts.map(([x, y]) => `${n(x)} ${n(y)}`).join("L")}${piece.fill ? "Z" : ""}`
+      return `<path d="${d}" fill="${piece.fill ? "white" : "none"}" stroke="white" stroke-width="${n(piece.width)}" stroke-linejoin="round" stroke-linecap="round"/>`
+    })
+    .join("")
+
+  let overlay = ""
+  for (const pin of scene.pins)
+    overlay += svgPin(n(pin.x), n(pin.y), pin.size, pin.fill, pin.icon)
+  for (const label of scene.labels)
+    overlay += `<text x="${n(label.x)}" y="${n(label.y)}" dominant-baseline="central" font-family="sans-serif" font-weight="600" font-size="${LABEL_FONT}" fill="white" stroke="rgba(10,20,14,0.55)" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">${esc(label.text)}</text>`
+  if (scene.legend)
+    for (const row of scene.legend.rows)
+      overlay +=
+        svgPin(n(row.x), n(row.y + 13), 24, row.fill, row.icon) +
+        `<text x="${n(row.x + 17)}" y="${n(row.y)}" dominant-baseline="central" font-family="sans-serif" font-weight="600" font-size="10.5" fill="${scene.ink}">${esc(row.text)}</text>`
+
+  const nx = crop.x + crop.w - 34
+  const ny = crop.y + 34
+  overlay += `<circle cx="${nx}" cy="${ny}" r="18" fill="rgba(255,255,255,0.94)"/><path d="M${nx} ${ny - 13}L${nx + 5.4} ${ny + 4.8}L${nx} ${ny + 1.2}L${nx - 5.4} ${ny + 4.8}Z" fill="#1f2a24"/><text x="${nx}" y="${ny + 13}" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-weight="700" font-size="7" fill="#1f2a24">N</text>`
+
+  if (scene.here) {
+    const { x, y, angle } = scene.here
+    const a0 = ((angle - 90) * Math.PI) / 180 - 0.55
+    const a1 = a0 + 1.1
+    overlay +=
+      `<defs><radialGradient id="hereGlow" cx="${x}" cy="${y}" r="42" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#2563eb" stop-opacity="0.75"/><stop offset="1" stop-color="#2563eb" stop-opacity="0"/></radialGradient></defs>` +
+      `<path d="M${n(x)} ${n(y)}L${n(x + 42 * Math.cos(a0))} ${n(y + 42 * Math.sin(a0))}A42 42 0 0 1 ${n(x + 42 * Math.cos(a1))} ${n(y + 42 * Math.sin(a1))}Z" fill="url(#hereGlow)"/>` +
+      `<circle cx="${n(x)}" cy="${n(y)}" r="6.6" fill="#2563eb" stroke="white" stroke-width="2.4"/>` +
+      `<rect x="${n(x - 43)}" y="${n(y + 12)}" width="86" height="19" rx="7" fill="#2563eb"/><text x="${n(x)}" y="${n(y + 22)}" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-weight="700" font-size="10.8" fill="white">You are here</text>`
+  }
+
+  if (scene.footer) {
+    const { rect, line1, line2, logo } = scene.footer
+    overlay += `<rect x="${n(rect.x)}" y="${n(rect.y)}" width="${n(rect.w)}" height="${rect.h}" rx="10" fill="rgba(18,30,22,0.86)"/>`
+    if (logoUrl)
+      overlay += `<clipPath id="logoClip"><rect x="${n(logo.x)}" y="${n(logo.y)}" width="${logo.w}" height="${logo.h}" rx="6"/></clipPath><image href="${logoUrl}" x="${n(logo.x)}" y="${n(logo.y)}" width="${logo.w}" height="${logo.h}" clip-path="url(#logoClip)"/>`
+    overlay += `<text x="${n(logo.x + logo.w + 8)}" y="${n(rect.y + 13)}" dominant-baseline="central" font-family="sans-serif" font-weight="700" font-size="9.5" fill="white">${esc(line1)}</text><text x="${n(logo.x + logo.w + 8)}" y="${n(rect.y + 26)}" dominant-baseline="central" font-family="sans-serif" font-weight="500" font-size="8" fill="rgba(255,255,255,0.7)">${esc(line2)}</text>`
+  }
+
+  const mask = scene.fade
+    ? `<defs><filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="${MASK_BLUR}"/></filter><mask id="campus" maskUnits="userSpaceOnUse" x="0" y="0" width="${BASE}" height="${BASE}"><g filter="url(#soft)">${maskShapes}</g></mask></defs>`
+    : ""
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${crop.x} ${crop.y} ${crop.w} ${crop.h}" width="${crop.w * SCALE}" height="${crop.h * SCALE}">${mask}<g${scene.fade ? ' mask="url(#campus)"' : ""}>${inner}</g>${overlay}</svg>\n`
+}
+
+// ------------------------------------------------------------------------- the page
 
 export function MapImageMaker({
   items,
   tags,
+  shapes,
 }: {
   items: MapItem[]
   tags: MapItemTag[]
+  shapes: CampusShapes
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [image, setImage] = useState<HTMLImageElement | null>(null)
+  const [logo, setLogo] = useState<HTMLImageElement | null>(null)
+  const [style, setStyle] = useState<Style>("satellite")
   const [showPins, setShowPins] = useState(true)
   const [showDetails, setShowDetails] = useState(false)
-  const [showNames, setShowNames] = useState(false)
+  const [showNames, setShowNames] = useState(true)
   const [showLegend, setShowLegend] = useState(true)
+  const [fade, setFade] = useState(true)
+  const [darkText, setDarkText] = useState(true)
   const [here, setHere] = useState<Here | null>(null)
   const [pinId, setPinId] = useState("")
+  const [svgUrl, setSvgUrl] = useState("")
 
   useEffect(() => {
     const img = new Image()
     img.src = "/auimap-1312.webp"
     img.onload = () => setImage(img)
+    const icon = new Image()
+    icon.src = "/icons/icon-192.png"
+    icon.onload = () => setLogo(icon)
   }, [])
 
+  const options = {
+    items,
+    tags,
+    showPins,
+    showDetails,
+    showNames,
+    showLegend,
+    fade,
+    darkText,
+    here,
+  }
+  const optionsKey = JSON.stringify([
+    style,
+    showPins,
+    showDetails,
+    showNames,
+    showLegend,
+    fade,
+    darkText,
+    here,
+  ])
+
+  // the picture as the page shows it now, with the time it was made
+  // biome-ignore lint/correctness/useExhaustiveDependencies: optionsKey stands for the options
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas || !image) return
-    const ctx = canvas.getContext("2d")
-    if (!ctx) return
-    canvas.width = W
-    canvas.height = W
-    ctx.drawImage(image, 0, 0, W, W)
-
-    const visible = items.filter(
-      (item) => showDetails || item.tag.sizeScale > DETAIL_PIN_SCALE,
-    )
-    if (showPins)
-      // north to south, so a pin further down is drawn over the one behind it
-      for (const item of [...visible].sort((a, b) => b.latitude - a.latitude)) {
-        const [nx, ny] = latLongToPosition(item.latitude, item.longitude)
-        const r = 8.5 * SCALE * item.tag.sizeScale
-        drawPin(
-          ctx,
-          nx * W,
-          ny * W,
-          r,
-          tagPinFillColor(item.tag.color),
-          item.tag.icon as unknown as IconNode[],
-        )
-        if (showNames) {
-          ctx.font = `600 ${11 * SCALE}px sans-serif`
-          ctx.lineWidth = 3 * SCALE
-          ctx.strokeStyle = "rgba(0,0,0,0.75)"
-          ctx.fillStyle = "white"
-          ctx.lineJoin = "round"
-          ctx.strokeText(item.title, nx * W + r * 1.4, ny * W - r * 1.2)
-          ctx.fillText(item.title, nx * W + r * 1.4, ny * W - r * 1.2)
-        }
-      }
-
-    // the legend: one row per colour, with the categories that use it. It sits over the hotel
-    if (showLegend) {
-      const groups = new Map<string, string[]>()
-      for (const tag of tags) {
-        const color = tagPinFillColor(tag.color)
-        groups.set(color, [...(groups.get(color) ?? []), tag.label])
-      }
-      const x = HOTEL.x * W
-      const y = HOTEL.y * W
-      const w = HOTEL.w * W
-      const h = HOTEL.h * W
-      roundRect(ctx, x, y, w, h, 34 * SCALE)
-      ctx.fillStyle = "rgb(18,30,22)"
-      ctx.fill()
-      ctx.lineWidth = 2 * SCALE
-      ctx.strokeStyle = "rgba(255,255,255,0.18)"
-      ctx.stroke()
-      const rows = [...groups.entries()]
-      const rowH = Math.min(70 * SCALE, (h - 40 * SCALE) / rows.length)
-      rows.forEach(([color, labels], k) => {
-        const cy = y + 20 * SCALE + rowH * k + rowH / 2
-        drawPin(ctx, x + 50 * SCALE, cy + 14 * SCALE, 12 * SCALE, color, [])
-        ctx.fillStyle = "white"
-        ctx.font = `600 ${22 * SCALE}px sans-serif`
-        ctx.textBaseline = "middle"
-        ctx.fillText(labels.join("  ·  "), x + 84 * SCALE, cy)
-      })
-      ctx.textBaseline = "alphabetic"
-    }
-
-    // north arrow, top right
-    ctx.save()
-    ctx.translate(W - 60 * SCALE, 60 * SCALE)
-    ctx.fillStyle = "rgba(255,255,255,0.92)"
-    ctx.beginPath()
-    ctx.arc(0, 0, 30 * SCALE, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.fillStyle = "#1f2a24"
-    ctx.beginPath()
-    ctx.moveTo(0, -22 * SCALE)
-    ctx.lineTo(9 * SCALE, 8 * SCALE)
-    ctx.lineTo(0, 2 * SCALE)
-    ctx.lineTo(-9 * SCALE, 8 * SCALE)
-    ctx.closePath()
-    ctx.fill()
-    ctx.font = `700 ${12 * SCALE}px sans-serif`
-    ctx.textAlign = "center"
-    ctx.fillText("N", 0, 22 * SCALE)
-    ctx.restore()
-
-    // you are here: a dot with a wedge showing which way you face
-    if (here) {
-      const cx = here.x * W
-      const cy = here.y * W
-      const rad = ((here.angle - 90) * Math.PI) / 180
-      ctx.save()
-      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 70 * SCALE)
-      grad.addColorStop(0, "rgba(37,99,235,0.75)")
-      grad.addColorStop(1, "rgba(37,99,235,0)")
-      ctx.fillStyle = grad
-      ctx.beginPath()
-      ctx.moveTo(cx, cy)
-      ctx.arc(cx, cy, 70 * SCALE, rad - 0.55, rad + 0.55)
-      ctx.closePath()
-      ctx.fill()
-      ctx.beginPath()
-      ctx.arc(cx, cy, 11 * SCALE, 0, Math.PI * 2)
-      ctx.fillStyle = "#2563eb"
-      ctx.fill()
-      ctx.lineWidth = 4 * SCALE
-      ctx.strokeStyle = "white"
-      ctx.stroke()
-      ctx.font = `700 ${18 * SCALE}px sans-serif`
-      const label = "You are here"
-      const tw = ctx.measureText(label).width
-      roundRect(
-        ctx,
-        cx - tw / 2 - 12 * SCALE,
-        cy + 20 * SCALE,
-        tw + 24 * SCALE,
-        32 * SCALE,
-        12 * SCALE,
+    if (!image || !logo) return
+    const scene = buildScene({ ...options, stamp: new Date() })
+    const pieces = maskPieces(shapes)
+    if (style === "satellite" && canvasRef.current)
+      drawCanvas(canvasRef.current, scene, image, logo, pieces)
+    if (style === "vector") {
+      const logoCanvas = document.createElement("canvas")
+      logoCanvas.width = 96
+      logoCanvas.height = 96
+      logoCanvas.getContext("2d")?.drawImage(logo, 0, 0, 96, 96)
+      const tagByPinId = Object.fromEntries(
+        items.map((item) => [item.id, item.tag.id]),
       )
-      ctx.fillStyle = "#2563eb"
-      ctx.fill()
-      ctx.fillStyle = "white"
-      ctx.textAlign = "center"
-      ctx.fillText(label, cx, cy + 43 * SCALE)
-      ctx.restore()
+      const svg = buildSvg(
+        scene,
+        shapes,
+        tagByPinId,
+        pieces,
+        logoCanvas.toDataURL("image/png"),
+      )
+      setSvgUrl(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`)
     }
+  }, [image, logo, shapes, optionsKey])
 
-    // credit, bottom right
-    ctx.font = `700 ${15 * SCALE}px sans-serif`
-    const credit = "auimap.ma"
-    const cw = ctx.measureText(credit).width
-    roundRect(
-      ctx,
-      W - cw - 44 * SCALE,
-      W - 52 * SCALE,
-      cw + 28 * SCALE,
-      34 * SCALE,
-      12 * SCALE,
-    )
-    ctx.fillStyle = "rgba(18,30,22,0.85)"
-    ctx.fill()
-    ctx.fillStyle = "white"
-    ctx.textAlign = "left"
-    ctx.fillText(credit, W - cw - 30 * SCALE, W - 28 * SCALE)
-  }, [image, items, tags, showPins, showDetails, showNames, showLegend, here])
-
-  function placeFromClick(event: React.MouseEvent<HTMLCanvasElement>) {
+  function placeFromClick(event: React.MouseEvent<HTMLElement>) {
+    if (!image) return
     const box = event.currentTarget.getBoundingClientRect()
+    const scene = buildScene({ ...options, stamp: new Date() })
+    const { crop } = scene
     setPinId("")
     setHere((current) => ({
-      x: (event.clientX - box.left) / box.width,
-      y: (event.clientY - box.top) / box.height,
+      x: crop.x + ((event.clientX - box.left) / box.width) * crop.w,
+      y: crop.y + ((event.clientY - box.top) / box.height) * crop.h,
       angle: current?.angle ?? 0,
     }))
   }
@@ -288,19 +694,44 @@ export function MapImageMaker({
     const item = items.find((candidate) => candidate.id === id)
     if (!item) return setHere(null)
     const [x, y] = latLongToPosition(item.latitude, item.longitude)
-    setHere((current) => ({ x, y, angle: current?.angle ?? 0 }))
+    setHere((current) => ({
+      x: x * BASE,
+      y: y * BASE,
+      angle: current?.angle ?? 0,
+    }))
   }
 
+  function save(blob: Blob, name: string) {
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = name
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // drawn again right now so the "last generated" time is the moment of the download
   function download() {
-    canvasRef.current?.toBlob((blob) => {
-      if (!blob) return
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement("a")
-      link.href = url
-      link.download = "aui-map.png"
-      link.click()
-      URL.revokeObjectURL(url)
-    }, "image/png")
+    if (!image || !logo) return
+    const scene = buildScene({ ...options, stamp: new Date() })
+    const pieces = maskPieces(shapes)
+    if (style === "satellite" && canvasRef.current) {
+      drawCanvas(canvasRef.current, scene, image, logo, pieces)
+      canvasRef.current.toBlob((blob) => blob && save(blob, "aui-map.png"))
+      return
+    }
+    const logoCanvas = document.createElement("canvas")
+    logoCanvas.width = 96
+    logoCanvas.height = 96
+    logoCanvas.getContext("2d")?.drawImage(logo, 0, 0, 96, 96)
+    const svg = buildSvg(
+      scene,
+      shapes,
+      Object.fromEntries(items.map((item) => [item.id, item.tag.id])),
+      pieces,
+      logoCanvas.toDataURL("image/png"),
+    )
+    save(new Blob([svg], { type: "image/svg+xml" }), "aui-map.svg")
   }
 
   const toggle = (label: string, value: boolean, set: (v: boolean) => void) => (
@@ -314,26 +745,55 @@ export function MapImageMaker({
     </label>
   )
 
+  const checkerboard = {
+    backgroundColor: "#e8ebe9",
+    backgroundImage:
+      "linear-gradient(45deg,#d3d8d5 25%,transparent 25%,transparent 75%,#d3d8d5 75%),linear-gradient(45deg,#d3d8d5 25%,transparent 25%,transparent 75%,#d3d8d5 75%)",
+    backgroundSize: "24px 24px",
+    backgroundPosition: "0 0,12px 12px",
+  }
+
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4 p-4 lg:flex-row">
       <div className="flex flex-col gap-4 lg:w-72 lg:shrink-0">
+        <div className="grid grid-cols-2 gap-1.5 rounded-2xl corner-squircle bg-foreground/5 p-1.5">
+          {(
+            [
+              ["satellite", "Satellite (PNG)"],
+              ["vector", "Drawing (SVG)"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setStyle(id)}
+              className={`rounded-xl corner-squircle px-2 py-2 text-sm font-medium ${
+                style === id ? "bg-primary text-primary-foreground" : ""
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           onClick={download}
           className="inline-flex items-center justify-center gap-2 rounded-2xl corner-squircle bg-primary px-4 py-3 font-semibold text-primary-foreground"
         >
           <Icon icon={Download01Icon} className="size-5" />
-          Download
+          Download {style === "vector" ? "SVG" : "PNG"}
         </button>
         <div className="flex flex-col gap-2 rounded-2xl corner-squircle bg-foreground/5 p-3">
           {toggle("Pins", showPins, setShowPins)}
+          {toggle("Names", showNames, setShowNames)}
           {toggle(
             "Small places (restrooms, printers)",
             showDetails,
             setShowDetails,
           )}
-          {toggle("Names", showNames, setShowNames)}
-          {toggle("Legend over the hotel", showLegend, setShowLegend)}
+          {toggle("Legend", showLegend, setShowLegend)}
+          {toggle("Fade out around the campus", fade, setFade)}
+          {fade && toggle("Dark legend text", darkText, setDarkText)}
         </div>
         <div className="flex flex-col gap-3 rounded-2xl corner-squircle bg-foreground/5 p-3">
           <span className="font-semibold text-sm">You are here</span>
@@ -393,11 +853,25 @@ export function MapImageMaker({
         </div>
       </div>
       <div className="min-w-0 flex-1">
-        <canvas
-          ref={canvasRef}
-          onClick={placeFromClick}
-          className="aspect-square w-full cursor-crosshair rounded-2xl bg-neutral-900"
-        />
+        {/* a checkerboard behind it, so the transparent parts show as transparent */}
+        {style === "satellite" ? (
+          <canvas
+            ref={canvasRef}
+            onClick={placeFromClick}
+            className="mx-auto h-auto max-h-[85vh] w-auto max-w-full cursor-crosshair rounded-2xl"
+            style={checkerboard}
+          />
+        ) : (
+          // biome-ignore lint/performance/noImgElement: a generated picture, not a site asset
+          <img
+            src={svgUrl}
+            alt="Map preview"
+            onClick={placeFromClick}
+            onKeyDown={() => {}}
+            className="mx-auto h-auto max-h-[85vh] w-auto max-w-full cursor-crosshair rounded-2xl"
+            style={checkerboard}
+          />
+        )}
       </div>
     </div>
   )

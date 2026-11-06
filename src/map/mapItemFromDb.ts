@@ -16,10 +16,13 @@ type PinWithAttachments = Prisma.PinGetPayload<{
 
 // the one place a db row turns into the shapes the map/admin ui actually render —
 // server-only, since it resolves icon strings via the registry
+// blank aliases are real in the data, they must never win as the shortest name
 export const getShortestName = (names: string[]) =>
-  names.reduce((shortest, name) =>
-    name.length < shortest.length ? name : shortest,
-  )
+  names
+    .filter((name) => name.trim())
+    .reduce((shortest, name) =>
+      name.length < shortest.length ? name : shortest,
+    )
 
 export function tagRowToMapItemTag(tag: Tag): MapItemTag {
   return {
