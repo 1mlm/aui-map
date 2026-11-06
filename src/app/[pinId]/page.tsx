@@ -1,34 +1,31 @@
-import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-import { cache, Suspense } from "react";
-import { buildAreas } from "@/map/areas";
-import { getCampusShapes } from "@/map/getCampusShapes";
-import { getMapData } from "@/map/getMapData";
-import { amenityById } from "@/map/amenities";
-import { placeNames } from "@/map/aliases";
-import { MapExperience } from "@/map/MapExperience";
-import type { MapItem } from "@/map/types";
+import type { Metadata } from "next"
+import { notFound } from "next/navigation"
+import { cache, Suspense } from "react"
+import { getMapData } from "@/map/getMapData"
+import { amenityById } from "@/map/amenities"
+import { placeNames } from "@/map/aliases"
+import { MapExperience } from "@/map/MapExperience"
+import type { MapItem } from "@/map/types"
 
 // same cadence as the home page, plus revalidatePath("/[pinId]", "page") in the admin actions
-export const revalidate = 60;
+export const revalidate = 60
 
 // generateMetadata and the page both need the data, cache() makes it one query per request
-const getMapDataOncePerRequest = cache(getMapData);
+const getMapDataOncePerRequest = cache(getMapData)
 
-type PageProps = { params: Promise<{ pinId: string }> };
+type PageProps = { params: Promise<{ pinId: string }> }
 
 export async function generateStaticParams() {
-  const { items } = await getMapDataOncePerRequest();
-  return items.map(({ id }) => ({ pinId: id }));
+  const { items } = await getMapDataOncePerRequest()
+  return items.map(({ id }) => ({ pinId: id }))
 }
 
 async function getPinPageData({ params }: PageProps) {
-  const { pinId } = await params;
-  const { items, tags } = await getMapDataOncePerRequest();
-  const pin = items.find((item) => item.id === pinId);
-  if (!pin) notFound();
-  const areas = buildAreas(await getCampusShapes());
-  return { pin, items, tags, areas };
+  const { pinId } = await params
+  const { items, tags } = await getMapDataOncePerRequest()
+  const pin = items.find((item) => item.id === pinId)
+  if (!pin) notFound()
+  return { pin, items, tags }
 }
 
 // what each category is, in plain words. Only used when a pin has no hand-written description,
@@ -44,52 +41,52 @@ const TAG_NOUNS: Record<string, string> = {
   other: "point of interest",
   restroom: "restroom",
   printer: "printing point",
-};
+}
 
-const CAMPUS_NAME = "Al Akhawayn University (AUI)";
+const CAMPUS_NAME = "Al Akhawayn University (AUI)"
 
 // "B8B is a student housing building at ..." comes first, then whatever was written about it, then
 // the hard facts. Search results show roughly the first 155 characters, so the type goes up front
-const namesOf = placeNames;
+const namesOf = placeNames
 
 function getPinDescription(pin: MapItem) {
-  const noun = TAG_NOUNS[pin.tag.id] ?? "place";
-  const article = /^[aeiou]/i.test(noun) ? "an" : "a";
+  const noun = TAG_NOUNS[pin.tag.id] ?? "place"
+  const article = /^[aeiou]/i.test(noun) ? "an" : "a"
   const alias = namesOf(pin).find(
     (name) => name.toLowerCase() !== pin.title.toLowerCase(),
-  );
-  const intro = `${pin.title}${alias ? ` (${alias})` : ""} is ${article} ${noun} at ${CAMPUS_NAME} in Ifrane, Morocco.`;
+  )
+  const intro = `${pin.title}${alias ? ` (${alias})` : ""} is ${article} ${noun} at ${CAMPUS_NAME} in Ifrane, Morocco.`
   // admin descriptions are multi-line, a meta description is one line, and @mentions are plain names
   const written = pin.description
     ?.replace(/@([a-z0-9-]+)/gi, (_, id: string) => id)
     .replace(/\s+/g, " ")
-    .trim();
-  const has = pin.amenities.flatMap((id) => amenityById(id)?.label ?? []);
+    .trim()
+  const has = pin.amenities.flatMap((id) => amenityById(id)?.label ?? [])
   const facts = [
     pin.hours && `Opening hours: ${pin.hours}.`,
     has.length > 0 && `Has: ${has.join(", ")}.`,
     pin.phone && `Phone: ${pin.phone}.`,
     pin.email && `Email: ${pin.email}.`,
-  ];
+  ]
   return [intro, written, ...facts, "Exact location on the AUI campus map."]
     .filter(Boolean)
-    .join(" ");
+    .join(" ")
 }
 
 function getPinThumbnailUrl(pin: MapItem) {
   const thumbnail = pin.attachments.find(
     ({ mimeType }) => !mimeType || mimeType.startsWith("image/"),
-  );
-  return thumbnail?.url;
+  )
+  return thumbnail?.url
 }
 
 export async function generateMetadata(props: PageProps): Promise<Metadata> {
-  const { pin } = await getPinPageData(props);
-  const description = getPinDescription(pin);
-  const thumbnailUrl = getPinThumbnailUrl(pin);
-  const title = `${pin.title} · ${pin.tag.label} at AUI Ifrane`;
+  const { pin } = await getPinPageData(props)
+  const description = getPinDescription(pin)
+  const thumbnailUrl = getPinThumbnailUrl(pin)
+  const title = `${pin.title} · ${pin.tag.label} at AUI Ifrane`
   // the generated card (title, type, campus) is always there, a real photo goes first when there is one
-  const cardUrl = `/${pin.id}/opengraph-image`;
+  const cardUrl = `/${pin.id}/opengraph-image`
   const images = [
     ...(thumbnailUrl ? [{ url: thumbnailUrl, alt: pin.title }] : []),
     {
@@ -98,7 +95,7 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
       height: 630,
       alt: `${pin.title} at Al Akhawayn University`,
     },
-  ];
+  ]
 
   return {
     title,
@@ -146,7 +143,7 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
       "og:postal-code": "53000",
       "dcterms.rights": "CC BY 4.0, credit AUI Map (https://auimap.ma)",
     },
-  };
+  }
 }
 
 // schema.org has a more exact type for some places than plain Place
@@ -156,7 +153,7 @@ const SCHEMA_TYPE_BY_TAG: Record<string, string> = {
   parking: "ParkingFacility",
   unknownHousing: "ApartmentComplex",
   auditorium: "CivicStructure",
-};
+}
 const SCHEMA_TYPE_BY_PIN: Record<string, string> = {
   m6l: "Library",
   "health-center": "MedicalClinic",
@@ -165,7 +162,7 @@ const SCHEMA_TYPE_BY_PIN: Record<string, string> = {
   bookstore: "BookStore",
   shop: "Store",
   atms: "AutomatedTeller",
-};
+}
 
 const POSTAL_ADDRESS = {
   "@type": "PostalAddress",
@@ -174,11 +171,11 @@ const POSTAL_ADDRESS = {
   addressLocality: "Ifrane",
   addressRegion: "Fès-Meknès",
   addressCountry: "MA",
-};
+}
 
 function getPinStructuredData(pin: MapItem) {
-  const pageUrl = `https://auimap.ma/${pin.id}`;
-  const description = getPinDescription(pin);
+  const pageUrl = `https://auimap.ma/${pin.id}`
+  const description = getPinDescription(pin)
   const images = pin.attachments
     .filter(({ mimeType }) => !mimeType || mimeType.startsWith("image/"))
     .map(({ url, caption, latitude, longitude, heading }) => ({
@@ -210,9 +207,9 @@ function getPinStructuredData(pin: MapItem) {
       },
       license: "https://creativecommons.org/licenses/by/4.0/",
       acquireLicensePage: pageUrl,
-    }));
+    }))
   const schemaType =
-    SCHEMA_TYPE_BY_PIN[pin.id] ?? SCHEMA_TYPE_BY_TAG[pin.tag.id] ?? "Place";
+    SCHEMA_TYPE_BY_PIN[pin.id] ?? SCHEMA_TYPE_BY_TAG[pin.tag.id] ?? "Place"
   return {
     "@context": "https://schema.org",
     "@graph": [
@@ -241,7 +238,7 @@ function getPinStructuredData(pin: MapItem) {
         openingHours: pin.hours ?? undefined,
         sameAs: pin.links.map(({ url }) => url),
         amenityFeature: pin.amenities.flatMap((id) => {
-          const amenity = amenityById(id);
+          const amenity = amenityById(id)
           return amenity
             ? [
                 {
@@ -250,7 +247,7 @@ function getPinStructuredData(pin: MapItem) {
                   value: true,
                 },
               ]
-            : [];
+            : []
         }),
         isAccessibleForFree: true,
         publicAccess: true,
@@ -298,20 +295,20 @@ function getPinStructuredData(pin: MapItem) {
         },
       },
     ],
-  };
+  }
 }
 
 export default async function Page(props: PageProps) {
-  const { pin, items, tags, areas } = await getPinPageData(props);
+  const { pin, items, tags } = await getPinPageData(props)
   const structuredData = JSON.stringify(getPinStructuredData(pin)).replaceAll(
     "<",
     "\\u003c",
-  );
+  )
 
   return (
     <>
       <Suspense>
-        <MapExperience initialSelectedId={pin.id} {...{ items, tags, areas }} />
+        <MapExperience initialSelectedId={pin.id} {...{ items, tags }} />
       </Suspense>
       {/* the map itself is all client js, this is what a crawler (or a screen reader) actually reads */}
       <article className="sr-only">
@@ -347,5 +344,5 @@ export default async function Page(props: PageProps) {
         dangerouslySetInnerHTML={{ __html: structuredData }}
       />
     </>
-  );
+  )
 }

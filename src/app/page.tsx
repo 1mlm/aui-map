@@ -1,12 +1,10 @@
-import { Suspense } from "react";
-import { buildAreas } from "@/map/areas";
-import { getCampusShapes } from "@/map/getCampusShapes";
-import { getMapData } from "@/map/getMapData";
-import { MapExperience } from "@/map/MapExperience";
+import { Suspense } from "react"
+import { getMapData } from "@/map/getMapData"
+import { MapExperience } from "@/map/MapExperience"
 
 // pins/tags rarely change — cheap time-based freshness here, plus admin mutations
 // call revalidatePath("/") for instant freshness right after a save
-export const revalidate = 60;
+export const revalidate = 60
 
 const SITE_STRUCTURED_DATA = JSON.stringify({
   "@context": "https://schema.org",
@@ -88,14 +86,10 @@ const SITE_STRUCTURED_DATA = JSON.stringify({
       ],
     },
   ],
-}).replaceAll("<", "\\u003c");
+}).replaceAll("<", "\\u003c")
 
 export default async function Page() {
-  const [{ items, tags }, shapes] = await Promise.all([
-    getMapData(),
-    getCampusShapes(),
-  ]);
-  const areas = buildAreas(shapes);
+  const { items, tags } = await getMapData()
 
   return (
     <>
@@ -105,7 +99,7 @@ export default async function Page() {
         dangerouslySetInnerHTML={{ __html: SITE_STRUCTURED_DATA }}
       />
       <Suspense>
-        <MapExperience {...{ items, tags, areas }} />
+        <MapExperience {...{ items, tags }} />
       </Suspense>
       {/* the map is all client js, this gives crawlers (and screen readers) real text and a link to every place's own page */}
       <nav className="sr-only" aria-label="All places">
@@ -119,5 +113,5 @@ export default async function Page() {
         </ul>
       </nav>
     </>
-  );
+  )
 }

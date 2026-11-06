@@ -1,15 +1,15 @@
-"use client";
+"use client"
 
-import { m, useMotionValueEvent } from "motion/react";
-import { useEffect, useImperativeHandle, useRef, useState } from "react";
-import { preload } from "react-dom";
-import { Icon } from "@/components/Icon";
-import { SquircleFuserContainer } from "@/components/SquircleFuser";
-import { ICONS } from "@/icons";
-import { cn } from "@/shadcn/utils";
-import { copyToClipboard } from "@/utils/clipboard";
-import { triggerHaptic } from "@/utils/haptics";
-import { useCopyFeedback } from "@/utils/useCopyFeedback";
+import { m, useMotionValueEvent } from "motion/react"
+import { useEffect, useImperativeHandle, useRef, useState } from "react"
+import { preload } from "react-dom"
+import { Icon } from "@/components/Icon"
+import { SquircleFuserContainer } from "@/components/SquircleFuser"
+import { ICONS } from "@/icons"
+import { cn } from "@/shadcn/utils"
+import { copyToClipboard } from "@/utils/clipboard"
+import { triggerHaptic } from "@/utils/haptics"
+import { useCopyFeedback } from "@/utils/useCopyFeedback"
 import {
   formatCoordinates,
   type NormalizedPosition,
@@ -17,20 +17,18 @@ import {
   positionToStyle,
   screenPointToPosition,
   latLongToPosition,
-} from "./geo";
+} from "./geo"
 import {
   DEFAULT_PIN_SIZE_TUNING,
   MapPin,
   PIN_TIP_FRACTION,
   type PinSizeTuning,
-} from "./MapPin";
-import { AreaLabels, singlePlaceBlocks } from "./AreaLabels";
-import type { Area } from "./areas";
-import { OffCampusIndicator } from "./OffCampusIndicator";
-import type { CrayonTuning } from "./tagColor";
-import type { MapItem, PhotoViewPoint } from "./types";
-import { type UserLocation, UserLocationMarker } from "./UserLocationMarker";
-import { pinCounterScale, useMapPanZoom } from "./useMapPanZoom";
+} from "./MapPin"
+import { OffCampusIndicator } from "./OffCampusIndicator"
+import type { CrayonTuning } from "./tagColor"
+import type { MapItem, PhotoViewPoint } from "./types"
+import { type UserLocation, UserLocationMarker } from "./UserLocationMarker"
+import { pinCounterScale, useMapPanZoom } from "./useMapPanZoom"
 
 // hoisted into <head> by react during render, so the download starts before the image element
 // even mounts. The browser picks AVIF when it can, and this hint matches that choice
@@ -39,25 +37,25 @@ function preloadMapImage() {
     as: "image",
     type: "image/svg+xml",
     fetchPriority: "high",
-  });
+  })
   preload("/auimap-640.avif", {
     as: "image",
     type: "image/avif",
     fetchPriority: "high",
-  });
+  })
 }
 
 const BLANK_PIXEL =
-  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
 
-const SURVEYED_COORD_TOAST_MS = 3000;
-const COPIED_FEEDBACK_MS = 1500;
+const SURVEYED_COORD_TOAST_MS = 3000
+const COPIED_FEEDBACK_MS = 1500
 
 // a tiny, heavily blurred copy of the map, inlined so it paints instantly with zero network
 // cost — shown until the real (still much lighter, post-crop) image finishes loading, so first
 // paint isn't blocked on it
 const MAP_IMAGE_PLACEHOLDER =
-  "data:image/webp;base64,UklGRuwAAABXRUJQVlA4IOAAAACQBgCdASocABwAPuleqE2pJSQiN/VYASAdCWMArDNDDj01wIQbHO7NrlrkXHtPrgvbXVQYAa9AYGdu74jgAP7uhUz/AWWkUW9SqKuJeTe9iHWwNySMJG8PfzG/dMaRQ+Fs9LT8ubyqdt1yTwRfFBWuj8qvT7S6GdN0WzQsDNA6TZ1LhmwMACA3b64ZCtoftWMMw++qu1UlV7hUg0HmWNZ+75Jkd44lJfjKaJX4iWIyo9pomiWf8bQLM8oFhAwABh8Ev2yQoP5GV1CkmKxfOerPN0Kk8avrYCzuNnqLODQAAA==";
+  "data:image/webp;base64,UklGRuwAAABXRUJQVlA4IOAAAACQBgCdASocABwAPuleqE2pJSQiN/VYASAdCWMArDNDDj01wIQbHO7NrlrkXHtPrgvbXVQYAa9AYGdu74jgAP7uhUz/AWWkUW9SqKuJeTe9iHWwNySMJG8PfzG/dMaRQ+Fs9LT8ubyqdt1yTwRfFBWuj8qvT7S6GdN0WzQsDNA6TZ1LhmwMACA3b64ZCtoftWMMw++qu1UlV7hUg0HmWNZ+75Jkd44lJfjKaJX4iWIyo9pomiWf8bQLM8oFhAwABh8Ev2yQoP5GV1CkmKxfOerPN0Kk8avrYCzuNnqLODQAAA=="
 
 // a marker for wherever the map's context menu was opened — never a real place, just a way to
 // see exactly which point the menu's coordinates/directions refer to
@@ -65,16 +63,16 @@ function DroppedPinMarker({
   position,
   strong,
 }: {
-  position: NormalizedPosition;
+  position: NormalizedPosition
   // a place someone searched for by coordinates: in the brand colour and fully visible, instead of
   // the faint cue used for a right click
-  strong?: boolean;
+  strong?: boolean
 }) {
   // white rather than one of the tag colors, and half-see-through — this isn't a real place, just
   // a faint "you clicked here" cue, so it shouldn't compete with the actual pins around it
-  const fill = strong ? "var(--primary)" : "white";
-  const outline = "white";
-  const glow = strong ? "var(--primary)" : "white";
+  const fill = strong ? "var(--primary)" : "white"
+  const outline = "white"
+  const glow = strong ? "var(--primary)" : "white"
 
   return (
     <div
@@ -99,12 +97,12 @@ function DroppedPinMarker({
         className="relative block size-7"
       />
     </div>
-  );
+  )
 }
 
 // where a photo was taken: a blue dot with a wedge showing which way the camera faced
 function PhotoViewMarker({ view }: { view: PhotoViewPoint }) {
-  const position = latLongToPosition(view.latitude, view.longitude);
+  const position = latLongToPosition(view.latitude, view.longitude)
   return (
     <div
       className="pointer-events-none absolute z-[900]"
@@ -143,13 +141,13 @@ function PhotoViewMarker({ view }: { view: PhotoViewPoint }) {
         <circle r="9" fill="#2563eb" stroke="#fff" strokeWidth="3.5" />
       </svg>
     </div>
-  );
+  )
 }
 
-const LONG_PRESS_MS = 600;
-const LONG_PRESS_MOVE_TOLERANCE_PX = 10;
-const MENU_WIDTH_PX = 208;
-const MENU_HEIGHT_PX = 4 * 36 + 8;
+const LONG_PRESS_MS = 600
+const LONG_PRESS_MOVE_TOLERANCE_PX = 10
+const MENU_WIDTH_PX = 208
+const MENU_HEIGHT_PX = 4 * 36 + 8
 
 // no menu library on purpose: Radix's context menu (plus its popper/focus-scope) was in the first
 // load for something used once in a while. This is a plain fixed-position list that closes on
@@ -159,47 +157,47 @@ function DroppedPinMenu({
   point,
   onClose,
 }: {
-  position: NormalizedPosition;
-  point: { x: number; y: number };
-  onClose: () => void;
+  position: NormalizedPosition
+  point: { x: number; y: number }
+  onClose: () => void
 }) {
-  const { latitude, longitude } = positionToLatLong(position);
-  const coordinates = `${latitude},${longitude}`;
-  const { copied, copy } = useCopyFeedback(COPIED_FEEDBACK_MS);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const { latitude, longitude } = positionToLatLong(position)
+  const coordinates = `${latitude},${longitude}`
+  const { copied, copy } = useCopyFeedback(COPIED_FEEDBACK_MS)
+  const menuRef = useRef<HTMLDivElement>(null)
 
-  const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${coordinates}`;
-  const appleMapsUrl = `https://maps.apple.com/?ll=${coordinates}`;
-  const wazeUrl = `https://waze.com/ul?ll=${coordinates}&navigate=yes`;
+  const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${coordinates}`
+  const appleMapsUrl = `https://maps.apple.com/?ll=${coordinates}`
+  const wazeUrl = `https://waze.com/ul?ll=${coordinates}&navigate=yes`
 
   useEffect(() => {
     function closeOnOutside(event: PointerEvent) {
-      if (!menuRef.current?.contains(event.target as Node)) onClose();
+      if (!menuRef.current?.contains(event.target as Node)) onClose()
     }
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") onClose()
     }
-    window.addEventListener("pointerdown", closeOnOutside, true);
-    window.addEventListener("keydown", closeOnEscape);
-    window.addEventListener("wheel", onClose, { passive: true });
-    window.addEventListener("resize", onClose);
+    window.addEventListener("pointerdown", closeOnOutside, true)
+    window.addEventListener("keydown", closeOnEscape)
+    window.addEventListener("wheel", onClose, { passive: true })
+    window.addEventListener("resize", onClose)
     return () => {
-      window.removeEventListener("pointerdown", closeOnOutside, true);
-      window.removeEventListener("keydown", closeOnEscape);
-      window.removeEventListener("wheel", onClose);
-      window.removeEventListener("resize", onClose);
-    };
-  }, [onClose]);
+      window.removeEventListener("pointerdown", closeOnOutside, true)
+      window.removeEventListener("keydown", closeOnEscape)
+      window.removeEventListener("wheel", onClose)
+      window.removeEventListener("resize", onClose)
+    }
+  }, [onClose])
 
   function openMapsUrl(url: string) {
-    triggerHaptic();
-    window.open(url, "_blank", "noopener,noreferrer");
-    onClose();
+    triggerHaptic()
+    window.open(url, "_blank", "noopener,noreferrer")
+    onClose()
   }
 
   function copyCoordinates() {
-    triggerHaptic();
-    copy(formatCoordinates({ latitude, longitude }));
+    triggerHaptic()
+    copy(formatCoordinates({ latitude, longitude }))
   }
 
   const items = [
@@ -223,7 +221,7 @@ function DroppedPinMenu({
       label: "Open in Waze",
       onSelect: () => openMapsUrl(wazeUrl),
     },
-  ];
+  ]
 
   return (
     <div
@@ -255,23 +253,22 @@ function DroppedPinMenu({
         </button>
       ))}
     </div>
-  );
+  )
 }
 
 export type MapCanvasHandle = {
   // an explicit recenter — unlike the one-time auto-center on first fix, this ignores whether
   // the user has already panned around, since clicking a "center me" button is unambiguous
   // intent to jump back to their position
-  centerOn: (position: [number, number]) => void;
+  centerOn: (position: [number, number]) => void
   // slide to a place and back again, see useMapPanZoom
-  peekAt: (position: [number, number]) => void;
-  endPeek: () => void;
-  commitPeek: () => void;
-};
+  peekAt: (position: [number, number]) => void
+  endPeek: () => void
+  commitPeek: () => void
+}
 
 export function MapCanvas({
   items,
-  areas = [],
   selectedId,
   onSelect,
   userPosition,
@@ -286,45 +283,43 @@ export function MapCanvas({
   sizeTuning = DEFAULT_PIN_SIZE_TUNING,
   ref,
 }: {
-  items: MapItem[];
-  // the buildings and areas, so one with a single place can be painted in its colour with its name
-  areas?: Area[];
-  selectedId: string | null;
-  onSelect: (id: string | null) => void;
-  userPosition: UserLocation["position"];
-  userAccuracy: UserLocation["accuracy"];
-  offCampusPosition: UserLocation["rawPosition"];
-  compassHeading: number | null;
-  hoveredTagId: string | null;
+  items: MapItem[]
+  selectedId: string | null
+  onSelect: (id: string | null) => void
+  userPosition: UserLocation["position"]
+  userAccuracy: UserLocation["accuracy"]
+  offCampusPosition: UserLocation["rawPosition"]
+  compassHeading: number | null
+  hoveredTagId: string | null
   // categories picked on their own in the filter. Their tiny pins show at any zoom
-  pickedTagIds?: Set<string> | null;
+  pickedTagIds?: Set<string> | null
   // where the photo being looked at was taken, with the way the camera faced
-  photoView?: PhotoViewPoint | null;
+  photoView?: PhotoViewPoint | null
   // where a coordinates search points, drawn as a marker until the search is cleared
-  searchedPosition?: NormalizedPosition | null;
+  searchedPosition?: NormalizedPosition | null
   // only ever overridden by the dev-only TagColorPlayground — real visitors always get the default
-  tuning?: CrayonTuning;
+  tuning?: CrayonTuning
   // only ever overridden by the dev-only PinTuningPlayground — real visitors always get the default
-  sizeTuning?: PinSizeTuning;
-  ref?: React.Ref<MapCanvasHandle>;
+  sizeTuning?: PinSizeTuning
+  ref?: React.Ref<MapCanvasHandle>
 }) {
-  preloadMapImage();
-  const panZoom = useMapPanZoom();
-  const imageBoxRef = useRef<HTMLDivElement>(null);
-  const [surveyedCoord, setSurveyedCoord] = useState<string | null>(null);
-  const surveyedCoordTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  preloadMapImage()
+  const panZoom = useMapPanZoom()
+  const imageBoxRef = useRef<HTMLDivElement>(null)
+  const [surveyedCoord, setSurveyedCoord] = useState<string | null>(null)
+  const surveyedCoordTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const [contextMenu, setContextMenu] = useState<{
-    position: NormalizedPosition;
-    point: { x: number; y: number };
-  } | null>(null);
-  const contextMenuPosition = contextMenu?.position ?? null;
+    position: NormalizedPosition
+    point: { x: number; y: number }
+  } | null>(null)
+  const contextMenuPosition = contextMenu?.position ?? null
   const longPress = useRef<{
-    timer: ReturnType<typeof setTimeout>;
-    x: number;
-    y: number;
-  } | null>(null);
-  const [lowLoaded, setLowLoaded] = useState(false);
-  const [fullLoaded, setFullLoaded] = useState(false);
+    timer: ReturnType<typeof setTimeout>
+    x: number
+    y: number
+  } | null>(null)
+  const [lowLoaded, setLowLoaded] = useState(false)
+  const [fullLoaded, setFullLoaded] = useState(false)
 
   // growthExponent and labelShowScale are the same for every pin (only ever overridden app-wide
   // by the dev-only PinTuningPlayground, never per-item), so they're computed once here. The
@@ -334,53 +329,29 @@ export function MapCanvas({
   // updates below
   const [initialPinCounterScale] = useState(() =>
     pinCounterScale(panZoom.scale.get(), sizeTuning.growthExponent),
-  );
+  )
   useMotionValueEvent(panZoom.scale, "change", (scale) => {
     imageBoxRef.current?.style.setProperty(
       "--pin-counter-scale",
       String(pinCounterScale(scale, sizeTuning.growthExponent)),
-    );
-  });
+    )
+  })
   const [showPinLabels, setShowPinLabels] = useState(
     () => panZoom.scale.get() > sizeTuning.labelShowScale,
-  );
+  )
   useMotionValueEvent(panZoom.scale, "change", (scale) => {
-    const next = scale > sizeTuning.labelShowScale;
-    setShowPinLabels((current) => (current === next ? current : next));
-  });
+    const next = scale > sizeTuning.labelShowScale
+    setShowPinLabels((current) => (current === next ? current : next))
+  })
   // small details (a bathroom, a printer) only appear once the map is zoomed in far enough. Tracked
   // in quarter steps so zooming doesn't re-render the map on every frame
   const [zoomStep, setZoomStep] = useState(
     () => Math.floor(panZoom.scale.get() * 4) / 4,
-  );
+  )
   useMotionValueEvent(panZoom.scale, "change", (scale) => {
-    const next = Math.floor(scale * 4) / 4;
-    setZoomStep((current) => (current === next ? current : next));
-  });
-
-  // the width of the map box on screen at zoom 1, to know how big a name would be written
-  const [boxWidth, setBoxWidth] = useState(0);
-  useEffect(() => {
-    const el = imageBoxRef.current;
-    if (!el) return;
-    const measure = () => setBoxWidth(el.offsetWidth);
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, []);
-  const visibleItems = items.filter(
-    (item) =>
-      item.minZoom == null ||
-      zoomStep >= item.minZoom ||
-      item.id === selectedId ||
-      pickedTagIds?.has(item.tag.id),
-  );
-  const blocks = singlePlaceBlocks(
-    areas,
-    visibleItems,
-    (boxWidth * zoomStep) / 1312,
-  );
-  const blockIds = new Set(blocks.map((block) => block.item.id));
+    const next = Math.floor(scale * 4) / 4
+    setZoomStep((current) => (current === next ? current : next))
+  })
 
   useImperativeHandle(
     ref,
@@ -391,94 +362,94 @@ export function MapCanvas({
       commitPeek: panZoom.commitPeek,
     }),
     [panZoom.centerOn, panZoom.peekAt, panZoom.endPeek, panZoom.commitPeek],
-  );
+  )
 
-  useEffect(() => () => clearTimeout(surveyedCoordTimer.current), []);
+  useEffect(() => () => clearTimeout(surveyedCoordTimer.current), [])
 
   // toggled imperatively instead of through React state, so dropping the selected pin's glow
   // filter mid-gesture doesn't itself cost a render — see useMapPanZoom's isMoving for why
   useMotionValueEvent(panZoom.isMoving, "change", (value) => {
-    imageBoxRef.current?.toggleAttribute("data-moving", value === 1);
-  });
+    imageBoxRef.current?.toggleAttribute("data-moving", value === 1)
+  })
 
   // the moment the user's location is first found, zoom in and center on them — but only if
   // they haven't touched the map yet themselves, and only ever this once. Later position updates
   // from the same watchPosition (useUserLocation) must not keep yanking the view back to them
-  const hasAutoLocated = useRef(false);
+  const hasAutoLocated = useRef(false)
   useEffect(() => {
-    if (!userPosition || hasAutoLocated.current) return;
-    hasAutoLocated.current = true;
-    if (!panZoom.hasInteracted.current) panZoom.centerOn(userPosition);
-  }, [userPosition, panZoom]);
+    if (!userPosition || hasAutoLocated.current) return
+    hasAutoLocated.current = true
+    if (!panZoom.hasInteracted.current) panZoom.centerOn(userPosition)
+  }, [userPosition, panZoom])
 
   // ctrl/cmd + click reads the coordinate under the cursor and copies it in data.ts's format, so
   // new map items can be surveyed straight off the satellite image
   async function copyCoordinateUnderCursor(event: React.MouseEvent) {
-    const imageBox = imageBoxRef.current?.getBoundingClientRect();
-    if (!event.ctrlKey && !event.metaKey) return;
-    if (!imageBox) return;
+    const imageBox = imageBoxRef.current?.getBoundingClientRect()
+    if (!event.ctrlKey && !event.metaKey) return
+    if (!imageBox) return
 
     const clicked = screenPointToPosition(
       { x: event.clientX, y: event.clientY },
       imageBox,
-    );
-    const coord = formatCoordinates(positionToLatLong(clicked));
+    )
+    const coord = formatCoordinates(positionToLatLong(clicked))
 
-    const succeeded = await copyToClipboard(coord);
+    const succeeded = await copyToClipboard(coord)
     if (!succeeded) {
-      triggerHaptic("error");
-      return;
+      triggerHaptic("error")
+      return
     }
-    triggerHaptic("success");
-    setSurveyedCoord(coord);
+    triggerHaptic("success")
+    setSurveyedCoord(coord)
 
     // restarts on every survey, so copying twice in a row doesn't inherit the first countdown
-    clearTimeout(surveyedCoordTimer.current);
+    clearTimeout(surveyedCoordTimer.current)
     surveyedCoordTimer.current = setTimeout(
       () => setSurveyedCoord(null),
       SURVEYED_COORD_TOAST_MS,
-    );
+    )
   }
 
   // right-click (desktop, Android long-press) or a 600ms touch long-press (iOS fires no
   // contextmenu event) drops a marker and opens a menu of things to do with that spot
   function openContextMenuAt(clientX: number, clientY: number) {
-    const imageBox = imageBoxRef.current?.getBoundingClientRect();
-    if (!imageBox) return;
+    const imageBox = imageBoxRef.current?.getBoundingClientRect()
+    if (!imageBox) return
     setContextMenu({
       position: screenPointToPosition({ x: clientX, y: clientY }, imageBox),
       point: { x: clientX, y: clientY },
-    });
+    })
   }
 
   function cancelLongPress() {
-    if (longPress.current) clearTimeout(longPress.current.timer);
-    longPress.current = null;
+    if (longPress.current) clearTimeout(longPress.current.timer)
+    longPress.current = null
   }
 
   function startLongPress(event: React.PointerEvent) {
-    if (event.pointerType !== "touch") return;
-    cancelLongPress();
-    const { clientX, clientY } = event;
+    if (event.pointerType !== "touch") return
+    cancelLongPress()
+    const { clientX, clientY } = event
     longPress.current = {
       x: clientX,
       y: clientY,
       timer: setTimeout(() => {
-        longPress.current = null;
-        triggerHaptic();
-        openContextMenuAt(clientX, clientY);
+        longPress.current = null
+        triggerHaptic()
+        openContextMenuAt(clientX, clientY)
       }, LONG_PRESS_MS),
-    };
+    }
   }
 
   function moveLongPress(event: React.PointerEvent) {
-    const pending = longPress.current;
-    if (!pending) return;
+    const pending = longPress.current
+    if (!pending) return
     if (
       Math.hypot(event.clientX - pending.x, event.clientY - pending.y) >
       LONG_PRESS_MOVE_TOLERANCE_PX
     )
-      cancelLongPress();
+      cancelLongPress()
   }
 
   return (
@@ -491,8 +462,8 @@ export function MapCanvas({
         onPointerUpCapture={cancelLongPress}
         onPointerCancelCapture={cancelLongPress}
         onContextMenu={(event) => {
-          event.preventDefault();
-          openContextMenuAt(event.clientX, event.clientY);
+          event.preventDefault()
+          openContextMenuAt(event.clientX, event.clientY)
         }}
         onClick={copyCoordinateUnderCursor}
         style={{ touchAction: "none" }}
@@ -572,7 +543,7 @@ export function MapCanvas({
                 // a cached image can finish loading before hydration, and that onLoad is then
                 // never replayed, which left the blurred placeholder up for good
                 ref={(image) => {
-                  if (image?.complete) setLowLoaded(true);
+                  if (image?.complete) setLowLoaded(true)
                 }}
                 className={cn(
                   "pointer-events-none absolute inset-0 size-full object-cover transition-opacity duration-300",
@@ -590,7 +561,7 @@ export function MapCanvas({
                   draggable={false}
                   onLoad={() => setFullLoaded(true)}
                   ref={(image) => {
-                    if (image?.complete) setFullLoaded(true);
+                    if (image?.complete) setFullLoaded(true)
                   }}
                   className={cn(
                     "pointer-events-none absolute inset-0 size-full object-cover transition-opacity duration-500",
@@ -607,16 +578,13 @@ export function MapCanvas({
             {offCampusPosition && (
               <OffCampusIndicator position={offCampusPosition} />
             )}
-            {blocks.length > 0 && (
-              <AreaLabels
-                {...{ blocks, selectedId, tuning }}
-                previewTagId={hoveredTagId}
-                onSelect={onSelect}
-              />
-            )}
-            {visibleItems
+            {items
               .filter(
-                (item) => !blockIds.has(item.id) || item.id === selectedId,
+                (item) =>
+                  item.minZoom == null ||
+                  zoomStep >= item.minZoom ||
+                  item.id === selectedId ||
+                  pickedTagIds?.has(item.tag.id),
               )
               .map((item) => (
                 <MapPin
@@ -664,5 +632,5 @@ export function MapCanvas({
         <DroppedPinMenu {...contextMenu} onClose={() => setContextMenu(null)} />
       )}
     </>
-  );
+  )
 }
