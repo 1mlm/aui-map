@@ -151,22 +151,25 @@ function buildScene({
     : []
 
   // the legend sits in the bottom left, where the hotel was: one pin per category with its name
-  const cols = tags.length > 5 ? 2 : 1
-  const perCol = Math.ceil(tags.length / cols)
+  const shownTags = tags.filter((tag) =>
+    visible.some((item) => item.tag.id === tag.id),
+  )
+  const cols = shownTags.length > 5 ? 2 : 1
+  const perCol = Math.ceil(shownTags.length / cols)
   const rowH = 31
   const legendFont = "600 10.5px sans-serif"
   const colW =
-    Math.max(...tags.map((tag) => measureText(legendFont, tag.label))) + 46
+    Math.max(...shownTags.map((tag) => measureText(legendFont, tag.label))) + 46
   const legendRect: Rect = {
-    x: crop.x + 14,
-    y: crop.y + crop.h - 14 - (perCol * rowH + 16),
+    x: crop.x + 70,
+    y: crop.y + crop.h - 90 - (perCol * rowH + 16),
     w: cols * colW + 8,
     h: perCol * rowH + 16,
   }
   const legend = showLegend
     ? {
         rect: legendRect,
-        rows: tags.map((tag, k) => ({
+        rows: shownTags.map((tag, k) => ({
           x: legendRect.x + 16 + Math.floor(k / perCol) * colW,
           y: legendRect.y + 8 + (k % perCol) * rowH + rowH / 2,
           fill: tagPinFillColor(tag.color),
@@ -289,6 +292,98 @@ function maskPieces(shapes: CampusShapes): MaskPiece[] {
 }
 const MASK_BLUR = 34
 
+// The soft shape the picture is cut to. It is made small (a quarter of the picture's pixels, it is
+// only ever a blurry blob) and blurred by hand instead of with the canvas blur filter, which some
+// browsers don't have and which is slow at full size. Made once per crop and kept
+const MASK_RES = 0.25
+const maskCache = new WeakMap<CampusShapes, Map<string, HTMLCanvasElement>>()
+
+function blurLine(
+  src: Float32Array,
+  dst: Float32Array,
+  n: number,
+  stride: number,
+  offset: number,
+  r: number,
+) {
+  // a running sum, so the cost doesn't grow with the radius
+  const size = 2 * r + 1
+  let sum = 0
+  for (let i = -r; i <= r; i++)
+    if (i >= 0 && i < n) sum += src[offset + i * stride]
+  for (let i = 0; i < n; i++) {
+    dst[offset + i * stride] = sum / size
+    const out = i - r
+    const into = i + r + 1
+    if (out >= 0) sum -= src[offset + out * stride]
+    if (into < n) sum += src[offset + into * stride]
+  }
+}
+
+function softMask(shapes: CampusShapes, crop: Rect) {
+  const key = `${crop.x},${crop.y},${crop.w},${crop.h}`
+  const perShapes =
+    maskCache.get(shapes) ?? new Map<string, HTMLCanvasElement>()
+  maskCache.set(shapes, perShapes)
+  const cached = perShapes.get(key)
+  if (cached) return cached
+
+  const w = Math.max(1, Math.ceil(crop.w * MASK_RES))
+  const h = Math.max(1, Math.ceil(crop.h * MASK_RES))
+  const canvas = document.createElement("canvas")
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext("2d")
+  if (!ctx) return canvas
+  ctx.setTransform(
+    MASK_RES,
+    0,
+    0,
+    MASK_RES,
+    -crop.x * MASK_RES,
+    -crop.y * MASK_RES,
+  )
+  ctx.fillStyle = "white"
+  ctx.strokeStyle = "white"
+  ctx.lineJoin = "round"
+  ctx.lineCap = "round"
+  for (const piece of maskPieces(shapes)) {
+    ctx.beginPath()
+    piece.pts.forEach(([x, y], i) => {
+      if (i === 0) ctx.moveTo(x, y)
+      else ctx.lineTo(x, y)
+    })
+    if (piece.fill) {
+      ctx.closePath()
+      ctx.fill()
+    }
+    ctx.lineWidth = piece.width
+    ctx.stroke()
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  const image = ctx.getImageData(0, 0, w, h)
+  let a: Float32Array = new Float32Array(w * h)
+  for (let i = 0; i < w * h; i++) a[i] = image.data[i * 4 + 3] / 255
+  let b: Float32Array = new Float32Array(w * h)
+  const r = Math.max(1, Math.round(MASK_BLUR * MASK_RES))
+  // three passes of a box blur are close to a gaussian one
+  for (let pass = 0; pass < 3; pass++) {
+    for (let y = 0; y < h; y++) blurLine(a, b, w, 1, y * w, r)
+    for (let x = 0; x < w; x++) blurLine(b, a, h, w, x, r)
+  }
+  for (let i = 0; i < w * h; i++) {
+    // a little contrast so the middle is fully solid and the edge still soft
+    const v = Math.min(1, Math.max(0, (a[i] - 0.15) / 0.55))
+    image.data[i * 4] = 255
+    image.data[i * 4 + 1] = 255
+    image.data[i * 4 + 2] = 255
+    image.data[i * 4 + 3] = Math.round(v * 255)
+  }
+  ctx.putImageData(image, 0, 0)
+  perShapes.set(key, canvas)
+  return canvas
+}
+
 // -------------------------------------------------------------------- canvas renderer
 
 function drawIcon(
@@ -338,7 +433,7 @@ function drawPin(
   ctx.restore()
   if (icon.length) {
     ctx.save()
-    ctx.translate(x, y - 12.5 * k)
+    ctx.translate(x, y - 10.8 * k)
     drawIcon(ctx, icon, size * 0.42, "white")
     ctx.restore()
   }
@@ -354,7 +449,7 @@ function drawCanvas(
   scene: Scene,
   image: HTMLImageElement,
   logo: HTMLImageElement | null,
-  pieces: MaskPiece[],
+  mask: HTMLCanvasElement,
 ) {
   const { crop } = scene
   canvas.width = Math.round(crop.w * SCALE)
@@ -366,39 +461,19 @@ function drawCanvas(
   ctx.clearRect(crop.x, crop.y, crop.w, crop.h)
 
   if (scene.fade) {
-    const mask = document.createElement("canvas")
-    mask.width = canvas.width
-    mask.height = canvas.height
-    const m = mask.getContext("2d")
     const layer = document.createElement("canvas")
     layer.width = canvas.width
     layer.height = canvas.height
     const l = layer.getContext("2d")
-    if (m && l) {
-      m.setTransform(...base)
-      m.filter = `blur(${MASK_BLUR * SCALE}px)`
-      m.fillStyle = "white"
-      m.strokeStyle = "white"
-      m.lineJoin = "round"
-      m.lineCap = "round"
-      for (const piece of pieces) {
-        m.beginPath()
-        piece.pts.forEach(([x, y], i) => {
-          if (i === 0) m.moveTo(x, y)
-          else m.lineTo(x, y)
-        })
-        if (piece.fill) {
-          m.closePath()
-          m.fill()
-        }
-        m.lineWidth = piece.width
-        m.stroke()
-      }
+    if (l) {
       l.setTransform(...base)
       l.drawImage(image, 0, 0, BASE, BASE)
       l.setTransform(1, 0, 0, 1, 0, 0)
+      // the soft shape is small and smooth, stretching it up keeps it smooth
+      l.imageSmoothingEnabled = true
+      l.imageSmoothingQuality = "high"
       l.globalCompositeOperation = "destination-in"
-      l.drawImage(mask, 0, 0)
+      l.drawImage(mask, 0, 0, canvas.width, canvas.height)
       ctx.setTransform(1, 0, 0, 1, 0, 0)
       ctx.drawImage(layer, 0, 0)
       ctx.setTransform(...base)
@@ -526,7 +601,7 @@ function svgPin(
   return (
     `<ellipse cx="${x}" cy="${y}" rx="${size * 0.28}" ry="${size * 0.1}" fill="rgba(0,0,0,0.32)"/>` +
     `<g transform="translate(${x - 12 * k} ${y - 22 * k}) scale(${k})"><path d="${PIN_D}" fill="${fill}" stroke="rgba(255,255,255,0.95)" stroke-width="1.6" stroke-linejoin="round"/></g>` +
-    (icon.length ? svgIcon(icon, x, y - 12.5 * k, size * 0.42) : "")
+    (icon.length ? svgIcon(icon, x, y - 10.8 * k, size * 0.42) : "")
   )
 }
 
@@ -656,7 +731,13 @@ export function MapImageMaker({
     const scene = buildScene({ ...options, stamp: new Date() })
     const pieces = maskPieces(shapes)
     if (style === "satellite" && canvasRef.current)
-      drawCanvas(canvasRef.current, scene, image, logo, pieces)
+      drawCanvas(
+        canvasRef.current,
+        scene,
+        image,
+        logo,
+        softMask(shapes, scene.crop),
+      )
     if (style === "vector") {
       const logoCanvas = document.createElement("canvas")
       logoCanvas.width = 96
@@ -716,7 +797,13 @@ export function MapImageMaker({
     const scene = buildScene({ ...options, stamp: new Date() })
     const pieces = maskPieces(shapes)
     if (style === "satellite" && canvasRef.current) {
-      drawCanvas(canvasRef.current, scene, image, logo, pieces)
+      drawCanvas(
+        canvasRef.current,
+        scene,
+        image,
+        logo,
+        softMask(shapes, scene.crop),
+      )
       canvasRef.current.toBlob((blob) => blob && save(blob, "aui-map.png"))
       return
     }
@@ -786,11 +873,7 @@ export function MapImageMaker({
         <div className="flex flex-col gap-2 rounded-2xl corner-squircle bg-foreground/5 p-3">
           {toggle("Pins", showPins, setShowPins)}
           {toggle("Names", showNames, setShowNames)}
-          {toggle(
-            "Small places (restrooms, printers)",
-            showDetails,
-            setShowDetails,
-          )}
+          {toggle("Small places (printers)", showDetails, setShowDetails)}
           {toggle("Legend", showLegend, setShowLegend)}
           {toggle("Fade out around the campus", fade, setFade)}
           {fade && toggle("Dark legend text", darkText, setDarkText)}

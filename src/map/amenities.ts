@@ -3,12 +3,11 @@ import {
   Atm01Icon,
   PrayerRugIcon,
   PrinterIcon,
-  Toilet01Icon,
   Wifi01Icon,
 } from "@hugeicons/core-free-icons"
 import type { HugeIcon } from "@/components/Icon"
 
-// what a place can have, ticked per pin in the admin. Small things (a printer, a restroom) live on
+// what a place can have, ticked per pin in the admin. Small things (a printer, wifi) live on
 // the building that has them instead of getting a pin each. `words` are hidden search words: typing
 // "print" finds every place with a printer
 export const AMENITIES = [
@@ -24,20 +23,6 @@ export const AMENITIES = [
       "copy",
       "scan",
       "imprimante",
-    ],
-  },
-  {
-    id: "restroom",
-    label: "Restrooms",
-    icon: Toilet01Icon,
-    words: [
-      "toilet",
-      "toilets",
-      "wc",
-      "bathroom",
-      "restroom",
-      "washroom",
-      "toilette",
     ],
   },
   {
