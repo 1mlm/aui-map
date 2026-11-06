@@ -65,7 +65,16 @@ function placeJson(item: MapItem, all: MapItem[]) {
     links: item.links,
     images: item.attachments
       .filter(({ mimeType }) => !mimeType || mimeType.startsWith("image/"))
-      .map(({ url, caption }) => ({ url, caption })),
+      .map(({ url, caption, latitude, longitude, heading }) => ({
+        url,
+        caption,
+        // where the photo was taken and the compass direction the camera faced, when known
+        taken_at:
+          latitude !== null && longitude !== null
+            ? { lat: latitude, lng: longitude }
+            : null,
+        facing_degrees: heading,
+      })),
     near,
     last_updated: item.updatedAt.toISOString(),
   }
@@ -173,8 +182,29 @@ export async function buildCampusGeoJson() {
         properties: { kind: zone.kind },
       })),
       ...shapes.roads.map((road) => line("road", road.p, {})),
+      ...shapes.roundabouts.map((ring) =>
+        line(
+          "roundabout",
+          Array.from({ length: 33 }, (_, i) => {
+            const angle = (i / 32) * Math.PI * 2
+            return [
+              ring.c[0] + Math.cos(angle) * ring.r,
+              ring.c[1] + Math.sin(angle) * ring.r,
+            ] as [number, number]
+          }),
+          {},
+        ),
+      ),
       ...shapes.paths.map((path) =>
-        line(path.kind === "dirt" ? "dirt_path" : "footpath", path.p, {}),
+        line(
+          path.kind === "dirt"
+            ? "dirt_path"
+            : path.kind === "green"
+              ? "green_path"
+              : "footpath",
+          path.p,
+          {},
+        ),
       ),
       ...placeFeatures,
     ],

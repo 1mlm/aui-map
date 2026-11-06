@@ -3,10 +3,14 @@
 
 import {
   Cancel01Icon,
+  CircleIcon,
   Cursor02Icon,
   Delete02Icon,
   FloppyDiskIcon,
+  Pentagon01Icon,
   Redo02Icon,
+  Road01Icon,
+  Route01Icon,
   Undo02Icon,
 } from "@hugeicons/core-free-icons"
 import { useEffect, useRef, useState } from "react"
@@ -15,6 +19,7 @@ import {
   type CampusShapes,
   type Point,
   rectToPolygon,
+  ROAD_WALK_BAND,
   smoothPath,
 } from "@/map/campusShapes"
 import { saveCampusLines } from "../map/actions"
@@ -23,105 +28,152 @@ const SIZE = 1312
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value))
 const dist = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b[1])
 
-type Layer = "roads" | "paths" | "zones"
-type Tool = "select" | "road" | "walk" | "dirt" | "field" | "court" | "parking"
+type Layer = "roads" | "paths" | "zones" | "roundabouts"
+type Tool = "select" | "area" | "road" | "ring" | "path"
+type AreaKind = "walk" | "field" | "court" | "parking"
+type PathKind = "walk" | "dirt" | "green"
 type Sel = { layer: Layer; i: number; v?: number }
 type View = { x: number; y: number; s: number }
 type Drag =
   | { kind: "pan"; start: [number, number]; view: View; moved: boolean }
   | { kind: "vertex"; sel: Sel & { v: number } }
   | { kind: "move"; start: Point; orig: CampusShapes; sel: Sel }
+  | { kind: "radius"; i: number }
 
-const TOOLS: { id: Tool; label: string; color: string }[] = [
-  { id: "road", label: "Road", color: "#fffdf6" },
-  { id: "walk", label: "Footpath", color: "#f6eed9" },
-  { id: "dirt", label: "Dirt path", color: "#d8bf92" },
+const AREA_KINDS: { id: AreaKind; label: string; color: string }[] = [
+  { id: "walk", label: "Walkway", color: "#f6eed9" },
   { id: "field", label: "Field", color: "#a9d18f" },
   { id: "court", label: "Court", color: "#d98a68" },
   { id: "parking", label: "Parking", color: "#c9ccd0" },
 ]
-const isZoneTool = (tool: Tool) =>
-  tool === "field" || tool === "court" || tool === "parking"
-const DEFAULT_WIDTH: Partial<Record<Tool, number>> = {
-  road: 7,
-  walk: 3.5,
-  dirt: 3,
+const PATH_KINDS: { id: PathKind; label: string; color: string; w: number }[] =
+  [
+    { id: "walk", label: "Paved", color: "#f6eed9", w: 3.5 },
+    { id: "dirt", label: "Dirt", color: "#d8bf92", w: 3 },
+    { id: "green", label: "Green", color: "#a6cf8d", w: 4 },
+  ]
+const PATH_COLOR = { walk: "#f6eed9", dirt: "#d8bf92", green: "#a6cf8d" }
+const ZONE_FILL = {
+  walk: "#f6eed9",
+  field: "#a9d18f",
+  court: "#d98a68",
+  parking: "#c9ccd0",
 }
-const ZONE_FILL = { field: "#a9d18f", court: "#d98a68", parking: "#c9ccd0" }
+const TOOLS: { id: Tool; label: string; icon: HugeIcon; hint: string }[] = [
+  {
+    id: "select",
+    label: "Select",
+    icon: Cursor02Icon,
+    hint: "Click anything to edit it",
+  },
+  {
+    id: "area",
+    label: "Area",
+    icon: Pentagon01Icon,
+    hint: "Click the corners. Enter to finish",
+  },
+  {
+    id: "road",
+    label: "Road",
+    icon: Road01Icon,
+    hint: "Click along the road. Enter to finish",
+  },
+  {
+    id: "ring",
+    label: "Roundabout",
+    icon: CircleIcon,
+    hint: "Click the middle, then click the edge",
+  },
+  {
+    id: "path",
+    label: "Path",
+    icon: Route01Icon,
+    hint: "Click along the path. Enter to finish",
+  },
+]
 
-function ToolButton({
-  icon,
-  label,
+function nearestOnCircle(p: Point, c: Point, r: number): Point {
+  const d = dist(p, c) || 1
+  return [c[0] + ((p[0] - c[0]) / d) * r, c[1] + ((p[1] - c[1]) / d) * r]
+}
+
+const Chip = ({
   active,
   onClick,
-  disabled,
   color,
+  children,
 }: {
-  icon?: HugeIcon
+  active: boolean
+  onClick: () => void
+  color?: string
+  children: React.ReactNode
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`inline-flex items-center gap-1.5 rounded-lg corner-squircle px-2.5 py-1 text-sm transition-colors ${
+      active
+        ? "bg-primary font-semibold text-primary-foreground"
+        : "hover:bg-foreground/10"
+    }`}
+  >
+    {color && (
+      <span
+        className="size-3 rounded-[0.25rem] ring-1 ring-black/20"
+        style={{ background: color }}
+      />
+    )}
+    {children}
+  </button>
+)
+
+const IconAction = ({
+  icon,
+  label,
+  onClick,
+  disabled,
+}: {
+  icon: HugeIcon
   label: string
-  active?: boolean
   onClick: () => void
   disabled?: boolean
-  color?: string
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      title={label}
-      className={`inline-flex items-center gap-1.5 rounded-xl corner-squircle px-3 py-1.5 text-sm transition-colors disabled:opacity-40 ${
-        active
-          ? "bg-primary font-semibold text-primary-foreground"
-          : "bg-foreground/10 hover:bg-foreground/20"
-      }`}
-    >
-      {color && (
-        <span
-          className="size-3.5 rounded-[0.3rem] ring-1 ring-black/20"
-          style={{ background: color }}
-        />
-      )}
-      {icon && <Icon icon={icon} className="size-4" />}
-      {label}
-    </button>
-  )
-}
-
-function buildingPoints(shapes: CampusShapes) {
-  return shapes.buildings.map((b) => (b.r ? rectToPolygon(b.r) : (b.p ?? [])))
-}
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    aria-label={label}
+    title={label}
+    className="grid size-9 place-items-center rounded-xl corner-squircle bg-background/90 shadow-sm ring-1 ring-foreground/10 backdrop-blur transition-colors hover:bg-background disabled:opacity-35"
+  >
+    <Icon icon={icon} className="size-[1.15rem]" />
+  </button>
+)
 
 export function RoadsEditor({ initial }: { initial: CampusShapes }) {
   const [shapes, setShapes] = useState(initial)
-  const [saved, setSaved] = useState(() => JSON.stringify(initial))
+  const [saved, setSaved] = useState(() => JSON.stringify(lines(initial)))
   const [tool, setTool] = useState<Tool>("select")
+  const [areaKind, setAreaKind] = useState<AreaKind>("walk")
+  const [pathKind, setPathKind] = useState<PathKind>("walk")
   const [draft, setDraft] = useState<Point[]>([])
+  const [ringCenter, setRingCenter] = useState<Point | null>(null)
   const [cursor, setCursor] = useState<Point | null>(null)
   const [sel, setSel] = useState<Sel | null>(null)
   const [view, setView] = useState<View>({ x: 180, y: 120, s: 940 })
   const [history, setHistory] = useState<CampusShapes[]>([])
   const [future, setFuture] = useState<CampusShapes[]>([])
-  const [satOpacity, setSatOpacity] = useState(0.8)
+  const [satOpacity, setSatOpacity] = useState(0.85)
   const [status, setStatus] = useState("")
   const [saving, setSaving] = useState(false)
   const [pxWidth, setPxWidth] = useState(800)
   const svgRef = useRef<SVGSVGElement>(null)
   const drag = useRef<Drag | null>(null)
 
-  const dirty =
-    JSON.stringify({
-      roads: shapes.roads,
-      paths: shapes.paths,
-      zones: shapes.zones,
-    }) !==
-    JSON.stringify({
-      roads: JSON.parse(saved).roads,
-      paths: JSON.parse(saved).paths,
-      zones: JSON.parse(saved).zones,
-    })
+  const dirty = JSON.stringify(lines(shapes)) !== saved
   const px = view.s / pxWidth
   const handleR = px * 6
+  const drawing = tool !== "select"
 
   useEffect(() => {
     const el = svgRef.current
@@ -157,12 +209,12 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
         if (event.shiftKey) redo()
         else undo()
       } else if (event.key === "Escape") {
-        if (tool !== "select") cancelDraw()
+        if (drawing) cancelDraw()
         else setSel(null)
-      } else if (event.key === "Enter" && tool !== "select") finishDraw()
+      } else if (event.key === "Enter" && drawing) finishDraw()
       else if (event.key === "Delete" || event.key === "Backspace") {
         event.preventDefault()
-        if (tool !== "select") setDraft((d) => d.slice(0, -1))
+        if (drawing) setDraft((d) => d.slice(0, -1))
         else removeSelected()
       }
     }
@@ -217,7 +269,8 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
     })
   }
 
-  // a new point sticks to a nearby existing point, so roads that meet really meet
+  // a new point sticks to a nearby corner, road point, or the edge of a roundabout, so everything
+  // that meets really meets. Alt skips it
   function snapPoint(raw: Point, free: boolean): Point {
     if (free) return raw
     let best: Point | null = null
@@ -226,10 +279,20 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
       ...shapes.roads.flatMap((r) => r.p),
       ...shapes.paths.flatMap((r) => r.p),
       ...shapes.zones.flatMap((z) => z.p),
-      ...buildingPoints(shapes).flat(),
+      ...shapes.buildings.flatMap((b) =>
+        b.r ? rectToPolygon(b.r) : (b.p ?? []),
+      ),
       ...draft,
     ]
     for (const q of all) {
+      const d = dist(q, raw)
+      if (d < bestD) {
+        best = q
+        bestD = d
+      }
+    }
+    for (const ring of shapes.roundabouts) {
+      const q = nearestOnCircle(raw, ring.c, ring.r)
       const d = dist(q, raw)
       if (d < bestD) {
         best = q
@@ -241,41 +304,46 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
 
   function pickTool(next: Tool) {
     setDraft([])
+    setRingCenter(null)
     setSel(null)
     setTool(next)
   }
   function cancelDraw() {
     setDraft([])
+    setRingCenter(null)
     setTool("select")
   }
   function finishDraw() {
     const pts = draft.filter(
       (q, k) => k === 0 || dist(q, draft[k - 1]) > px * 2,
     )
-    const need = isZoneTool(tool) ? 3 : 2
+    const need = tool === "area" ? 3 : 2
     if (pts.length < need) {
       setDraft([])
       return
     }
-    if (tool === "road")
-      change((d) => d.roads.push({ w: DEFAULT_WIDTH.road ?? 7, p: pts }))
-    else if (tool === "walk" || tool === "dirt")
+    if (tool === "road") change((d) => d.roads.push({ w: 7, p: pts }))
+    else if (tool === "path")
       change((d) =>
         d.paths.push({
-          w: DEFAULT_WIDTH[tool] ?? 3,
-          kind: tool === "dirt" ? "dirt" : "walk",
+          w: PATH_KINDS.find((k) => k.id === pathKind)?.w ?? 3.5,
+          kind: pathKind,
           p: pts,
         }),
       )
-    else if (isZoneTool(tool))
-      change((d) => d.zones.push({ kind: tool as "field", p: pts }))
+    else if (tool === "area")
+      change((d) => d.zones.push({ kind: areaKind, p: pts }))
     setDraft([])
   }
 
   function removeSelected() {
     if (!sel) return
-    const list = shapes[sel.layer]
-    const entry = list[sel.i] as { p: Point[] } | undefined
+    if (sel.layer === "roundabouts") {
+      change((d) => d.roundabouts.splice(sel.i, 1))
+      setSel(null)
+      return
+    }
+    const entry = shapes[sel.layer][sel.i] as { p: Point[] } | undefined
     if (!entry) return
     const min = sel.layer === "zones" ? 3 : 2
     if (sel.v !== undefined && entry.p.length > min) {
@@ -289,11 +357,19 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
     setSel(null)
   }
 
-  function setWidth(width: number) {
+  function setField(field: "w" | "r", value: number) {
     if (!sel || sel.layer === "zones") return
-    const layer = sel.layer
+    const { layer, i } = sel
     change((d) => {
-      ;(d[layer][sel.i] as { w: number }).w = width
+      ;(d[layer][i] as unknown as Record<string, number>)[field] = value
+    })
+  }
+  function setKind(kind: string) {
+    if (!sel) return
+    const { layer, i } = sel
+    if (layer !== "paths" && layer !== "zones") return
+    change((d) => {
+      ;(d[layer][i] as { kind: string }).kind = kind
     })
   }
 
@@ -322,6 +398,12 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
     setSel({ layer, i, v })
     drag.current = { kind: "vertex", sel: { layer, i, v } }
   }
+  function startRadius(event: React.PointerEvent, i: number) {
+    event.stopPropagation()
+    ;(svgRef.current as SVGSVGElement).setPointerCapture(event.pointerId)
+    remember()
+    drag.current = { kind: "radius", i }
+  }
   function onBackgroundDown(event: React.PointerEvent) {
     ;(svgRef.current as SVGSVGElement).setPointerCapture(event.pointerId)
     drag.current = {
@@ -334,7 +416,10 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
 
   function onPointerMove(event: React.PointerEvent) {
     const raw = toSvg(event)
-    if (tool !== "select") setCursor(snapPoint(raw, event.altKey))
+    if (drawing)
+      setCursor(
+        tool === "ring" && ringCenter ? raw : snapPoint(raw, event.altKey),
+      )
     const d = drag.current
     if (!d) return
     if (d.kind === "pan") {
@@ -349,8 +434,13 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
       const dy = raw[1] - d.start[1]
       setShapes(() => {
         const next = clone(d.orig)
-        const entry = next[d.sel.layer][d.sel.i] as { p: Point[] }
-        entry.p = entry.p.map(([x, y]) => [x + dx, y + dy] as Point)
+        if (d.sel.layer === "roundabouts") {
+          const ring = next.roundabouts[d.sel.i]
+          ring.c = [ring.c[0] + dx, ring.c[1] + dy]
+        } else {
+          const entry = next[d.sel.layer][d.sel.i] as { p: Point[] }
+          entry.p = entry.p.map(([x, y]) => [x + dx, y + dy] as Point)
+        }
         return next
       })
     } else if (d.kind === "vertex") {
@@ -358,7 +448,14 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
       const { layer, i, v } = d.sel
       setShapes((current) => {
         const next = clone(current)
-        ;(next[layer][i] as { p: Point[] }).p[v] = at
+        ;(next[layer as "roads"][i] as { p: Point[] }).p[v] = at
+        return next
+      })
+    } else if (d.kind === "radius") {
+      setShapes((current) => {
+        const next = clone(current)
+        const ring = next.roundabouts[d.i]
+        ring.r = Math.max(4, dist(raw, ring.c))
         return next
       })
     }
@@ -369,13 +466,27 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
     drag.current = null
     if (d?.kind === "pan" && !d.moved) {
       if (tool === "select") setSel(null)
-      else {
+      else if (tool === "ring") {
+        const at = toSvg(event)
+        if (!ringCenter) setRingCenter(at)
+        else {
+          change((s) =>
+            s.roundabouts.push({
+              c: ringCenter,
+              r: Math.max(5, dist(at, ringCenter)),
+              w: 6,
+            }),
+          )
+          setRingCenter(null)
+          setSel({ layer: "roundabouts", i: shapes.roundabouts.length })
+          setTool("select")
+        }
+      } else {
         const at = snapPoint(toSvg(event), event.altKey)
-        // clicking the last point again finishes the line
         if (draft.length >= 2 && dist(at, draft[draft.length - 1]) < px * 4)
           finishDraw()
         else if (
-          isZoneTool(tool) &&
+          tool === "area" &&
           draft.length >= 3 &&
           dist(at, draft[0]) < px * 10
         )
@@ -385,13 +496,12 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
     }
   }
 
-  // a point added halfway along a side: a fresh vertex the line can be bent at
   function addMidpoint(layer: Layer, i: number, after: number) {
-    const entry = shapes[layer][i] as { p: Point[] }
+    const entry = shapes[layer as "roads"][i] as { p: Point[] }
     const a = entry.p[after]
     const b = entry.p[(after + 1) % entry.p.length]
     change((d) => {
-      ;(d[layer][i] as { p: Point[] }).p.splice(after + 1, 0, [
+      ;(d[layer as "roads"][i] as { p: Point[] }).p.splice(after + 1, 0, [
         (a[0] + b[0]) / 2,
         (a[1] + b[1]) / 2,
       ])
@@ -402,28 +512,130 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
   async function save() {
     setSaving(true)
     setStatus("")
-    const result = await saveCampusLines({
-      roads: shapes.roads,
-      paths: shapes.paths,
-      zones: shapes.zones,
-    })
+    const result = await saveCampusLines(lines(shapes))
     setSaving(false)
     if ("error" in result) setStatus(result.error)
     else {
-      setSaved(JSON.stringify(shapes))
-      setStatus("Saved. The public map picture updates within a minute.")
+      setSaved(JSON.stringify(lines(shapes)))
+      setStatus("Saved")
     }
   }
 
-  const selectedEntry = sel
-    ? (shapes[sel.layer][sel.i] as { p: Point[]; w?: number } | undefined)
+  const selected = sel
+    ? (shapes[sel.layer][sel.i] as unknown as
+        | { p?: Point[]; w?: number; r?: number; kind?: string }
+        | undefined)
     : undefined
-  const drawing = tool !== "select"
-  const draftPoints = cursor && drawing ? [...draft, cursor] : draft
+  const draftPoints =
+    cursor && drawing && tool !== "ring" ? [...draft, cursor] : draft
+
+  const hint = drawing
+    ? (TOOLS.find((t) => t.id === tool)?.hint ?? "")
+    : sel
+      ? "Drag it to move. Drag a square to move a point, a small circle adds one. Delete removes"
+      : "Click anything to edit it. Drag empty space to move around, scroll to zoom"
+
+  // what the bar at the top offers right now: only what applies to what is being drawn or selected
+  const barFor: Tool | Layer | null = drawing
+    ? tool
+    : sel
+      ? sel.layer === "zones"
+        ? "area"
+        : sel.layer === "roads"
+          ? "road"
+          : sel.layer === "paths"
+            ? "path"
+            : "ring"
+      : null
+  const activeAreaKind = (
+    sel?.layer === "zones" ? selected?.kind : areaKind
+  ) as AreaKind
+  const activePathKind = (
+    sel?.layer === "paths" ? selected?.kind : pathKind
+  ) as PathKind
 
   function renderEditable(layer: Layer, i: number) {
+    const sel1 = sel?.layer === layer && sel.i === i
+    if (layer === "roundabouts") {
+      const ring = shapes.roundabouts[i]
+      return (
+        <g key={`ring-${i}`}>
+          <circle
+            cx={ring.c[0]}
+            cy={ring.c[1]}
+            r={ring.r}
+            fill="none"
+            stroke="#f6eed9"
+            strokeWidth={ring.w + ROAD_WALK_BAND * 2}
+            opacity={0.9}
+            pointerEvents="none"
+          />
+          <circle
+            cx={ring.c[0]}
+            cy={ring.c[1]}
+            r={ring.r}
+            fill="none"
+            stroke="#b8b3a4"
+            strokeWidth={ring.w + 2.4}
+            pointerEvents="none"
+          />
+          <circle
+            cx={ring.c[0]}
+            cy={ring.c[1]}
+            r={ring.r}
+            fill="none"
+            stroke="#fffdf6"
+            strokeWidth={ring.w}
+            pointerEvents="none"
+          />
+          <circle
+            cx={ring.c[0]}
+            cy={ring.c[1]}
+            r={Math.max(0, ring.r - ring.w / 2 - 0.6)}
+            fill="#b9d9a3"
+            pointerEvents="none"
+          />
+          {sel1 && (
+            <circle
+              cx={ring.c[0]}
+              cy={ring.c[1]}
+              r={ring.r}
+              fill="none"
+              stroke="#3b82f6"
+              strokeWidth={px * 1.5}
+              strokeDasharray={`${px * 4} ${px * 3}`}
+              pointerEvents="none"
+            />
+          )}
+          <circle
+            cx={ring.c[0]}
+            cy={ring.c[1]}
+            r={ring.r}
+            fill="transparent"
+            stroke="transparent"
+            strokeWidth={Math.max(px * 14, ring.w + 6)}
+            onPointerDown={(e) => startMove(e, "roundabouts", i)}
+            pointerEvents={tool === "select" ? undefined : "none"}
+            style={{ cursor: "move" }}
+          />
+          {sel1 && tool === "select" && (
+            <rect
+              x={ring.c[0] + ring.r - handleR}
+              y={ring.c[1] - handleR}
+              width={handleR * 2}
+              height={handleR * 2}
+              rx={handleR * 0.5}
+              fill="#fff"
+              stroke="#3b82f6"
+              strokeWidth={px * 1.5}
+              style={{ cursor: "ew-resize" }}
+              onPointerDown={(e) => startRadius(e, i)}
+            />
+          )}
+        </g>
+      )
+    }
     const entry = shapes[layer][i] as { p: Point[]; w?: number; kind?: string }
-    const selected = sel?.layer === layer && sel.i === i
     const closed = layer === "zones"
     const d = closed
       ? `M${entry.p.map((q) => q.join(" ")).join("L")}Z`
@@ -433,145 +645,346 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
         {layer === "zones" ? (
           <path
             d={d}
-            fill={ZONE_FILL[(entry.kind as keyof typeof ZONE_FILL) ?? "field"]}
-            fillOpacity={0.6}
-            stroke={selected ? "#fff" : "rgba(0,0,0,0.4)"}
-            strokeWidth={px * (selected ? 2 : 1)}
+            fill={ZONE_FILL[(entry.kind as AreaKind) ?? "walk"]}
+            fillOpacity={0.65}
+            stroke={sel1 ? "#fff" : "rgba(0,0,0,0.35)"}
+            strokeWidth={px * (sel1 ? 2 : 1)}
             pointerEvents="none"
           />
-        ) : (
+        ) : layer === "roads" ? (
           <>
             <path
               d={d}
               fill="none"
-              stroke="#b8b3a4"
-              strokeWidth={(entry.w ?? 5) + 2.4}
+              stroke="#f6eed9"
+              strokeWidth={(entry.w ?? 7) + ROAD_WALK_BAND * 2}
               strokeLinecap="round"
               strokeLinejoin="round"
-              opacity={0.85}
+              opacity={0.9}
               pointerEvents="none"
             />
             <path
               d={d}
               fill="none"
-              stroke={
-                layer === "roads"
-                  ? "#fffdf6"
-                  : entry.kind === "dirt"
-                    ? "#d8bf92"
-                    : "#f6eed9"
-              }
+              stroke="#b8b3a4"
+              strokeWidth={(entry.w ?? 7) + 2.4}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              pointerEvents="none"
+            />
+            <path
+              d={d}
+              fill="none"
+              stroke="#fffdf6"
               strokeWidth={entry.w}
               strokeLinecap="round"
               strokeLinejoin="round"
               pointerEvents="none"
             />
-            {selected && (
-              <path
-                d={d}
-                fill="none"
-                stroke="#3b82f6"
-                strokeWidth={px * 1.5}
-                strokeDasharray={`${px * 4} ${px * 3}`}
-                pointerEvents="none"
-              />
-            )}
           </>
+        ) : (
+          <path
+            d={d}
+            fill="none"
+            stroke={PATH_COLOR[(entry.kind as PathKind) ?? "walk"]}
+            strokeWidth={entry.w}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            pointerEvents="none"
+          />
         )}
-        {/* a wide invisible stroke so thin lines are easy to grab */}
+        {sel1 && !closed && (
+          <path
+            d={d}
+            fill="none"
+            stroke="#3b82f6"
+            strokeWidth={px * 1.5}
+            strokeDasharray={`${px * 4} ${px * 3}`}
+            pointerEvents="none"
+          />
+        )}
         <path
-          d={closed ? d : d}
+          d={d}
           fill={closed ? "transparent" : "none"}
           stroke="transparent"
           strokeWidth={Math.max(px * 14, (entry.w ?? 0) + 4)}
           strokeLinecap="round"
           onPointerDown={(e) => startMove(e, layer, i)}
-          // while drawing, clicks go through to the drawing instead of grabbing the road underneath
           pointerEvents={tool === "select" ? undefined : "none"}
-          style={{ cursor: tool === "select" ? "move" : "crosshair" }}
+          style={{ cursor: "move" }}
         />
-        {selected && tool === "select" && (
-          <>
-            {entry.p.map((q, v) => {
-              const next = entry.p[(v + 1) % entry.p.length]
-              const last = v === entry.p.length - 1
-              return (
-                <g key={`h-${v}`}>
-                  {(!last || closed) && (
-                    <circle
-                      cx={(q[0] + next[0]) / 2}
-                      cy={(q[1] + next[1]) / 2}
-                      r={handleR * 0.6}
-                      fill="#fff"
-                      fillOpacity={0.55}
-                      stroke="#3b82f6"
-                      strokeWidth={px}
-                      style={{ cursor: "copy" }}
-                      onPointerDown={(e) => {
-                        e.stopPropagation()
-                        addMidpoint(layer, i, v)
-                      }}
-                    />
-                  )}
-                  <rect
-                    x={q[0] - handleR}
-                    y={q[1] - handleR}
-                    width={handleR * 2}
-                    height={handleR * 2}
-                    rx={handleR * 0.5}
-                    fill={sel?.v === v ? "#3b82f6" : "#fff"}
+        {sel1 &&
+          tool === "select" &&
+          entry.p.map((q, v) => {
+            const next = entry.p[(v + 1) % entry.p.length]
+            const last = v === entry.p.length - 1
+            return (
+              <g key={`h-${v}`}>
+                {(!last || closed) && (
+                  <circle
+                    cx={(q[0] + next[0]) / 2}
+                    cy={(q[1] + next[1]) / 2}
+                    r={handleR * 0.6}
+                    fill="#fff"
+                    fillOpacity={0.6}
                     stroke="#3b82f6"
-                    strokeWidth={px * 1.5}
-                    style={{ cursor: "grab" }}
-                    onPointerDown={(e) => startVertex(e, layer, i, v)}
+                    strokeWidth={px}
+                    style={{ cursor: "copy" }}
+                    onPointerDown={(e) => {
+                      e.stopPropagation()
+                      addMidpoint(layer, i, v)
+                    }}
                   />
-                </g>
-              )
-            })}
-          </>
-        )}
+                )}
+                <rect
+                  x={q[0] - handleR}
+                  y={q[1] - handleR}
+                  width={handleR * 2}
+                  height={handleR * 2}
+                  rx={handleR * 0.5}
+                  fill={sel?.v === v ? "#3b82f6" : "#fff"}
+                  stroke="#3b82f6"
+                  strokeWidth={px * 1.5}
+                  style={{ cursor: "grab" }}
+                  onPointerDown={(e) => startVertex(e, layer, i, v)}
+                />
+              </g>
+            )
+          })}
       </g>
     )
   }
 
   return (
-    <div className="flex h-[calc(100dvh-6rem)] min-h-[32rem] flex-col gap-3 p-3 md:p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <ToolButton
-          icon={Cursor02Icon}
-          label="Select"
-          active={tool === "select"}
-          onClick={() => pickTool("select")}
+    <div className="relative h-full min-h-0 p-2">
+      <svg
+        ref={svgRef}
+        viewBox={`${view.x} ${view.y} ${view.s} ${view.s}`}
+        className="size-full touch-none select-none rounded-2xl bg-neutral-900"
+        style={{
+          cursor: drawing ? "crosshair" : "default",
+          userSelect: "none",
+        }}
+        preserveAspectRatio="xMidYMid meet"
+        onMouseDown={(e) => e.preventDefault()}
+        onDragStart={(e) => e.preventDefault()}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onDoubleClick={() => {
+          if (drawing && tool !== "ring") finishDraw()
+          else if (sel?.v !== undefined) removeSelected()
+        }}
+      >
+        <title>Paths and areas</title>
+        <rect
+          x={-2000}
+          y={-2000}
+          width={6000}
+          height={6000}
+          fill="transparent"
+          onPointerDown={onBackgroundDown}
         />
-        {TOOLS.map((t) => (
-          <ToolButton
-            key={t.id}
-            label={t.label}
-            color={t.color}
-            active={tool === t.id}
-            onClick={() => pickTool(t.id)}
+        <image
+          href="/auimap-1312.avif"
+          width={SIZE}
+          height={SIZE}
+          opacity={satOpacity}
+          pointerEvents="none"
+        />
+
+        {/* the buildings, to line things up with. Edited in the Buildings view */}
+        {shapes.buildings.map((b, i) => (
+          <path
+            key={`b-${i}`}
+            d={`M${(b.r ? rectToPolygon(b.r) : (b.p ?? [])).map((q) => q.join(" ")).join("L")}Z`}
+            fill="rgba(217,128,95,0.4)"
+            stroke="rgba(156,79,56,0.85)"
+            strokeWidth={px}
+            pointerEvents="none"
           />
         ))}
-        <span className="mx-1 h-6 w-px bg-foreground/15" />
-        <ToolButton
+
+        {shapes.zones.map((_, i) => renderEditable("zones", i))}
+        {shapes.paths.map((_, i) => renderEditable("paths", i))}
+        {shapes.roads.map((_, i) => renderEditable("roads", i))}
+        {shapes.roundabouts.map((_, i) => renderEditable("roundabouts", i))}
+
+        {drawing && tool !== "ring" && draftPoints.length > 0 && (
+          <>
+            <path
+              d={`M${draftPoints.map((q) => q.join(" ")).join("L")}`}
+              fill="none"
+              stroke="#3b82f6"
+              strokeWidth={px * 2}
+              strokeDasharray={`${px * 5} ${px * 3}`}
+              pointerEvents="none"
+            />
+            {draft.map((q, k) => (
+              <circle
+                key={`d-${k}`}
+                cx={q[0]}
+                cy={q[1]}
+                r={handleR * 0.7}
+                fill="#3b82f6"
+                pointerEvents="none"
+              />
+            ))}
+          </>
+        )}
+        {tool === "ring" && ringCenter && cursor && (
+          <circle
+            cx={ringCenter[0]}
+            cy={ringCenter[1]}
+            r={dist(cursor, ringCenter)}
+            fill="none"
+            stroke="#3b82f6"
+            strokeWidth={px * 2}
+            strokeDasharray={`${px * 5} ${px * 3}`}
+            pointerEvents="none"
+          />
+        )}
+        {drawing && cursor && (
+          <circle
+            cx={cursor[0]}
+            cy={cursor[1]}
+            r={handleR * 0.5}
+            fill="none"
+            stroke="#fff"
+            strokeWidth={px * 1.5}
+            pointerEvents="none"
+          />
+        )}
+      </svg>
+
+      {/* the tools, one column on the left */}
+      <div className="absolute top-5 left-5 flex flex-col gap-1 rounded-2xl corner-squircle bg-background/90 p-1.5 shadow-md ring-1 ring-foreground/10 backdrop-blur">
+        {TOOLS.map(({ id, label, icon }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => pickTool(id)}
+            title={label}
+            className={`flex w-16 flex-col items-center gap-0.5 rounded-xl corner-squircle py-2 text-[0.7rem] font-medium transition-colors ${
+              tool === id
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-foreground/10"
+            }`}
+          >
+            <Icon icon={icon} className="size-5" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* what the current tool or selection offers, and nothing else */}
+      {barFor && (
+        <div className="absolute top-5 left-28 flex flex-wrap items-center gap-1 rounded-2xl corner-squircle bg-background/90 p-1.5 text-sm shadow-md ring-1 ring-foreground/10 backdrop-blur">
+          {barFor === "area" &&
+            AREA_KINDS.map((k) => (
+              <Chip
+                key={k.id}
+                color={k.color}
+                active={activeAreaKind === k.id}
+                onClick={() =>
+                  sel?.layer === "zones" ? setKind(k.id) : setAreaKind(k.id)
+                }
+              >
+                {k.label}
+              </Chip>
+            ))}
+          {barFor === "path" &&
+            PATH_KINDS.map((k) => (
+              <Chip
+                key={k.id}
+                color={k.color}
+                active={activePathKind === k.id}
+                onClick={() =>
+                  sel?.layer === "paths" ? setKind(k.id) : setPathKind(k.id)
+                }
+              >
+                {k.label}
+              </Chip>
+            ))}
+          {(barFor === "road" || barFor === "path") &&
+            sel &&
+            selected &&
+            sel.layer !== "zones" && (
+              <label className="flex items-center gap-2 px-2">
+                Width
+                <input
+                  type="range"
+                  min={1.5}
+                  max={16}
+                  step={0.5}
+                  value={selected.w ?? 5}
+                  onChange={(e) => setField("w", Number(e.target.value))}
+                />
+              </label>
+            )}
+          {barFor === "ring" && sel?.layer === "roundabouts" && selected && (
+            <>
+              <label className="flex items-center gap-2 px-2">
+                Size
+                <input
+                  type="range"
+                  min={4}
+                  max={60}
+                  step={0.5}
+                  value={selected.r ?? 10}
+                  onChange={(e) => setField("r", Number(e.target.value))}
+                />
+              </label>
+              <label className="flex items-center gap-2 px-2">
+                Road
+                <input
+                  type="range"
+                  min={2}
+                  max={14}
+                  step={0.5}
+                  value={selected.w ?? 6}
+                  onChange={(e) => setField("w", Number(e.target.value))}
+                />
+              </label>
+            </>
+          )}
+          {(barFor === "road" || barFor === "ring") && !sel && (
+            <span className="px-2 text-muted-foreground">
+              Snaps to roads, paths and roundabouts it touches
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* the actions, top right */}
+      <div className="absolute top-5 right-5 flex items-center gap-1.5">
+        {status && (
+          <span className="rounded-lg bg-background/90 px-2 py-1 text-muted-foreground text-xs">
+            {status}
+          </span>
+        )}
+        <IconAction
           icon={Undo02Icon}
           label="Undo"
           disabled={!history.length}
           onClick={undo}
         />
-        <ToolButton
+        <IconAction
           icon={Redo02Icon}
           label="Redo"
           disabled={!future.length}
           onClick={redo}
         />
-        <ToolButton
+        <IconAction
           icon={Delete02Icon}
           label="Delete"
           disabled={!sel}
           onClick={removeSelected}
         />
-        <label className="ml-1 flex items-center gap-2 text-muted-foreground text-xs">
+        <label
+          className="flex h-9 items-center rounded-xl corner-squircle bg-background/90 px-2.5 shadow-sm ring-1 ring-foreground/10 backdrop-blur"
+          title="Satellite picture"
+        >
           <input
             type="range"
             min={0.2}
@@ -579,142 +992,43 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
             step={0.05}
             value={satOpacity}
             onChange={(e) => setSatOpacity(Number(e.target.value))}
+            className="w-20"
           />
-          Satellite
         </label>
-        {sel && selectedEntry && sel.layer !== "zones" && (
-          <label className="flex items-center gap-2 text-sm">
-            Width
-            <input
-              type="range"
-              min={1.5}
-              max={16}
-              step={0.5}
-              value={selectedEntry.w ?? 5}
-              onChange={(e) => setWidth(Number(e.target.value))}
-            />
-          </label>
-        )}
-        <span className="flex-1" />
-        {status && (
-          <span className="text-muted-foreground text-xs">{status}</span>
-        )}
         <button
           type="button"
           onClick={save}
           disabled={!dirty || saving}
-          className="inline-flex items-center gap-1.5 rounded-xl corner-squircle bg-primary px-4 py-1.5 font-semibold text-primary-foreground text-sm disabled:opacity-40"
+          className="inline-flex h-9 items-center gap-1.5 rounded-xl corner-squircle bg-primary px-3.5 font-semibold text-primary-foreground text-sm shadow-sm disabled:opacity-40"
         >
           <Icon icon={FloppyDiskIcon} className="size-4" />
           {saving ? "Saving..." : "Save"}
         </button>
       </div>
 
-      <div className="relative min-h-0 flex-1">
-        <svg
-          ref={svgRef}
-          viewBox={`${view.x} ${view.y} ${view.s} ${view.s}`}
-          className="size-full touch-none select-none rounded-2xl bg-neutral-900"
-          style={{
-            cursor: drawing ? "crosshair" : "default",
-            userSelect: "none",
-          }}
-          preserveAspectRatio="xMidYMid meet"
-          onMouseDown={(e) => e.preventDefault()}
-          onDragStart={(e) => e.preventDefault()}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          onDoubleClick={() => {
-            if (drawing) finishDraw()
-            else if (sel?.v !== undefined) removeSelected()
-          }}
+      <p className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 rounded-xl bg-black/70 px-3 py-1.5 text-white text-xs">
+        {hint}
+      </p>
+      {drawing && (
+        <button
+          type="button"
+          onClick={cancelDraw}
+          className="absolute bottom-5 left-5 grid size-9 place-items-center rounded-xl bg-black/70 text-white"
+          aria-label="Cancel drawing"
         >
-          <title>Roads</title>
-          <rect
-            x={-2000}
-            y={-2000}
-            width={6000}
-            height={6000}
-            fill="transparent"
-            onPointerDown={onBackgroundDown}
-          />
-          <image
-            href="/auimap-1312.avif"
-            width={SIZE}
-            height={SIZE}
-            opacity={satOpacity}
-            pointerEvents="none"
-          />
-
-          {/* the buildings, to line the roads up with. Not editable here */}
-          {buildingPoints(shapes).map((pts, i) => (
-            <path
-              key={`b-${i}`}
-              d={`M${pts.map((q) => q.join(" ")).join("L")}Z`}
-              fill="rgba(217,128,95,0.35)"
-              stroke="rgba(156,79,56,0.8)"
-              strokeWidth={px}
-              pointerEvents="none"
-              onPointerDown={onBackgroundDown}
-            />
-          ))}
-
-          {shapes.zones.map((_, i) => renderEditable("zones", i))}
-          {shapes.paths.map((_, i) => renderEditable("paths", i))}
-          {shapes.roads.map((_, i) => renderEditable("roads", i))}
-
-          {drawing && draftPoints.length > 0 && (
-            <>
-              <path
-                d={`M${draftPoints.map((q) => q.join(" ")).join("L")}`}
-                fill="none"
-                stroke="#3b82f6"
-                strokeWidth={px * 2}
-                strokeDasharray={`${px * 5} ${px * 3}`}
-                pointerEvents="none"
-              />
-              {draft.map((q, k) => (
-                <circle
-                  key={`d-${k}`}
-                  cx={q[0]}
-                  cy={q[1]}
-                  r={handleR * 0.7}
-                  fill="#3b82f6"
-                  pointerEvents="none"
-                />
-              ))}
-            </>
-          )}
-          {drawing && cursor && (
-            <circle
-              cx={cursor[0]}
-              cy={cursor[1]}
-              r={handleR * 0.5}
-              fill="none"
-              stroke="#fff"
-              strokeWidth={px * 1.5}
-              pointerEvents="none"
-            />
-          )}
-        </svg>
-
-        <p className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-xl bg-black/70 px-3 py-1.5 text-white text-xs">
-          {drawing
-            ? "Click to add points. Enter or double click to finish. Esc cancels. Points stick to nearby ones, hold Alt to skip"
-            : "Click a road to edit it. Drag a square to move a point, drag a small circle to add one. Scroll to zoom"}
-        </p>
-        {drawing && (
-          <button
-            type="button"
-            onClick={cancelDraw}
-            className="absolute top-3 right-3 grid size-9 place-items-center rounded-xl bg-black/70 text-white"
-            aria-label="Cancel drawing"
-          >
-            <Icon icon={Cancel01Icon} className="size-4" />
-          </button>
-        )}
-      </div>
+          <Icon icon={Cancel01Icon} className="size-4" />
+        </button>
+      )}
     </div>
   )
+}
+
+// the parts of the drawing this view edits
+function lines(s: CampusShapes) {
+  return {
+    roads: s.roads,
+    paths: s.paths,
+    zones: s.zones,
+    roundabouts: s.roundabouts,
+  }
 }

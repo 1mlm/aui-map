@@ -17,21 +17,26 @@ export type Building = {
   done?: boolean
 }
 export type Road = { w: number; p: Point[] }
-export type Path = { w: number; kind: "walk" | "dirt"; p: Point[] }
-export type Zone = { kind: "field" | "court" | "parking"; p: Point[] }
+export type Path = { w: number; kind: "walk" | "dirt" | "green"; p: Point[] }
+// "walk" is a walkable area (a plaza, a lawn people cross): buildings drawn on top of it sit inside it
+export type Zone = { kind: "walk" | "field" | "court" | "parking"; p: Point[] }
+// a circle roads can be snapped to: c is the centre, r the radius to the middle of the ring, w the
+// width of the road ring
+export type Roundabout = { c: Point; r: number; w: number }
 export type CampusShapes = {
   size: number
   buildings: Building[]
   roads: Road[]
   paths: Path[]
   zones: Zone[]
+  roundabouts: Roundabout[]
   // pins that are marked as not needing a building (a field, a parking lot...), so they stop
   // showing up as "still to do" in /admin/map
   skipPins?: string[]
 }
 
-export const ZONE_KINDS = ["field", "court", "parking"] as const
-export const PATH_KINDS = ["walk", "dirt"] as const
+export const ZONE_KINDS = ["walk", "field", "court", "parking"] as const
+export const PATH_KINDS = ["walk", "dirt", "green"] as const
 
 export function rectToPolygon([cx, cy, w, h, a]: Rect): Point[] {
   const rad = (a * Math.PI) / 180
@@ -186,7 +191,8 @@ export function sanitizeShapes(input: unknown): CampusShapes | null {
     if (!p || !finite(entry.w) || entry.w <= 0) return null
     paths.push({
       w: round(entry.w),
-      kind: entry.kind === "dirt" ? "dirt" : "walk",
+      kind:
+        entry.kind === "dirt" ? "dirt" : entry.kind === "green" ? "green" : "walk",
       p: p.map(([x, y]) => [round(x), round(y)]),
     })
   }
@@ -200,7 +206,25 @@ export function sanitizeShapes(input: unknown): CampusShapes | null {
       : "field"
     zones.push({ kind, p: p.map(([x, y]) => [round(x), round(y)]) })
   }
-  if (buildings.length + roads.length + paths.length + zones.length > 2000)
+  const roundabouts: Roundabout[] = []
+  for (const item of list("roundabouts")) {
+    const entry = item as { c?: unknown; r?: unknown; w?: unknown }
+    if (!isPoint(entry?.c) || !finite(entry.r) || !finite(entry.w)) return null
+    if (entry.r <= 0 || entry.w <= 0) return null
+    roundabouts.push({
+      c: [round(entry.c[0]), round(entry.c[1])],
+      r: round(entry.r),
+      w: round(entry.w),
+    })
+  }
+  if (
+    buildings.length +
+      roads.length +
+      paths.length +
+      zones.length +
+      roundabouts.length >
+    2000
+  )
     return null
   const skipPins = list("skipPins")
     .filter((id): id is string => typeof id === "string" && id.length > 0)
@@ -212,6 +236,7 @@ export function sanitizeShapes(input: unknown): CampusShapes | null {
     roads,
     paths,
     zones,
+    roundabouts,
     ...(skipPins.length ? { skipPins } : {}),
   }
 }
@@ -235,9 +260,12 @@ export function smoothPath(pts: Point[]): string {
 }
 
 // the colours live in css so the picture follows the phone's light or dark setting, even as an <img>
-const STYLE = `:root{--ground:#d9e2c8;--field:#a9d18f;--court:#d98a68;--parking:#c9ccd0;--casing:#b8b3a4;--road:#fffdf6;--walk:#f6eed9;--dirt:#d8bf92;--roof:#d9805f;--roofline:#9c4f38;--aud:#c9a45b;--food:#d8636a;--sport:#6fb36b}@media (prefers-color-scheme:dark){:root{--ground:#1c271f;--field:#2f4a2b;--court:#8a4a36;--parking:#363a3f;--casing:#171c18;--road:#3b403b;--walk:#4a4a42;--dirt:#5b4d36;--roof:#a85a40;--roofline:#6e3626;--aud:#8c7237;--food:#9c444a;--sport:#3f7a3d}}.zf{fill:var(--field)}.zc{fill:var(--court)}.zp{fill:var(--parking)}.rc{fill:none;stroke:var(--casing);stroke-linecap:round;stroke-linejoin:round}.rr{fill:none;stroke:var(--road);stroke-linecap:round;stroke-linejoin:round}.pw{fill:none;stroke:var(--walk);stroke-linecap:round;stroke-linejoin:round}.pd{fill:none;stroke:var(--dirt);stroke-linecap:round;stroke-linejoin:round}.b{fill:var(--roof);stroke:var(--roofline);stroke-width:.8;stroke-linejoin:round}.b-auditorium{fill:var(--aud)}.b-food{fill:var(--food)}.b-sports{fill:var(--sport)}`
+const STYLE = `:root{--ground:#d9e2c8;--field:#a9d18f;--court:#d98a68;--parking:#c9ccd0;--casing:#b8b3a4;--road:#fffdf6;--walk:#f6eed9;--dirt:#d8bf92;--green:#a6cf8d;--island:#b9d9a3;--roof:#d9805f;--roofline:#9c4f38;--aud:#c9a45b;--food:#d8636a;--sport:#6fb36b}@media (prefers-color-scheme:dark){:root{--ground:#1c271f;--field:#2f4a2b;--court:#8a4a36;--parking:#363a3f;--casing:#171c18;--road:#3b403b;--walk:#4a4a42;--dirt:#5b4d36;--green:#46703f;--island:#3b5d36;--roof:#a85a40;--roofline:#6e3626;--aud:#8c7237;--food:#9c444a;--sport:#3f7a3d}}.zw{fill:var(--walk)}.zf{fill:var(--field)}.zc{fill:var(--court)}.zp{fill:var(--parking)}.rc{fill:none;stroke:var(--casing);stroke-linecap:round;stroke-linejoin:round}.rr{fill:none;stroke:var(--road);stroke-linecap:round;stroke-linejoin:round}.pw{fill:none;stroke:var(--walk);stroke-linecap:round;stroke-linejoin:round}.pd{fill:none;stroke:var(--dirt);stroke-linecap:round;stroke-linejoin:round}.pg{fill:none;stroke:var(--green);stroke-linecap:round;stroke-linejoin:round}.rw{fill:none;stroke:var(--walk);stroke-linecap:round;stroke-linejoin:round}.ri{fill:var(--island)}.b{fill:var(--roof);stroke:var(--roofline);stroke-width:.8;stroke-linejoin:round}.b-auditorium{fill:var(--aud)}.b-food{fill:var(--food)}.b-sports{fill:var(--sport)}`
 
-const ZONE_CLASS = { field: "zf", court: "zc", parking: "zp" } as const
+const ZONE_CLASS = { walk: "zw", field: "zf", court: "zc", parking: "zp" } as const
+const PATH_CLASS = { walk: "pw", dirt: "pd", green: "pg" } as const
+// how much walkable strip shows each side of a road or roundabout
+export const ROAD_WALK_BAND = 3.2
 
 // how much a building's corners are softened, in drawing units (the picture is 1312 wide)
 const BUILDING_CORNER_RADIUS = 2.4
@@ -281,12 +309,23 @@ export function buildCampusSvg(
   for (const zone of shapes.zones)
     body += `<path class="${ZONE_CLASS[zone.kind]}" d="${polygon(zone.p)}"/>`
   for (const path of shapes.paths)
-    body += `<path class="${path.kind === "dirt" ? "pd" : "pw"}" stroke-width="${path.w}" d="${smoothPath(path.p)}"/>`
-  // every outline first, then every fill, so two roads that meet read as one joined road
+    body += `<path class="${PATH_CLASS[path.kind]}" stroke-width="${path.w}" d="${smoothPath(path.p)}"/>`
+  // a road is a strip of walkable ground with the road itself inside it. Every walkable strip
+  // first, then every outline, then every fill, so roads that meet read as one joined road
+  for (const road of shapes.roads)
+    body += `<path class="rw" stroke-width="${n(road.w + ROAD_WALK_BAND * 2)}" d="${smoothPath(road.p)}"/>`
+  for (const ring of shapes.roundabouts)
+    body += `<circle class="rw" cx="${n(ring.c[0])}" cy="${n(ring.c[1])}" r="${n(ring.r)}" stroke-width="${n(ring.w + ROAD_WALK_BAND * 2)}"/>`
   for (const road of shapes.roads)
     body += `<path class="rc" stroke-width="${n(road.w + 2.4)}" d="${smoothPath(road.p)}"/>`
+  for (const ring of shapes.roundabouts)
+    body += `<circle class="rc" cx="${n(ring.c[0])}" cy="${n(ring.c[1])}" r="${n(ring.r)}" stroke-width="${n(ring.w + 2.4)}"/>`
   for (const road of shapes.roads)
     body += `<path class="rr" stroke-width="${road.w}" d="${smoothPath(road.p)}"/>`
+  for (const ring of shapes.roundabouts) {
+    body += `<circle class="rr" cx="${n(ring.c[0])}" cy="${n(ring.c[1])}" r="${n(ring.r)}" stroke-width="${ring.w}"/>`
+    body += `<circle class="ri" cx="${n(ring.c[0])}" cy="${n(ring.c[1])}" r="${n(Math.max(0, ring.r - ring.w / 2 - 0.6))}"/>`
+  }
   for (const building of shapes.buildings) {
     const tag = building.id ? tagByPinId[building.id] : undefined
     const cls = tag ? `b b-${tag}` : "b"
@@ -306,4 +345,5 @@ export const BUNDLED_SHAPES: CampusShapes = sanitizeShapes(bundled) ?? {
   roads: [],
   paths: [],
   zones: [],
+  roundabouts: [],
 }

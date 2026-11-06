@@ -31,7 +31,13 @@ import { PinCommentButton } from "./PinCommentButton"
 import { UNDOCKED_PANEL_WIDTH } from "./panelWidth"
 import { ShareMenu } from "./ShareMenu"
 import { tagColorStyle } from "./tagColor"
-import type { MapItem, MapItemAttachment, MapItemTag, PinLink } from "./types"
+import type {
+  MapItem,
+  MapItemAttachment,
+  MapItemTag,
+  PhotoViewPoint,
+  PinLink,
+} from "./types"
 import { useDismissKey } from "./useDismissKey"
 
 const COPIED_FEEDBACK_MS = 1500
@@ -52,6 +58,7 @@ export function MapDetailPanel({
   places,
   onOpenPlace,
   onPreviewPlace,
+  onShowPhotoView,
 }: {
   item: MapItem
   onClose: () => void
@@ -59,6 +66,8 @@ export function MapDetailPanel({
   places?: MapItem[]
   onOpenPlace?: (item: MapItem) => void
   onPreviewPlace?: (item: MapItem | null) => void
+  // shows where a photo was taken (and which way it faced) on the map behind the panel
+  onShowPhotoView?: (view: PhotoViewPoint) => void
   // narrow layouts have no room for a side panel, so it becomes a bottom sheet instead
   docked?: boolean
 }) {
@@ -250,6 +259,18 @@ export function MapDetailPanel({
           attachments={item.attachments}
           startIndex={openAttachmentIndex}
           onClose={() => setOpenAttachmentIndex(null)}
+          onShowOnMap={
+            onShowPhotoView
+              ? (attachment) => {
+                  setOpenAttachmentIndex(null)
+                  onShowPhotoView({
+                    latitude: attachment.latitude as number,
+                    longitude: attachment.longitude as number,
+                    heading: attachment.heading,
+                  })
+                }
+              : undefined
+          }
         />
       )}
     </m.div>

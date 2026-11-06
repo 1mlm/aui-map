@@ -3,7 +3,13 @@
 import { useState } from "react"
 import { Icon } from "@/components/Icon"
 import { ICONS } from "@/icons"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/shadcn/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/shadcn/ui/dialog"
 import { AttachmentManager, type AttachmentRow } from "./AttachmentManager"
 
 // a focused popup for just the photo gallery, reachable straight from the pins table —
@@ -12,12 +18,14 @@ export function PinPhotosDialog({
   pinId,
   pinTitle,
   attachments,
+  origin,
   open,
   onOpenChange,
 }: {
   pinId: string
   pinTitle: string
   attachments: AttachmentRow[]
+  origin: { latitude: number; longitude: number }
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
@@ -32,10 +40,15 @@ export function PinPhotosDialog({
             {pinTitle}
           </DialogTitle>
           <DialogDescription>
-            Drag to reorder, right-click a photo to set it as the thumbnail.
+            Drag to reorder. Right-click a photo for the thumbnail, its caption
+            and where it was taken.
           </DialogDescription>
         </DialogHeader>
-        <AttachmentManager {...{ pinId }} attachments={rows} onAttachmentsChange={setRows} />
+        <AttachmentManager
+          {...{ pinId, origin }}
+          attachments={rows}
+          onAttachmentsChange={setRows}
+        />
       </DialogContent>
     </Dialog>
   )

@@ -1,10 +1,6 @@
-import type { Metadata } from "next"
-import { getCampusShapes } from "@/map/getCampusShapes"
-import { RoadsEditor } from "./RoadsEditor"
+import { redirect } from "next/navigation"
 
-export const metadata: Metadata = { title: "Roads" }
-export const dynamic = "force-dynamic"
-
-export default async function AdminRoadsPage() {
-  return <RoadsEditor initial={await getCampusShapes()} />
+// everything about the campus drawing lives in one page now
+export default function Page() {
+  redirect("/admin/drawing?view=paths")
 }

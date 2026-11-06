@@ -81,6 +81,11 @@ model Attachment {
   // manual admin ordering within a pin's gallery, independent of postedAt
   order       Int      @default(0)
   postedAt    DateTime @default(now())
+  // where the photo was taken and which way the camera faced (degrees clockwise from north).
+  // All optional: filled from the photo's own location data when it has some, or set by hand
+  latitude    Float?
+  longitude   Float?
+  heading     Float?
   pinId       String
   pin         Pin      @relation(fields: [pinId], references: [uuid], onDelete: Cascade)
 }

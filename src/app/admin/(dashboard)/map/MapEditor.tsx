@@ -962,7 +962,7 @@ export function MapEditor({
   const draftPoints = cursor && draft.length ? [...draft, cursor] : draft
 
   return (
-    <div className="flex h-[calc(100dvh-1rem)] flex-col gap-2 p-2 lg:flex-row">
+    <div className="flex h-full flex-col gap-2 p-2 lg:flex-row">
       <div className="flex min-h-0 flex-1 select-none flex-col gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           <IconBtn

@@ -26,13 +26,14 @@ export async function saveCampusShapes(
   data.roads = current.roads
   data.paths = current.paths
   data.zones = current.zones
+  data.roundabouts = current.roundabouts
   await saveRow(data)
   return { ok: true }
 }
 
 // roads, footpaths and zones from /admin/roads. The buildings saved in /admin/map are kept
 export async function saveCampusLines(
-  input: Pick<CampusShapes, "roads" | "paths" | "zones">,
+  input: Pick<CampusShapes, "roads" | "paths" | "zones" | "roundabouts">,
 ): Promise<{ error: string } | { ok: true }> {
   await requireAuth()
   const current = await getCampusShapes()
@@ -52,5 +53,7 @@ async function saveRow(data: CampusShapes) {
   // the public svg is cached like a static file, this rebuilds it
   revalidatePath("/campus-map.svg")
   revalidatePath("/admin/map")
-  revalidatePath("/admin/roads")
+  revalidatePath("/admin/drawing")
+  revalidatePath("/admin/drawing")
+  revalidatePath("/data/campus.geojson")
 }

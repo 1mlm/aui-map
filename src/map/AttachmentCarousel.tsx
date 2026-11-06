@@ -165,10 +165,13 @@ export function AttachmentCarousel({
   attachments,
   startIndex,
   onClose,
+  onShowOnMap,
 }: {
   attachments: MapItemAttachment[]
   startIndex: number
   onClose: () => void
+  // shows where the current photo was taken on the map, when it says
+  onShowOnMap?: (attachment: MapItemAttachment) => void
 }) {
   const [index, setIndex] = useState(startIndex)
   const hasMultiple = attachments.length > 1
@@ -247,6 +250,18 @@ export function AttachmentCarousel({
             </p>
           )}
           <DateCell date={postedAt} />
+          {onShowOnMap &&
+            attachments[index].latitude !== null &&
+            attachments[index].longitude !== null && (
+              <button
+                type="button"
+                onClick={() => onShowOnMap(attachments[index])}
+                className="mt-1 inline-flex items-center gap-1.5 rounded-xl corner-squircle bg-white/10 px-3 py-1.5 text-white hover:bg-white/20"
+              >
+                <Icon icon={ICONS.place} className="size-4" />
+                On the map
+              </button>
+            )}
         </div>
       </DialogContent>
     </Dialog>

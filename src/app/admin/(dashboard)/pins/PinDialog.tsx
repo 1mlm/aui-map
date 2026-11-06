@@ -404,6 +404,7 @@ export function PinDialog({
             <FieldLabel icon={ICONS.photos}>Photos</FieldLabel>
             <AttachmentManager
               pinId={pin.uuid}
+              origin={position}
               {...{ attachments }}
               onAttachmentsChange={setAttachments}
             />

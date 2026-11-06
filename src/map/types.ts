@@ -26,6 +26,17 @@ export type MapItemAttachment = {
   mimeType: string | null
   fileName: string | null
   postedAt: Date
+  // where it was taken and which way the camera faced (degrees from north), all optional
+  latitude: number | null
+  longitude: number | null
+  heading: number | null
+}
+
+// where a photo was taken, for showing on the map
+export type PhotoViewPoint = {
+  latitude: number
+  longitude: number
+  heading: number | null
 }
 
 export type PinLink = { label: string; url: string }

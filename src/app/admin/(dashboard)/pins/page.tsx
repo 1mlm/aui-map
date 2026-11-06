@@ -48,6 +48,9 @@ export default async function AdminPinsPage() {
       isThumbnail: attachment.isThumbnail,
       order: attachment.order,
       postedAt: attachment.postedAt.toISOString(),
+      latitude: attachment.latitude,
+      longitude: attachment.longitude,
+      heading: attachment.heading,
     })),
   }))
 

@@ -37,8 +37,10 @@ import {
   deleteAttachment,
   reorderAttachments,
   setAttachmentCaption,
+  setAttachmentView,
   setThumbnail,
 } from "./actions"
+import { PhotoViewDialog } from "./PhotoViewDialog"
 
 export type AttachmentRow = Omit<Attachment, "pinId" | "postedAt"> & {
   postedAt: string
@@ -50,6 +52,35 @@ type PendingUpload = {
   status: "uploading" | "error"
   progress: number
   message?: string
+}
+
+// a phone photo usually carries where it was taken and which way the camera pointed. Read here, in
+// the browser, before the upload, and only when the photo has it. The library loads only now
+async function readPhotoView(file: File) {
+  if (!file.type.startsWith("image/")) return null
+  try {
+    const exifr = (await import("exifr")).default
+    const data = await exifr.parse(file, {
+      gps: true,
+      pick: ["latitude", "longitude", "GPSImgDirection"],
+    })
+    if (
+      !data ||
+      typeof data.latitude !== "number" ||
+      typeof data.longitude !== "number"
+    )
+      return null
+    return {
+      latitude: data.latitude,
+      longitude: data.longitude,
+      heading:
+        typeof data.GPSImgDirection === "number"
+          ? Math.round(data.GPSImgDirection)
+          : null,
+    }
+  } catch {
+    return null
+  }
 }
 
 function AttachmentThumbnail({ attachment }: { attachment: AttachmentRow }) {
@@ -97,6 +128,7 @@ function AttachmentThumbnail({ attachment }: { attachment: AttachmentRow }) {
 function AttachmentTile({
   pinId,
   attachment,
+  origin,
   disabled,
   onDelete,
   onSetThumbnail,
@@ -104,6 +136,7 @@ function AttachmentTile({
 }: {
   pinId: string
   attachment: AttachmentRow
+  origin?: { latitude: number; longitude: number }
   disabled: boolean
   onDelete: () => void
   onSetThumbnail: () => void
@@ -113,6 +146,8 @@ function AttachmentTile({
   const [captionDraft, setCaptionDraft] = useState(attachment.caption ?? "")
   const [captionOpen, setCaptionOpen] = useState(false)
   const [captionError, setCaptionError] = useState<string | null>(null)
+  const [viewOpen, setViewOpen] = useState(false)
+  const hasView = attachment.latitude !== null && attachment.longitude !== null
 
   function saveCaption() {
     setCaptionError(null)
@@ -136,6 +171,14 @@ function AttachmentTile({
           className="group relative size-20 shrink-0 cursor-grab overflow-hidden rounded-xl corner-squircle bg-muted active:cursor-grabbing"
         >
           <AttachmentThumbnail {...{ attachment }} />
+          {hasView && (
+            <span
+              title="Location set"
+              className="absolute right-1 bottom-1 grid size-5 place-items-center rounded-full corner-squircle bg-black/70 text-white"
+            >
+              <Icon icon={ICONS.place} className="size-3" />
+            </span>
+          )}
           {attachment.isThumbnail && (
             <span className="absolute top-1 left-1 rounded-full corner-squircle bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
               Thumbnail
@@ -151,6 +194,15 @@ function AttachmentTile({
           <Icon icon={ICONS.text} />
           Edit caption
         </ContextMenuItem>
+        {isImageMimeType(attachment.mimeType) && origin && (
+          <ContextMenuItem
+            disabled={disabled}
+            onSelect={() => setViewOpen(true)}
+          >
+            <Icon icon={ICONS.place} />
+            Where it was taken
+          </ContextMenuItem>
+        )}
         {isImageMimeType(attachment.mimeType) && (
           <ContextMenuItem
             disabled={disabled || attachment.isThumbnail}
@@ -170,6 +222,27 @@ function AttachmentTile({
           Delete photo
         </ContextMenuItem>
       </ContextMenuContent>
+
+      {origin && (
+        <PhotoViewDialog
+          open={viewOpen}
+          onOpenChange={setViewOpen}
+          imageUrl={attachment.url}
+          initial={
+            hasView
+              ? {
+                  latitude: attachment.latitude as number,
+                  longitude: attachment.longitude as number,
+                  heading: attachment.heading,
+                }
+              : null
+          }
+          {...{ origin }}
+          onSave={async (view) =>
+            onCaptionSaved(await setAttachmentView(pinId, attachment.id, view))
+          }
+        />
+      )}
 
       <Dialog open={captionOpen} onOpenChange={setCaptionOpen}>
         <DialogContent className="corner-squircle sm:max-w-sm">
@@ -262,10 +335,13 @@ function PendingUploadTile({
 export function AttachmentManager({
   pinId,
   attachments,
+  origin,
   onAttachmentsChange,
 }: {
   pinId: string
   attachments: AttachmentRow[]
+  // where the pin is, so a photo's "where it was taken" map opens there
+  origin?: { latitude: number; longitude: number }
   onAttachmentsChange: (attachments: AttachmentRow[]) => void
 }) {
   const [pending, startTransition] = useTransition()
@@ -291,6 +367,7 @@ export function AttachmentManager({
           url: uploaded.url,
           fileName: file.name,
           mimeType: file.type || null,
+          view: await readPhotoView(file),
         }),
       )
       setPendingUploads((current) => current.filter((p) => p.key !== key))
@@ -405,7 +482,7 @@ export function AttachmentManager({
             <AttachmentTile
               key={attachment.id}
               disabled={pending}
-              {...{ pinId, attachment }}
+              {...{ pinId, attachment, origin }}
               onDelete={() => handleDelete(attachment.id)}
               onSetThumbnail={() => handleSetThumbnail(attachment.id)}
               onCaptionSaved={onAttachmentsChange}

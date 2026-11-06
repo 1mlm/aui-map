@@ -51,6 +51,9 @@ async function getAttachments(pinId: string) {
       isThumbnail: true,
       order: true,
       postedAt: true,
+      latitude: true,
+      longitude: true,
+      heading: true,
     },
   })
   return attachments.map((attachment) => ({
@@ -168,6 +171,43 @@ export async function setAttachmentCaption(
   return getAttachments(pinId)
 }
 
+export type PhotoView = {
+  latitude: number
+  longitude: number
+  // degrees clockwise from north, null when only the place is known
+  heading: number | null
+}
+
+// where a photo was taken and which way the camera faced. null clears it
+export async function setAttachmentView(
+  pinId: string,
+  attachmentId: string,
+  view: PhotoView | null,
+) {
+  await requireAuth()
+  const valid =
+    view &&
+    Number.isFinite(view.latitude) &&
+    Number.isFinite(view.longitude) &&
+    Math.abs(view.latitude) <= 90 &&
+    Math.abs(view.longitude) <= 180
+  await prisma.attachment.update({
+    where: { id: attachmentId },
+    data: valid
+      ? {
+          latitude: view.latitude,
+          longitude: view.longitude,
+          heading:
+            view.heading !== null && Number.isFinite(view.heading)
+              ? ((view.heading % 360) + 360) % 360
+              : null,
+        }
+      : { latitude: null, longitude: null, heading: null },
+  })
+  revalidatePinPaths()
+  return getAttachments(pinId)
+}
+
 // `orderedIds` is the attachment list in its new drag order — persisted as each one's index
 export async function reorderAttachments(pinId: string, orderedIds: string[]) {
   await requireAuth()
@@ -195,7 +235,13 @@ export async function deleteAttachment(pinId: string, attachmentId: string) {
 // 4.5mb body limit a server action would otherwise hit, then calls this just to persist the row
 export async function createAttachment(
   pinId: string,
-  file: { url: string; fileName: string; mimeType: string | null },
+  file: {
+    url: string
+    fileName: string
+    mimeType: string | null
+    // read from the photo itself when it has them
+    view?: PhotoView | null
+  },
 ) {
   await requireAuth()
   const order = await prisma.attachment.count({ where: { pinId } })
@@ -206,6 +252,13 @@ export async function createAttachment(
       order,
       mimeType: file.mimeType,
       fileName: file.fileName,
+      ...(file.view
+        ? {
+            latitude: file.view.latitude,
+            longitude: file.view.longitude,
+            heading: file.view.heading,
+          }
+        : {}),
     },
   })
 

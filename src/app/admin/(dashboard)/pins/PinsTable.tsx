@@ -195,6 +195,10 @@ function PinsTableInner({
           pinId={viewingPhotosOf.uuid}
           pinTitle={viewingPhotosOf.title}
           attachments={viewingPhotosOf.attachments}
+          origin={{
+            latitude: viewingPhotosOf.latitude,
+            longitude: viewingPhotosOf.longitude,
+          }}
           open={Boolean(viewingPhotosOf)}
           onOpenChange={(open) => !open && setViewingPhotosOf(null)}
         />

@@ -74,6 +74,9 @@ export function pinRowToMapItem(
       mimeType: attachment.mimeType,
       fileName: attachment.fileName,
       postedAt: attachment.postedAt,
+      latitude: attachment.latitude,
+      longitude: attachment.longitude,
+      heading: attachment.heading,
     })),
   }
 }

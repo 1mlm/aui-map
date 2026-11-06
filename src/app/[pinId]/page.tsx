@@ -178,10 +178,27 @@ function getPinStructuredData(pin: MapItem) {
   const description = getPinDescription(pin)
   const images = pin.attachments
     .filter(({ mimeType }) => !mimeType || mimeType.startsWith("image/"))
-    .map(({ url, caption }) => ({
+    .map(({ url, caption, latitude, longitude, heading }) => ({
       "@type": "ImageObject",
       url,
       caption: caption ?? pin.title,
+      ...(latitude !== null && longitude !== null
+        ? {
+            contentLocation: {
+              "@type": "Place",
+              geo: {
+                "@type": "GeoCoordinates",
+                latitude,
+                longitude,
+              },
+            },
+          }
+        : {}),
+      ...(heading !== null
+        ? {
+            description: `${caption ?? pin.title}, photographed facing ${Math.round(heading)} degrees from north`,
+          }
+        : {}),
       creditText: "AUI Map",
       creator: {
         "@type": "Organization",

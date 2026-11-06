@@ -16,6 +16,7 @@ import {
   positionToLatLong,
   positionToStyle,
   screenPointToPosition,
+  latLongToPosition,
 } from "./geo"
 import {
   DEFAULT_PIN_SIZE_TUNING,
@@ -25,7 +26,7 @@ import {
 } from "./MapPin"
 import { OffCampusIndicator } from "./OffCampusIndicator"
 import type { CrayonTuning } from "./tagColor"
-import type { MapItem } from "./types"
+import type { MapItem, PhotoViewPoint } from "./types"
 import { type UserLocation, UserLocationMarker } from "./UserLocationMarker"
 import { pinCounterScale, useMapPanZoom } from "./useMapPanZoom"
 
@@ -95,6 +96,50 @@ function DroppedPinMarker({
         style={{ color: outline, filter: `drop-shadow(0 0 6px ${glow})` }}
         className="relative block size-7"
       />
+    </div>
+  )
+}
+
+// where a photo was taken: a blue dot with a wedge showing which way the camera faced
+function PhotoViewMarker({ view }: { view: PhotoViewPoint }) {
+  const position = latLongToPosition(view.latitude, view.longitude)
+  return (
+    <div
+      className="pointer-events-none absolute z-[900]"
+      style={{
+        ...positionToStyle(position),
+        transform: "translate(-50%, -50%) scale(var(--pin-counter-scale))",
+      }}
+    >
+      <svg
+        width="170"
+        height="170"
+        viewBox="-85 -85 170 170"
+        className="block overflow-visible"
+      >
+        <title>Where the photo was taken</title>
+        {view.heading !== null && (
+          <g transform={`rotate(${view.heading})`}>
+            <defs>
+              <radialGradient
+                id="photoViewGlow"
+                cx="0"
+                cy="0"
+                r="78"
+                gradientUnits="userSpaceOnUse"
+              >
+                <stop offset="0" stopColor="#2563eb" stopOpacity="0.9" />
+                <stop offset="1" stopColor="#2563eb" stopOpacity="0" />
+              </radialGradient>
+            </defs>
+            <path
+              d="M0 0L-40 -67A78 78 0 0 1 40 -67Z"
+              fill="url(#photoViewGlow)"
+            />
+          </g>
+        )}
+        <circle r="9" fill="#2563eb" stroke="#fff" strokeWidth="3.5" />
+      </svg>
     </div>
   )
 }
@@ -232,6 +277,7 @@ export function MapCanvas({
   compassHeading,
   hoveredTagId,
   pickedTagIds = null,
+  photoView = null,
   searchedPosition,
   tuning,
   sizeTuning = DEFAULT_PIN_SIZE_TUNING,
@@ -247,6 +293,8 @@ export function MapCanvas({
   hoveredTagId: string | null
   // categories picked on their own in the filter. Their tiny pins show at any zoom
   pickedTagIds?: Set<string> | null
+  // where the photo being looked at was taken, with the way the camera faced
+  photoView?: PhotoViewPoint | null
   // where a coordinates search points, drawn as a marker until the search is cleared
   searchedPosition?: NormalizedPosition | null
   // only ever overridden by the dev-only TagColorPlayground — real visitors always get the default
@@ -554,6 +602,7 @@ export function MapCanvas({
             {contextMenuPosition && (
               <DroppedPinMarker position={contextMenuPosition} />
             )}
+            {photoView && <PhotoViewMarker view={photoView} />}
             {searchedPosition && (
               <DroppedPinMarker position={searchedPosition} strong />
             )}

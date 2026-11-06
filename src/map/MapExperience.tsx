@@ -19,7 +19,7 @@ import { SearchSuggestions } from "./SearchSuggestions"
 import { searchPlaces } from "./searchEngine"
 import { recordSearchMiss } from "./searchMissActions"
 import { DEFAULT_CRAYON_TUNING, type TagColorName } from "./tagColor"
-import type { MapItem, MapItemTag } from "./types"
+import type { MapItem, MapItemTag, PhotoViewPoint } from "./types"
 import { useAvailableSpace } from "./useAvailableSpace"
 import { useCompassHeading } from "./useCompassHeading"
 import { usePinSelection } from "./usePinSelection"
@@ -289,6 +289,16 @@ export function MapExperience({
     mapCanvasRef.current?.peekAt(position)
     setPreviewPosition(position)
   }
+  // where the photo being looked at was taken, shown on the map until another place is picked
+  const [photoView, setPhotoView] = useState<PhotoViewPoint | null>(null)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: clears whenever the selected place changes
+  useEffect(() => setPhotoView(null), [selectedId])
+  function showPhotoView(view: PhotoViewPoint) {
+    setPhotoView(view)
+    mapCanvasRef.current?.centerOn(
+      latLongToPosition(view.latitude, view.longitude),
+    )
+  }
   // clicking a mention opens that place for real, and keeps the view it slid to
   function openPlace(place: MapItem) {
     mapCanvasRef.current?.commitPeek()
@@ -356,6 +366,7 @@ export function MapExperience({
               searchedOnCampus ? searchedPosition : previewPosition
             }
             pickedTagIds={shownTagIds}
+            photoView={photoView}
             {...{ selectedId, hoveredTagId, tuning, sizeTuning }}
           />
 
@@ -417,6 +428,7 @@ export function MapExperience({
                 places={effectiveItems}
                 onOpenPlace={openPlace}
                 onPreviewPlace={previewPlace}
+                onShowPhotoView={showPhotoView}
                 item={selected}
                 onClose={() => setSelectedId(null)}
                 docked={space.docksPanel}

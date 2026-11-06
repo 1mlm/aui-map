@@ -1,8 +1,6 @@
-import type { Metadata } from "next"
-import { WalkLogger } from "./WalkLogger"
+import { redirect } from "next/navigation"
 
-export const metadata: Metadata = { title: "Walk" }
-
-export default function AdminWalkPage() {
-  return <WalkLogger />
+// everything about the campus drawing lives in one page now
+export default function Page() {
+  redirect("/admin/drawing?view=walk")
 }
