@@ -1,5 +1,5 @@
 // biome-ignore-all lint/suspicious/noArrayIndexKey: lines have no ids, their position is their identity
-"use client";
+"use client"
 
 import {
   Cancel01Icon,
@@ -14,70 +14,71 @@ import {
   Route01Icon,
   Scissor01Icon,
   Undo02Icon,
-} from "@hugeicons/core-free-icons";
-import { useEffect, useRef, useState } from "react";
-import { type HugeIcon, Icon } from "@/components/Icon";
-import { Button } from "@/shadcn/ui/button";
-import { Separator } from "@/shadcn/ui/separator";
-import { Toggle } from "@/shadcn/ui/toggle";
-import { ToggleGroup, ToggleGroupItem } from "@/shadcn/ui/toggle-group";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/shadcn/ui/tooltip";
+} from "@hugeicons/core-free-icons"
+import { useEffect, useRef, useState } from "react"
+import { type HugeIcon, Icon } from "@/components/Icon"
+import { Button } from "@/shadcn/ui/button"
+import { Separator } from "@/shadcn/ui/separator"
+import { Toggle } from "@/shadcn/ui/toggle"
+import { ToggleGroup, ToggleGroupItem } from "@/shadcn/ui/toggle-group"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shadcn/ui/tooltip"
 import {
   type CampusShapes,
+  growPolygon,
   type Point,
   rectToPolygon,
   ROAD_WALK_BAND,
   smoothPath,
-} from "@/map/campusShapes";
-import { saveCampusLines } from "../map/actions";
+} from "@/map/campusShapes"
+import { saveCampusLines } from "../map/actions"
 
-const SIZE = 1312;
-const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
-const dist = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+const SIZE = 1312
+const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value))
+const dist = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b[1])
 
-type Layer = "roads" | "paths" | "zones" | "roundabouts";
-type Tool = "select" | "area" | "road" | "ring" | "path";
-type AreaKind = "walk" | "field" | "court" | "parking";
-type PathKind = "walk" | "dirt" | "green";
-type Sel = { layer: Layer; i: number; v?: number };
-type View = { x: number; y: number; s: number };
+type Layer = "roads" | "paths" | "zones" | "roundabouts"
+type Tool = "select" | "area" | "road" | "ring" | "path"
+type AreaKind = "walk" | "field" | "court" | "parking"
+type PathKind = "walk" | "dirt" | "green"
+type Sel = { layer: Layer; i: number; v?: number }
+type View = { x: number; y: number; s: number }
 type Drag =
   | { kind: "pan"; start: [number, number]; view: View; moved: boolean }
   | { kind: "vertex"; sel: Sel & { v: number } }
   | { kind: "move"; start: Point; orig: CampusShapes; sel: Sel }
-  | { kind: "radius"; i: number };
+  | { kind: "radius"; i: number }
 
 const AREA_KINDS: { id: AreaKind; label: string; color: string }[] = [
   { id: "walk", label: "Walkway", color: "#f6eed9" },
   { id: "field", label: "Field", color: "#a9d18f" },
   { id: "court", label: "Court", color: "#d98a68" },
   { id: "parking", label: "Parking", color: "#c9ccd0" },
-];
+]
 const PATH_KINDS: { id: PathKind; label: string; color: string }[] = [
   { id: "walk", label: "Paved", color: "#f6eed9" },
   { id: "dirt", label: "Dirt", color: "#d8bf92" },
   { id: "green", label: "Green", color: "#a6cf8d" },
-];
+]
 // only three widths each, nobody needs a number
 const WIDTHS = {
   road: [5, 7, 10],
   path: [2.5, 3.5, 5],
   ring: [5, 7, 10],
-} as const;
-const WIDTH_LABELS = ["S", "M", "L"] as const;
-const PATH_COLOR = { walk: "#f6eed9", dirt: "#d8bf92", green: "#a6cf8d" };
+} as const
+const WIDTH_LABELS = ["S", "M", "L"] as const
+const PATH_COLOR = { walk: "#f6eed9", dirt: "#d8bf92", green: "#a6cf8d" }
 const ZONE_FILL = {
   walk: "#f6eed9",
   field: "#a9d18f",
   court: "#d98a68",
   parking: "#c9ccd0",
-};
+}
 const TOOLS: {
-  id: Tool;
-  label: string;
-  key: string;
-  icon: HugeIcon;
-  hint: string;
+  id: Tool
+  label: string
+  key: string
+  icon: HugeIcon
+  hint: string
 }[] = [
   {
     id: "select",
@@ -91,7 +92,7 @@ const TOOLS: {
     label: "Area",
     key: "A",
     icon: Pentagon01Icon,
-    hint: "Click the corners, right click to finish",
+    hint: "Click a building for a walkway around it, or click corners",
   },
   {
     id: "road",
@@ -114,11 +115,11 @@ const TOOLS: {
     icon: Route01Icon,
     hint: "Click along the path, right click to finish",
   },
-];
+]
 
 function nearestOnCircle(p: Point, c: Point, r: number): Point {
-  const d = dist(p, c) || 1;
-  return [c[0] + ((p[0] - c[0]) / d) * r, c[1] + ((p[1] - c[1]) / d) * r];
+  const d = dist(p, c) || 1
+  return [c[0] + ((p[0] - c[0]) / d) * r, c[1] + ((p[1] - c[1]) / d) * r]
 }
 
 const Hint = ({ label, keys }: { label: string; keys?: string }) => (
@@ -130,7 +131,7 @@ const Hint = ({ label, keys }: { label: string; keys?: string }) => (
       </kbd>
     )}
   </>
-);
+)
 
 function IconAction({
   icon,
@@ -139,11 +140,11 @@ function IconAction({
   onClick,
   disabled,
 }: {
-  icon: HugeIcon;
-  label: string;
-  keys?: string;
-  onClick: () => void;
-  disabled?: boolean;
+  icon: HugeIcon
+  label: string
+  keys?: string
+  onClick: () => void
+  disabled?: boolean
 }) {
   return (
     <Tooltip>
@@ -164,7 +165,7 @@ function IconAction({
         <Hint {...{ label, keys }} />
       </TooltipContent>
     </Tooltip>
-  );
+  )
 }
 
 // the choices for whatever is being drawn or is selected, one group each: what kind it is, how wide
@@ -176,12 +177,12 @@ function Options({
   width,
   onWidth,
 }: {
-  kinds?: { id: string; label: string; color: string }[];
-  kind?: string;
-  onKind: (id: string) => void;
-  widths?: readonly number[];
-  width?: number;
-  onWidth: (index: number) => void;
+  kinds?: { id: string; label: string; color: string }[]
+  kind?: string
+  onKind: (id: string) => void
+  widths?: readonly number[]
+  width?: number
+  onWidth: (index: number) => void
 }) {
   return (
     <>
@@ -235,160 +236,158 @@ function Options({
         </ToggleGroup>
       )}
     </>
-  );
+  )
 }
 
 export function RoadsEditor({ initial }: { initial: CampusShapes }) {
-  const [shapes, setShapes] = useState(initial);
-  const [saved, setSaved] = useState(() => JSON.stringify(lines(initial)));
-  const [tool, setTool] = useState<Tool>("select");
+  const [shapes, setShapes] = useState(initial)
+  const [saved, setSaved] = useState(() => JSON.stringify(lines(initial)))
+  const [tool, setTool] = useState<Tool>("select")
   // the drawing tool used last, so a right click on empty space brings it back
-  const [lastDraw, setLastDraw] = useState<Tool>("road");
-  const [areaKind, setAreaKind] = useState<AreaKind>("walk");
-  const [pathKind, setPathKind] = useState<PathKind>("walk");
+  const [lastDraw, setLastDraw] = useState<Tool>("road")
+  const [areaKind, setAreaKind] = useState<AreaKind>("walk")
+  const [pathKind, setPathKind] = useState<PathKind>("walk")
   // which of the three widths the next road, path or roundabout gets
-  const [widthIdx, setWidthIdx] = useState(1);
-  const [draft, setDraft] = useState<Point[]>([]);
-  const [ringCenter, setRingCenter] = useState<Point | null>(null);
-  const [cursor, setCursor] = useState<Point | null>(null);
-  const [sel, setSel] = useState<Sel | null>(null);
-  const [view, setView] = useState<View>({ x: 180, y: 120, s: 940 });
-  const [history, setHistory] = useState<CampusShapes[]>([]);
-  const [future, setFuture] = useState<CampusShapes[]>([]);
-  const [dimSatellite, setDimSatellite] = useState(false);
-  const [status, setStatus] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [pxWidth, setPxWidth] = useState(800);
-  const svgRef = useRef<SVGSVGElement>(null);
-  const boxRef = useRef<HTMLDivElement>(null);
-  const drag = useRef<Drag | null>(null);
+  const [widthIdx, setWidthIdx] = useState(1)
+  const [draft, setDraft] = useState<Point[]>([])
+  const [ringCenter, setRingCenter] = useState<Point | null>(null)
+  const [cursor, setCursor] = useState<Point | null>(null)
+  const [sel, setSel] = useState<Sel | null>(null)
+  const [view, setView] = useState<View>({ x: 180, y: 120, s: 940 })
+  const [history, setHistory] = useState<CampusShapes[]>([])
+  const [future, setFuture] = useState<CampusShapes[]>([])
+  const [dimSatellite, setDimSatellite] = useState(false)
+  const [status, setStatus] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [pxWidth, setPxWidth] = useState(800)
+  const svgRef = useRef<SVGSVGElement>(null)
+  const boxRef = useRef<HTMLDivElement>(null)
+  const drag = useRef<Drag | null>(null)
 
-  const dirty = JSON.stringify(lines(shapes)) !== saved;
-  const px = view.s / pxWidth;
-  const handleR = px * 6;
-  const drawing = tool !== "select";
-  const satOpacity = dimSatellite ? 0.4 : 0.9;
-
-  useEffect(() => {
-    const el = svgRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver(() =>
-      setPxWidth(el.clientWidth || 800),
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+  const dirty = JSON.stringify(lines(shapes)) !== saved
+  const px = view.s / pxWidth
+  const handleR = px * 6
+  const drawing = tool !== "select"
+  const satOpacity = dimSatellite ? 0.4 : 0.9
 
   useEffect(() => {
-    const el = svgRef.current;
-    if (!el) return;
+    const el = svgRef.current
+    if (!el) return
+    const observer = new ResizeObserver(() => setPxWidth(el.clientWidth || 800))
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const el = svgRef.current
+    if (!el) return
     function onWheel(event: WheelEvent) {
-      event.preventDefault();
-      const at = toSvg(event);
-      const factor = event.deltaY > 0 ? 1.15 : 1 / 1.15;
+      event.preventDefault()
+      const at = toSvg(event)
+      const factor = event.deltaY > 0 ? 1.15 : 1 / 1.15
       setView((v) => {
-        const s = Math.min(SIZE * 1.2, Math.max(60, v.s * factor));
-        const k = s / v.s;
+        const s = Math.min(SIZE * 1.2, Math.max(60, v.s * factor))
+        const k = s / v.s
         return {
           s,
           x: at[0] - (at[0] - v.x) * k,
           y: at[1] - (at[1] - v.y) * k,
-        };
-      });
+        }
+      })
     }
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  });
+    el.addEventListener("wheel", onWheel, { passive: false })
+    return () => el.removeEventListener("wheel", onWheel)
+  })
 
   // keys for everything, so the pointer can stay on the drawing: V A R O P pick a tool, 1 2 3 the
   // width, Tab the next kind, Enter finishes, Esc cancels
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (/INPUT|SELECT|TEXTAREA/.test((event.target as HTMLElement).tagName))
-        return;
-      const key = event.key.toLowerCase();
+        return
+      const key = event.key.toLowerCase()
       if ((event.ctrlKey || event.metaKey) && key === "z") {
-        event.preventDefault();
-        if (event.shiftKey) redo();
-        else undo();
-      } else if (event.ctrlKey || event.metaKey || event.altKey) return;
+        event.preventDefault()
+        if (event.shiftKey) redo()
+        else undo()
+      } else if (event.ctrlKey || event.metaKey || event.altKey) return
       else if (event.key === "Escape") {
-        if (drawing) cancelDraw();
-        else setSel(null);
-      } else if (event.key === "Enter" && drawing) finishDraw();
+        if (drawing) cancelDraw()
+        else setSel(null)
+      } else if (event.key === "Enter" && drawing) finishDraw()
       else if (event.key === "Delete" || event.key === "Backspace") {
-        event.preventDefault();
-        if (drawing && draft.length) setDraft((d) => d.slice(0, -1));
-        else removeSelected();
+        event.preventDefault()
+        if (drawing && draft.length) setDraft((d) => d.slice(0, -1))
+        else removeSelected()
       } else if (event.key === "Tab" && barKinds) {
-        event.preventDefault();
-        const ids: string[] = barKinds.map((k) => k.id);
-        applyKind(ids[(ids.indexOf(barKind ?? "") + 1) % ids.length]);
-      } else if (key === "s" && canSplit) splitSelected();
+        event.preventDefault()
+        const ids: string[] = barKinds.map((k) => k.id)
+        applyKind(ids[(ids.indexOf(barKind ?? "") + 1) % ids.length])
+      } else if (key === "s" && canSplit) splitSelected()
       else if (["1", "2", "3"].includes(event.key) && barWidths)
-        applyWidth(Number(event.key) - 1);
+        applyWidth(Number(event.key) - 1)
       else {
-        const tool = TOOLS.find((t) => t.key.toLowerCase() === key);
-        if (tool) pickTool(tool.id);
+        const tool = TOOLS.find((t) => t.key.toLowerCase() === key)
+        if (tool) pickTool(tool.id)
       }
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  })
 
   useEffect(() => {
-    if (!dirty) return;
-    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
+    if (!dirty) return
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault()
+    window.addEventListener("beforeunload", warn)
+    return () => window.removeEventListener("beforeunload", warn)
+  }, [dirty])
 
   function toSvg(event: { clientX: number; clientY: number }): Point {
-    const svg = svgRef.current;
-    const ctm = svg?.getScreenCTM();
-    if (!svg || !ctm) return [0, 0];
-    const point = svg.createSVGPoint();
-    point.x = event.clientX;
-    point.y = event.clientY;
-    const p = point.matrixTransform(ctm.inverse());
-    return [p.x, p.y];
+    const svg = svgRef.current
+    const ctm = svg?.getScreenCTM()
+    if (!svg || !ctm) return [0, 0]
+    const point = svg.createSVGPoint()
+    point.x = event.clientX
+    point.y = event.clientY
+    const p = point.matrixTransform(ctm.inverse())
+    return [p.x, p.y]
   }
 
   function remember() {
-    setHistory((h) => [...h.slice(-59), clone(shapes)]);
-    setFuture([]);
+    setHistory((h) => [...h.slice(-59), clone(shapes)])
+    setFuture([])
   }
   function undo() {
-    const last = history[history.length - 1];
-    if (!last) return;
-    setFuture((f) => [...f, clone(shapes)]);
-    setHistory((h) => h.slice(0, -1));
-    setShapes(last);
-    setSel(null);
+    const last = history[history.length - 1]
+    if (!last) return
+    setFuture((f) => [...f, clone(shapes)])
+    setHistory((h) => h.slice(0, -1))
+    setShapes(last)
+    setSel(null)
   }
   function redo() {
-    const next = future[future.length - 1];
-    if (!next) return;
-    setHistory((h) => [...h, clone(shapes)]);
-    setFuture((f) => f.slice(0, -1));
-    setShapes(next);
-    setSel(null);
+    const next = future[future.length - 1]
+    if (!next) return
+    setHistory((h) => [...h, clone(shapes)])
+    setFuture((f) => f.slice(0, -1))
+    setShapes(next)
+    setSel(null)
   }
   function change(fn: (draft: CampusShapes) => void) {
-    remember();
+    remember()
     setShapes((current) => {
-      const next = clone(current);
-      fn(next);
-      return next;
-    });
+      const next = clone(current)
+      fn(next)
+      return next
+    })
   }
 
   // a new point sticks to a nearby corner, road point, or the edge of a roundabout, so everything
   // that meets really meets. Alt skips it
   function snapPoint(raw: Point, free: boolean): Point {
-    if (free) return raw;
-    let best: Point | null = null;
-    let bestD = px * 9;
+    if (free) return raw
+    let best: Point | null = null
+    let bestD = px * 9
     const all = [
       ...shapes.roads.flatMap((r) => r.p),
       ...shapes.paths.flatMap((r) => r.p),
@@ -397,93 +396,117 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
         b.r ? rectToPolygon(b.r) : (b.p ?? []),
       ),
       ...draft,
-    ];
+    ]
     for (const q of all) {
-      const d = dist(q, raw);
+      const d = dist(q, raw)
       if (d < bestD) {
-        best = q;
-        bestD = d;
+        best = q
+        bestD = d
       }
     }
     for (const ring of shapes.roundabouts) {
-      const q = nearestOnCircle(raw, ring.c, ring.r);
-      const d = dist(q, raw);
+      const q = nearestOnCircle(raw, ring.c, ring.r)
+      const d = dist(q, raw)
       if (d < bestD) {
-        best = q;
-        bestD = d;
+        best = q
+        bestD = d
       }
     }
-    return best ? ([...best] as Point) : raw;
+    return best ? ([...best] as Point) : raw
   }
 
   function pickTool(next: Tool) {
-    setDraft([]);
-    setRingCenter(null);
+    setDraft([])
+    setRingCenter(null)
     // going back to Select keeps what was just drawn selected, so it can be adjusted at once
     if (next !== "select") {
-      setSel(null);
-      setLastDraw(next);
+      setSel(null)
+      setLastDraw(next)
     }
-    setTool(next);
+    setTool(next)
   }
   function cancelDraw() {
-    setDraft([]);
-    setRingCenter(null);
-    setTool("select");
+    setDraft([])
+    setRingCenter(null)
+    setTool("select")
   }
   function finishDraw() {
     const pts = draft.filter(
       (q, k) => k === 0 || dist(q, draft[k - 1]) > px * 2,
-    );
-    const need = tool === "area" ? 3 : 2;
+    )
+    const need = tool === "area" ? 3 : 2
     if (pts.length < need) {
-      setDraft([]);
-      return;
+      setDraft([])
+      return
     }
     if (tool === "road") {
-      change((d) => d.roads.push({ w: WIDTHS.road[widthIdx], p: pts }));
-      setSel({ layer: "roads", i: shapes.roads.length });
+      change((d) => d.roads.push({ w: WIDTHS.road[widthIdx], p: pts }))
+      setSel({ layer: "roads", i: shapes.roads.length })
     } else if (tool === "path") {
       change((d) =>
         d.paths.push({ w: WIDTHS.path[widthIdx], kind: pathKind, p: pts }),
-      );
-      setSel({ layer: "paths", i: shapes.paths.length });
+      )
+      setSel({ layer: "paths", i: shapes.paths.length })
     } else if (tool === "area") {
-      change((d) => d.zones.push({ kind: areaKind, p: pts }));
-      setSel({ layer: "zones", i: shapes.zones.length });
+      change((d) => d.zones.push({ kind: areaKind, p: pts }))
+      setSel({ layer: "zones", i: shapes.zones.length })
     }
-    setDraft([]);
+    setDraft([])
   }
 
   // right click anywhere does the next sensible thing: finish the line being drawn, then leave
   // drawing, then go back to the last drawing tool
   function rightClick() {
     if (drawing && (draft.length || ringCenter)) {
-      if (tool === "ring") setRingCenter(null);
-      else finishDraw();
-    } else if (drawing) setTool("select");
-    else pickTool(lastDraw);
+      if (tool === "ring") setRingCenter(null)
+      else finishDraw()
+    } else if (drawing) setTool("select")
+    else pickTool(lastDraw)
+  }
+
+  // one click on a building gives it a walkway all around, to reshape from there
+  function walkAround(at: Point) {
+    for (const b of shapes.buildings) {
+      const outline = b.r ? rectToPolygon(b.r) : (b.p ?? [])
+      let hit = false
+      for (let i = 0, j = outline.length - 1; i < outline.length; j = i++) {
+        const [xi, yi] = outline[i]
+        const [xj, yj] = outline[j]
+        if (
+          yi > at[1] !== yj > at[1] &&
+          at[0] < ((xj - xi) * (at[1] - yi)) / (yj - yi) + xi
+        )
+          hit = !hit
+      }
+      if (!hit) continue
+      change((d) =>
+        d.zones.push({ kind: areaKind, p: growPolygon(outline, 7) }),
+      )
+      setSel({ layer: "zones", i: shapes.zones.length })
+      return true
+    }
+    return false
   }
 
   function removeSelected() {
-    if (!sel) return;
+    if (!sel) return
     if (sel.layer === "roundabouts") {
-      change((d) => d.roundabouts.splice(sel.i, 1));
-      setSel(null);
-      return;
+      change((d) => d.roundabouts.splice(sel.i, 1))
+      setSel(null)
+      return
     }
-    const entry = shapes[sel.layer][sel.i] as { p: Point[] } | undefined;
-    if (!entry) return;
-    const min = sel.layer === "zones" ? 3 : 2;
+    const entry = shapes[sel.layer][sel.i] as { p: Point[] } | undefined
+    if (!entry) return
+    const min = sel.layer === "zones" ? 3 : 2
     if (sel.v !== undefined && entry.p.length > min) {
       change((d) =>
         (d[sel.layer][sel.i] as { p: Point[] }).p.splice(sel.v as number, 1),
-      );
-      setSel({ layer: sel.layer, i: sel.i });
-      return;
+      )
+      setSel({ layer: sel.layer, i: sel.i })
+      return
     }
-    change((d) => d[sel.layer].splice(sel.i, 1));
-    setSel(null);
+    change((d) => d[sel.layer].splice(sel.i, 1))
+    setSel(null)
   }
 
   // cuts a road or path in two at the selected point: both halves keep the point, their kind and
@@ -497,31 +520,31 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
         ((shapes[sel.layer][sel.i] as { p: Point[] } | undefined)?.p.length ??
           0) -
           1,
-  );
+  )
   function splitSelected() {
-    if (!sel || !canSplit || sel.v === undefined) return;
-    const { layer, i, v } = sel;
+    if (!sel || !canSplit || sel.v === undefined) return
+    const { layer, i, v } = sel
     change((d) => {
-      const list = d[layer as "roads"] as { p: Point[] }[];
-      const whole = list[i];
-      const second = { ...clone(whole), p: whole.p.slice(v) };
-      whole.p = whole.p.slice(0, v + 1);
-      list.splice(i + 1, 0, second);
-    });
-    setSel({ layer, i });
+      const list = d[layer as "roads"] as { p: Point[] }[]
+      const whole = list[i]
+      const second = { ...clone(whole), p: whole.p.slice(v) }
+      whole.p = whole.p.slice(0, v + 1)
+      list.splice(i + 1, 0, second)
+    })
+    setSel({ layer, i })
   }
 
   // the kind and width of the selected shape, or what the next one gets when nothing is selected
   const selected = sel
     ? (shapes[sel.layer][sel.i] as unknown as
         | {
-            p?: Point[];
-            w?: number;
-            r?: number;
-            kind?: string;
+            p?: Point[]
+            w?: number
+            r?: number
+            kind?: string
           }
         | undefined)
-    : undefined;
+    : undefined
   const barTool: Tool | null = sel
     ? sel.layer === "zones"
       ? "area"
@@ -532,13 +555,13 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
           : "ring"
     : drawing
       ? tool
-      : null;
+      : null
   const barKinds =
     barTool === "area"
       ? AREA_KINDS
       : barTool === "path"
         ? PATH_KINDS
-        : undefined;
+        : undefined
   const barKind =
     barTool === "area"
       ? sel?.layer === "zones"
@@ -548,7 +571,7 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
         ? sel?.layer === "paths"
           ? selected?.kind
           : pathKind
-        : undefined;
+        : undefined
   const barWidths =
     barTool === "road"
       ? WIDTHS.road
@@ -556,46 +579,46 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
         ? WIDTHS.path
         : barTool === "ring"
           ? WIDTHS.ring
-          : undefined;
+          : undefined
   const barWidth = sel
     ? selected?.w
     : barWidths
       ? barWidths[widthIdx]
-      : undefined;
+      : undefined
 
   function applyKind(kind: string) {
     if (sel && (sel.layer === "zones" || sel.layer === "paths")) {
-      const { layer, i } = sel;
+      const { layer, i } = sel
       change((d) => {
-        (d[layer][i] as { kind: string }).kind = kind;
-      });
+        ;(d[layer][i] as { kind: string }).kind = kind
+      })
     }
-    if (barTool === "area") setAreaKind(kind as AreaKind);
-    if (barTool === "path") setPathKind(kind as PathKind);
+    if (barTool === "area") setAreaKind(kind as AreaKind)
+    if (barTool === "path") setPathKind(kind as PathKind)
   }
   function applyWidth(index: number) {
-    if (!barWidths) return;
-    setWidthIdx(index);
+    if (!barWidths) return
+    setWidthIdx(index)
     if (sel && sel.layer !== "zones") {
-      const { layer, i } = sel;
+      const { layer, i } = sel
       change((d) => {
-        (d[layer][i] as unknown as { w: number }).w = barWidths[index];
-      });
+        ;(d[layer][i] as unknown as { w: number }).w = barWidths[index]
+      })
     }
   }
 
   function startMove(event: React.PointerEvent, layer: Layer, i: number) {
-    if (tool !== "select") return;
-    event.stopPropagation();
-    (svgRef.current as SVGSVGElement).setPointerCapture(event.pointerId);
-    remember();
-    setSel({ layer, i });
+    if (tool !== "select") return
+    event.stopPropagation()
+    ;(svgRef.current as SVGSVGElement).setPointerCapture(event.pointerId)
+    remember()
+    setSel({ layer, i })
     drag.current = {
       kind: "move",
       start: toSvg(event),
       orig: clone(shapes),
       sel: { layer, i },
-    };
+    }
   }
   function startVertex(
     event: React.PointerEvent,
@@ -603,87 +626,87 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
     i: number,
     v: number,
   ) {
-    event.stopPropagation();
-    (svgRef.current as SVGSVGElement).setPointerCapture(event.pointerId);
-    remember();
-    setSel({ layer, i, v });
-    drag.current = { kind: "vertex", sel: { layer, i, v } };
+    event.stopPropagation()
+    ;(svgRef.current as SVGSVGElement).setPointerCapture(event.pointerId)
+    remember()
+    setSel({ layer, i, v })
+    drag.current = { kind: "vertex", sel: { layer, i, v } }
   }
   function startRadius(event: React.PointerEvent, i: number) {
-    event.stopPropagation();
-    (svgRef.current as SVGSVGElement).setPointerCapture(event.pointerId);
-    remember();
-    drag.current = { kind: "radius", i };
+    event.stopPropagation()
+    ;(svgRef.current as SVGSVGElement).setPointerCapture(event.pointerId)
+    remember()
+    drag.current = { kind: "radius", i }
   }
   function onBackgroundDown(event: React.PointerEvent) {
-    (svgRef.current as SVGSVGElement).setPointerCapture(event.pointerId);
+    ;(svgRef.current as SVGSVGElement).setPointerCapture(event.pointerId)
     drag.current = {
       kind: "pan",
       start: [event.clientX, event.clientY],
       view,
       moved: false,
-    };
+    }
   }
 
   function onPointerMove(event: React.PointerEvent) {
-    const raw = toSvg(event);
+    const raw = toSvg(event)
     if (drawing)
       setCursor(
         tool === "ring" && ringCenter ? raw : snapPoint(raw, event.altKey),
-      );
-    const d = drag.current;
-    if (!d) return;
+      )
+    const d = drag.current
+    if (!d) return
     if (d.kind === "pan") {
-      const dx = event.clientX - d.start[0];
-      const dy = event.clientY - d.start[1];
-      if (!d.moved && Math.hypot(dx, dy) < 4) return;
-      d.moved = true;
-      const scale = d.view.s / pxWidth;
+      const dx = event.clientX - d.start[0]
+      const dy = event.clientY - d.start[1]
+      if (!d.moved && Math.hypot(dx, dy) < 4) return
+      d.moved = true
+      const scale = d.view.s / pxWidth
       setView({
         ...d.view,
         x: d.view.x - dx * scale,
         y: d.view.y - dy * scale,
-      });
+      })
     } else if (d.kind === "move") {
-      const dx = raw[0] - d.start[0];
-      const dy = raw[1] - d.start[1];
+      const dx = raw[0] - d.start[0]
+      const dy = raw[1] - d.start[1]
       setShapes(() => {
-        const next = clone(d.orig);
+        const next = clone(d.orig)
         if (d.sel.layer === "roundabouts") {
-          const ring = next.roundabouts[d.sel.i];
-          ring.c = [ring.c[0] + dx, ring.c[1] + dy];
+          const ring = next.roundabouts[d.sel.i]
+          ring.c = [ring.c[0] + dx, ring.c[1] + dy]
         } else {
-          const entry = next[d.sel.layer][d.sel.i] as { p: Point[] };
-          entry.p = entry.p.map(([x, y]) => [x + dx, y + dy] as Point);
+          const entry = next[d.sel.layer][d.sel.i] as { p: Point[] }
+          entry.p = entry.p.map(([x, y]) => [x + dx, y + dy] as Point)
         }
-        return next;
-      });
+        return next
+      })
     } else if (d.kind === "vertex") {
-      const at = snapPoint(raw, event.altKey);
-      const { layer, i, v } = d.sel;
+      const at = snapPoint(raw, event.altKey)
+      const { layer, i, v } = d.sel
       setShapes((current) => {
-        const next = clone(current);
-        (next[layer as "roads"][i] as { p: Point[] }).p[v] = at;
-        return next;
-      });
+        const next = clone(current)
+        ;(next[layer as "roads"][i] as { p: Point[] }).p[v] = at
+        return next
+      })
     } else if (d.kind === "radius") {
       setShapes((current) => {
-        const next = clone(current);
-        const ring = next.roundabouts[d.i];
-        ring.r = Math.max(4, dist(raw, ring.c));
-        return next;
-      });
+        const next = clone(current)
+        const ring = next.roundabouts[d.i]
+        ring.r = Math.max(4, dist(raw, ring.c))
+        return next
+      })
     }
   }
 
   function onPointerUp(event: React.PointerEvent) {
-    const d = drag.current;
-    drag.current = null;
+    const d = drag.current
+    drag.current = null
     if (d?.kind === "pan" && !d.moved) {
-      if (tool === "select") setSel(null);
+      if (tool === "select") setSel(null)
       else if (tool === "ring") {
-        const at = toSvg(event);
-        if (!ringCenter) setRingCenter(at);
+        const at = toSvg(event)
+        if (!ringCenter) setRingCenter(at)
         else {
           change((s) =>
             s.roundabouts.push({
@@ -691,95 +714,97 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
               r: Math.max(5, dist(at, ringCenter)),
               w: WIDTHS.ring[widthIdx],
             }),
-          );
-          setRingCenter(null);
-          setSel({ layer: "roundabouts", i: shapes.roundabouts.length });
+          )
+          setRingCenter(null)
+          setSel({ layer: "roundabouts", i: shapes.roundabouts.length })
         }
+      } else if (tool === "area" && !draft.length && walkAround(toSvg(event))) {
+        // a click on a building drew its walkway
       } else {
-        const at = snapPoint(toSvg(event), event.altKey);
+        const at = snapPoint(toSvg(event), event.altKey)
         if (draft.length >= 2 && dist(at, draft[draft.length - 1]) < px * 4)
-          finishDraw();
+          finishDraw()
         else if (
           tool === "area" &&
           draft.length >= 3 &&
           dist(at, draft[0]) < px * 10
         )
-          finishDraw();
+          finishDraw()
         else {
-          if (!draft.length) setSel(null);
-          setDraft((current) => [...current, at]);
+          if (!draft.length) setSel(null)
+          setDraft((current) => [...current, at])
         }
       }
     }
   }
 
   function addMidpoint(layer: Layer, i: number, after: number) {
-    const entry = shapes[layer as "roads"][i] as { p: Point[] };
-    const a = entry.p[after];
-    const b = entry.p[(after + 1) % entry.p.length];
+    const entry = shapes[layer as "roads"][i] as { p: Point[] }
+    const a = entry.p[after]
+    const b = entry.p[(after + 1) % entry.p.length]
     change((d) => {
-      (d[layer as "roads"][i] as { p: Point[] }).p.splice(after + 1, 0, [
+      ;(d[layer as "roads"][i] as { p: Point[] }).p.splice(after + 1, 0, [
         (a[0] + b[0]) / 2,
         (a[1] + b[1]) / 2,
-      ]);
-    });
-    setSel({ layer, i, v: after + 1 });
+      ])
+    })
+    setSel({ layer, i, v: after + 1 })
   }
 
   async function save() {
-    setSaving(true);
-    setStatus("");
-    const result = await saveCampusLines(lines(shapes));
-    setSaving(false);
-    if ("error" in result) setStatus(result.error);
+    setSaving(true)
+    setStatus("")
+    const result = await saveCampusLines(lines(shapes))
+    setSaving(false)
+    if ("error" in result) setStatus(result.error)
     else {
-      setSaved(JSON.stringify(lines(shapes)));
-      setStatus("Saved");
+      setSaved(JSON.stringify(lines(shapes)))
+      setStatus("Saved")
     }
   }
 
   const draftPoints =
-    cursor && drawing && tool !== "ring" ? [...draft, cursor] : draft;
+    cursor && drawing && tool !== "ring" ? [...draft, cursor] : draft
 
   // where the little toolbar for the selected shape goes: right above it, so the pointer barely
   // has to move. Worked out from where the shape is on screen
   const anchor = (() => {
-    const svg = svgRef.current;
-    const box = boxRef.current;
-    const ctm = svg?.getScreenCTM();
-    if (drawing || !sel || !selected || !svg || !box || !ctm) return null;
-    let at: Point;
+    const svg = svgRef.current
+    const box = boxRef.current
+    const ctm = svg?.getScreenCTM()
+    if (drawing || !sel || !selected || !svg || !box || !ctm) return null
+    let at: Point
     if (sel.layer === "roundabouts" && selected.r !== undefined) {
-      const ring = shapes.roundabouts[sel.i];
-      at = [ring.c[0], ring.c[1] - ring.r - ring.w];
+      const ring = shapes.roundabouts[sel.i]
+      at = [ring.c[0], ring.c[1] - ring.r - ring.w]
     } else if (selected.p) {
       // a selected point gets the toolbar beside it, otherwise it sits above the whole shape
       const top =
         sel.v !== undefined && selected.p[sel.v]
           ? selected.p[sel.v]
-          : selected.p.reduce((a, b) => (b[1] < a[1] ? b : a));
-      at = [top[0], top[1]];
-    } else return null;
-    const rect = box.getBoundingClientRect();
-    const x = ctm.a * at[0] + ctm.c * at[1] + ctm.e - rect.left;
-    const y = ctm.b * at[0] + ctm.d * at[1] + ctm.f - rect.top;
+          : selected.p.reduce((a, b) => (b[1] < a[1] ? b : a))
+      at = [top[0], top[1]]
+    } else return null
+    const rect = box.getBoundingClientRect()
+    const x = ctm.a * at[0] + ctm.c * at[1] + ctm.e - rect.left
+    const y = ctm.b * at[0] + ctm.d * at[1] + ctm.f - rect.top
     return {
       x: Math.min(rect.width - 150, Math.max(150, x)),
       y: Math.min(rect.height - 60, Math.max(70, y - 14)),
-    };
-  })();
+    }
+  })()
 
-  const activeTool = TOOLS.find((t) => t.id === tool);
+  const activeTool = TOOLS.find((t) => t.id === tool)
   const hint = drawing
     ? (activeTool?.hint ?? "")
     : sel
       ? "Drag it to move. Drag a square to move a point, a small circle adds one"
-      : "Click anything to edit it. Drag empty space to move around, scroll to zoom";
+      : "Click anything to edit it. Drag empty space to move around, scroll to zoom"
 
   function renderEditable(layer: Layer, i: number) {
-    const sel1 = sel?.layer === layer && sel.i === i;
+    const sel1 = sel?.layer === layer && sel.i === i
     if (layer === "roundabouts") {
-      const ring = shapes.roundabouts[i];
+      const ring = shapes.roundabouts[i]
       return (
         <g key={`ring-${i}`}>
           <circle
@@ -855,13 +880,13 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
             />
           )}
         </g>
-      );
+      )
     }
-    const entry = shapes[layer][i] as { p: Point[]; w?: number; kind?: string };
-    const closed = layer === "zones";
+    const entry = shapes[layer][i] as { p: Point[]; w?: number; kind?: string }
+    const closed = layer === "zones"
     const d = closed
       ? `M${entry.p.map((q) => q.join(" ")).join("L")}Z`
-      : smoothPath(entry.p);
+      : smoothPath(entry.p)
     return (
       <g key={`${layer}-${i}`}>
         {layer === "zones" ? (
@@ -938,8 +963,8 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
         {sel1 &&
           tool === "select" &&
           entry.p.map((q, v) => {
-            const next = entry.p[(v + 1) % entry.p.length];
-            const last = v === entry.p.length - 1;
+            const next = entry.p[(v + 1) % entry.p.length]
+            const last = v === entry.p.length - 1
             return (
               <g key={`h-${v}`}>
                 {(!last || closed) && (
@@ -953,8 +978,8 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
                     strokeWidth={px}
                     style={{ cursor: "copy" }}
                     onPointerDown={(e) => {
-                      e.stopPropagation();
-                      addMidpoint(layer, i, v);
+                      e.stopPropagation()
+                      addMidpoint(layer, i, v)
                     }}
                   />
                 )}
@@ -971,10 +996,10 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
                   onPointerDown={(e) => startVertex(e, layer, i, v)}
                 />
               </g>
-            );
+            )
           })}
       </g>
-    );
+    )
   }
 
   const optionProps = {
@@ -984,8 +1009,8 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
     widths: barWidths,
     width: barWidth,
     onWidth: applyWidth,
-  };
-  const hasOptions = Boolean(barKinds || barWidths);
+  }
+  const hasOptions = Boolean(barKinds || barWidths)
 
   return (
     <div ref={boxRef} className="relative h-full min-h-0 p-2">
@@ -1005,12 +1030,12 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
         onPointerCancel={onPointerUp}
         // right click: finish the line, then leave drawing, then back to the last tool
         onContextMenu={(e) => {
-          e.preventDefault();
-          rightClick();
+          e.preventDefault()
+          rightClick()
         }}
         onDoubleClick={() => {
-          if (drawing && tool !== "ring") finishDraw();
-          else if (sel?.v !== undefined) removeSelected();
+          if (drawing && tool !== "ring") finishDraw()
+          else if (sel?.v !== undefined) removeSelected()
         }}
       >
         <title>Roads, paths and areas</title>
@@ -1234,7 +1259,7 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
         </Button>
       )}
     </div>
-  );
+  )
 }
 
 // the parts of the drawing this view edits
@@ -1244,5 +1269,5 @@ function lines(s: CampusShapes) {
     paths: s.paths,
     zones: s.zones,
     roundabouts: s.roundabouts,
-  };
+  }
 }

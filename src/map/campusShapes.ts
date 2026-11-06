@@ -192,7 +192,11 @@ export function sanitizeShapes(input: unknown): CampusShapes | null {
     paths.push({
       w: round(entry.w),
       kind:
-        entry.kind === "dirt" ? "dirt" : entry.kind === "green" ? "green" : "walk",
+        entry.kind === "dirt"
+          ? "dirt"
+          : entry.kind === "green"
+            ? "green"
+            : "walk",
       p: p.map(([x, y]) => [round(x), round(y)]),
     })
   }
@@ -262,9 +266,37 @@ export function smoothPath(pts: Point[]): string {
 // the colours live in css so the picture follows the phone's light or dark setting, even as an <img>
 const STYLE = `:root{--ground:#d9e2c8;--field:#a9d18f;--court:#d98a68;--parking:#c9ccd0;--casing:#b8b3a4;--road:#fffdf6;--walk:#f6eed9;--dirt:#d8bf92;--green:#a6cf8d;--island:#b9d9a3;--roof:#d9805f;--roofline:#9c4f38;--aud:#c9a45b;--food:#d8636a;--sport:#6fb36b}@media (prefers-color-scheme:dark){:root{--ground:#1c271f;--field:#2f4a2b;--court:#8a4a36;--parking:#363a3f;--casing:#171c18;--road:#3b403b;--walk:#4a4a42;--dirt:#5b4d36;--green:#46703f;--island:#3b5d36;--roof:#a85a40;--roofline:#6e3626;--aud:#8c7237;--food:#9c444a;--sport:#3f7a3d}}.zw{fill:var(--walk)}.zf{fill:var(--field)}.zc{fill:var(--court)}.zp{fill:var(--parking)}.rc{fill:none;stroke:var(--casing);stroke-linecap:round;stroke-linejoin:round}.rr{fill:none;stroke:var(--road);stroke-linecap:round;stroke-linejoin:round}.pw{fill:none;stroke:var(--walk);stroke-linecap:round;stroke-linejoin:round}.pd{fill:none;stroke:var(--dirt);stroke-linecap:round;stroke-linejoin:round}.pg{fill:none;stroke:var(--green);stroke-linecap:round;stroke-linejoin:round}.rw{fill:none;stroke:var(--walk);stroke-linecap:round;stroke-linejoin:round}.ri{fill:var(--island)}.b{fill:var(--roof);stroke:var(--roofline);stroke-width:.8;stroke-linejoin:round}.b-auditorium{fill:var(--aud)}.b-food{fill:var(--food)}.b-sports{fill:var(--sport)}`
 
-const ZONE_CLASS = { walk: "zw", field: "zf", court: "zc", parking: "zp" } as const
+const ZONE_CLASS = {
+  walk: "zw",
+  field: "zf",
+  court: "zc",
+  parking: "zp",
+} as const
 const PATH_CLASS = { walk: "pw", dirt: "pd", green: "pg" } as const
 // how much walkable strip shows each side of a road or roundabout
+// the outline pushed out by `d` on every side, for a walkway around a building. Corners are
+// mitred, which is exact for rectangles and close enough for hand drawn shapes
+export function growPolygon(pts: Point[], d: number): Point[] {
+  let area = 0
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i]
+    const b = pts[(i + 1) % pts.length]
+    area += a[0] * b[1] - b[0] * a[1]
+  }
+  const side = area >= 0 ? 1 : -1
+  const unit = (a: Point, b: Point): Point => {
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1
+    // outward normal of the edge a -> b
+    return [(side * (b[1] - a[1])) / l, (-side * (b[0] - a[0])) / l]
+  }
+  return pts.map((q, i) => {
+    const n1 = unit(pts[(i + pts.length - 1) % pts.length], q)
+    const n2 = unit(q, pts[(i + 1) % pts.length])
+    const k = Math.min(3, d / Math.max(0.35, 1 + n1[0] * n2[0] + n1[1] * n2[1]))
+    return [q[0] + (n1[0] + n2[0]) * k, q[1] + (n1[1] + n2[1]) * k] as Point
+  })
+}
+
 export const ROAD_WALK_BAND = 3.2
 
 // how much a building's corners are softened, in drawing units (the picture is 1312 wide)
@@ -306,8 +338,9 @@ export function buildCampusSvg(
   const polygon = (pts: Point[]) =>
     `M${pts.map((q) => `${n(q[0])} ${n(q[1])}`).join("L")}Z`
   let body = `<rect width="${shapes.size}" height="${shapes.size}" fill="var(--ground)"/>`
+  // walkways get soft corners, fields and courts keep their sharp outline
   for (const zone of shapes.zones)
-    body += `<path class="${ZONE_CLASS[zone.kind]}" d="${polygon(zone.p)}"/>`
+    body += `<path class="${ZONE_CLASS[zone.kind]}" d="${zone.kind === "walk" ? roundedPolygon(zone.p, 4) : polygon(zone.p)}"/>`
   for (const path of shapes.paths)
     body += `<path class="${PATH_CLASS[path.kind]}" stroke-width="${path.w}" d="${smoothPath(path.p)}"/>`
   // a road is a strip of walkable ground with the road itself inside it. Every walkable strip
