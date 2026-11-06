@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useTransition } from "react"
 import type { PropsWithChildren } from "react"
 import { logout } from "@/app/admin/(dashboard)/actions"
@@ -8,6 +9,7 @@ import { Icon } from "@/components/Icon"
 import { ICONS } from "@/icons"
 import { Button } from "@/shadcn/ui/button"
 import { APP_HEADER, NAV_ITEMS } from "./data"
+import { BackToMapLink } from "./BackToMapLink"
 import { LogoutButton } from "./LogoutButton"
 
 function MobileLogoutButton() {
@@ -29,6 +31,21 @@ function MobileLogoutButton() {
   )
 }
 
+function MobileMapLink() {
+  return (
+    <Button
+      asChild
+      variant="outline"
+      className="w-full rounded-full corner-squircle"
+    >
+      <Link href="/">
+        <Icon icon={ICONS.place} />
+        Back to the map
+      </Link>
+    </Button>
+  )
+}
+
 export type NavCounts = Record<"pins" | "tags" | "searchMisses" | "comments", number>
 
 export function AppShell({
@@ -40,10 +57,20 @@ export function AppShell({
       brand={APP_HEADER}
       items={NAV_ITEMS}
       {...{ counts }}
-      sidebarFooter={<LogoutButton />}
+      sidebarFooter={
+        <>
+          <BackToMapLink />
+          <LogoutButton />
+        </>
+      }
       sheetTitle="More options"
       sheetDescription="Account actions"
-      sheetFooter={() => <MobileLogoutButton />}
+      sheetFooter={() => (
+        <div className="flex flex-col gap-2">
+          <MobileMapLink />
+          <MobileLogoutButton />
+        </div>
+      )}
     >
       {children}
     </AppNav>

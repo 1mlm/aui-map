@@ -2,6 +2,7 @@
 
 import { AnimatePresence, LazyMotion } from "motion/react"
 import dynamic from "next/dynamic"
+import { useRouter } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 import { triggerHaptic } from "@/utils/haptics"
 import { CoordinateResult } from "./CoordinateResult"
@@ -113,7 +114,19 @@ export function MapExperience({
     navigator.storage?.persist?.()
   }, [])
 
+  const router = useRouter()
   const [search, setSearch] = useState("")
+  // typing the secret phrase opens the admin panel, handy in the installed app where there is no
+  // address bar. It still asks for the code there
+  const handleSearchChange = (value: string) => {
+    if (value.trim().toLowerCase() === "admin!!!") {
+      triggerHaptic()
+      setSearch("")
+      router.push("/admin")
+      return
+    }
+    setSearch(value)
+  }
   // which categories are on the map. null = everything (the default)
   const [shownTagIds, setShownTagIds] = useState<Set<string> | null>(null)
   const [filterOpen, setFilterOpen] = useState(false)
@@ -357,7 +370,7 @@ export function MapExperience({
           )}
 
           <MapControls
-            onSearchChange={setSearch}
+            onSearchChange={handleSearchChange}
             onOpenFilter={() => {
               setFilterMounted(true)
               setFilterOpen(true)

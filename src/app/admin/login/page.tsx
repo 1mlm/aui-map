@@ -1,6 +1,7 @@
 "use client"
 
-import { Key01Icon, SquareUnlock01Icon } from "@hugeicons/core-free-icons"
+import { ArrowLeft02Icon, Key01Icon, SquareUnlock01Icon } from "@hugeicons/core-free-icons"
+import Link from "next/link"
 import { useActionState, useEffect, useRef, useState } from "react"
 import { DelayedButton } from "@/components/DelayedButton"
 import { FormError } from "@/components/FormError"
@@ -57,6 +58,13 @@ export default function AdminLoginPage() {
           </FormError>
         )}
       </form>
+      <Link
+        href="/"
+        className="flex items-center gap-1.5 rounded-full corner-squircle px-3 py-1.5 text-sm text-muted-foreground hover:bg-foreground/5"
+      >
+        <Icon icon={ArrowLeft02Icon} className="size-4" />
+        Map
+      </Link>
     </div>
   )
 }
