@@ -56,7 +56,18 @@ type Scene = {
       text: string
     }[]
   } | null
-  footer: { rect: Rect; line1: string; line2: string; logo: Rect } | null
+  footer: {
+    rect: Rect
+    textX: number
+    y1: number
+    y2: number
+    partA: string
+    partB: string
+    partBX: number
+    line2: string
+    logo: Rect
+    ink2: string
+  } | null
   here: Here | null
   ink: string
   fade: boolean
@@ -150,7 +161,9 @@ function buildScene({
         }))
     : []
 
-  // the legend sits in the bottom left, where the hotel was: one pin per category with its name
+  // the legend and the credit are one block in the bottom left, roughly centred in the empty
+  // space beside the campus: one pin per category with its name, then where the app lives and
+  // when this picture was made
   const shownTags = tags.filter((tag) =>
     visible.some((item) => item.tag.id === tag.id),
   )
@@ -160,11 +173,27 @@ function buildScene({
   const legendFont = "600 10.5px sans-serif"
   const colW =
     Math.max(...shownTags.map((tag) => measureText(legendFont, tag.label))) + 46
+  const legendW = cols * colW + 8
+  const legendH = perCol * rowH + 16
+
+  const partA = "Interactive app on"
+  const partB = "auimap.ma"
+  const line2 = `Last generated: ${stamp.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}`
+  const wA = measureText("700 9.5px sans-serif", partA)
+  const wB = measureText("700 9.5px sans-serif", partB)
+  const logoSize = 12
+  const line1W = wA + 4 + logoSize + 4 + wB
+  const footerW = Math.max(line1W, measureText("500 8px sans-serif", line2))
+  const footerH = 28
+
+  const blockW = Math.max(legendW, footerW + 16)
+  const blockX = Math.max(crop.x + 24, crop.x + crop.w * 0.27 - blockW / 2)
+  const footerTop = crop.y + crop.h - 70 - footerH
   const legendRect: Rect = {
-    x: crop.x + 70,
-    y: crop.y + crop.h - 90 - (perCol * rowH + 16),
-    w: cols * colW + 8,
-    h: perCol * rowH + 16,
+    x: blockX,
+    y: footerTop - 14 - legendH,
+    w: legendW,
+    h: legendH,
   }
   const legend = showLegend
     ? {
@@ -179,26 +208,30 @@ function buildScene({
       }
     : null
 
-  // the credit, bottom right: where the app lives and when this picture was made
-  const line1 = "Interactive app on auimap.ma"
-  const line2 = `Last generated: ${stamp.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}`
-  const textW = Math.max(
-    measureText("700 9.5px sans-serif", line1),
-    measureText("500 8px sans-serif", line2),
-  )
-  const footerH = 36
-  const footerW = textW + 14 + 22 + 12
+  const textX = blockX + 8
+  const lineY = footerTop + 7
   const footerRect: Rect = {
-    x: crop.x + crop.w - 14 - footerW,
-    y: crop.y + crop.h - 14 - footerH,
-    w: footerW,
-    h: footerH,
+    x: textX - 6,
+    y: footerTop - 4,
+    w: footerW + 12,
+    h: footerH + 8,
   }
   const footer = {
     rect: footerRect,
-    line1,
+    textX,
+    y1: lineY,
+    y2: lineY + 14,
+    partA,
+    partB,
+    partBX: textX + wA + 4 + logoSize + 4,
     line2,
-    logo: { x: footerRect.x + 8, y: footerRect.y + 7, w: 22, h: 22 },
+    logo: {
+      x: textX + wA + 4,
+      y: lineY - logoSize / 2,
+      w: logoSize,
+      h: logoSize,
+    },
+    ink2: fade && darkText ? "rgba(22,35,27,0.62)" : "rgba(255,255,255,0.75)",
   }
 
   // names: each goes to the first side of its pin where it fits and is left out when nothing is
@@ -500,7 +533,7 @@ function drawCanvas(
       drawPin(ctx, row.x, row.y + 13, 24, row.fill, row.icon)
       ctx.fillStyle = scene.ink
       ctx.textAlign = "left"
-      ctx.fillText(row.text, row.x + 17, row.y)
+      ctx.fillText(row.text, row.x + 17, row.y + 2.2)
     }
   }
 
@@ -557,24 +590,22 @@ function drawCanvas(
   }
 
   if (scene.footer) {
-    const { rect, line1, line2, logo: logoRect } = scene.footer
-    roundRect(ctx, rect, 10)
-    ctx.fillStyle = "rgba(18,30,22,0.86)"
-    ctx.fill()
+    const f = scene.footer
+    ctx.textAlign = "left"
+    ctx.fillStyle = scene.ink
+    ctx.font = "700 9.5px sans-serif"
+    ctx.fillText(f.partA, f.textX, f.y1)
+    ctx.fillText(f.partB, f.partBX, f.y1)
     if (logo) {
       ctx.save()
-      roundRect(ctx, logoRect, 6)
+      roundRect(ctx, f.logo, 3)
       ctx.clip()
-      ctx.drawImage(logo, logoRect.x, logoRect.y, logoRect.w, logoRect.h)
+      ctx.drawImage(logo, f.logo.x, f.logo.y, f.logo.w, f.logo.h)
       ctx.restore()
     }
-    ctx.textAlign = "left"
-    ctx.fillStyle = "white"
-    ctx.font = "700 9.5px sans-serif"
-    ctx.fillText(line1, logoRect.x + logoRect.w + 8, rect.y + 13)
-    ctx.fillStyle = "rgba(255,255,255,0.7)"
+    ctx.fillStyle = f.ink2
     ctx.font = "500 8px sans-serif"
-    ctx.fillText(line2, logoRect.x + logoRect.w + 8, rect.y + 26)
+    ctx.fillText(f.line2, f.textX, f.y2)
   }
 }
 
@@ -637,7 +668,7 @@ function buildSvg(
     for (const row of scene.legend.rows)
       overlay +=
         svgPin(n(row.x), n(row.y + 13), 24, row.fill, row.icon) +
-        `<text x="${n(row.x + 17)}" y="${n(row.y)}" dominant-baseline="central" font-family="sans-serif" font-weight="600" font-size="10.5" fill="${scene.ink}">${esc(row.text)}</text>`
+        `<text x="${n(row.x + 17)}" y="${n(row.y + 2.2)}" dominant-baseline="central" font-family="sans-serif" font-weight="600" font-size="10.5" fill="${scene.ink}">${esc(row.text)}</text>`
 
   const nx = crop.x + crop.w - 34
   const ny = crop.y + 34
@@ -655,11 +686,21 @@ function buildSvg(
   }
 
   if (scene.footer) {
-    const { rect, line1, line2, logo } = scene.footer
-    overlay += `<rect x="${n(rect.x)}" y="${n(rect.y)}" width="${n(rect.w)}" height="${rect.h}" rx="10" fill="rgba(18,30,22,0.86)"/>`
+    const f = scene.footer
+    const text = (
+      x: number,
+      y: number,
+      weight: number,
+      size: number,
+      fill: string,
+      body: string,
+    ) =>
+      `<text x="${n(x)}" y="${n(y)}" dominant-baseline="central" font-family="sans-serif" font-weight="${weight}" font-size="${size}" fill="${fill}">${esc(body)}</text>`
+    overlay += text(f.textX, f.y1, 700, 9.5, scene.ink, f.partA)
+    overlay += text(f.partBX, f.y1, 700, 9.5, scene.ink, f.partB)
     if (logoUrl)
-      overlay += `<clipPath id="logoClip"><rect x="${n(logo.x)}" y="${n(logo.y)}" width="${logo.w}" height="${logo.h}" rx="6"/></clipPath><image href="${logoUrl}" x="${n(logo.x)}" y="${n(logo.y)}" width="${logo.w}" height="${logo.h}" clip-path="url(#logoClip)"/>`
-    overlay += `<text x="${n(logo.x + logo.w + 8)}" y="${n(rect.y + 13)}" dominant-baseline="central" font-family="sans-serif" font-weight="700" font-size="9.5" fill="white">${esc(line1)}</text><text x="${n(logo.x + logo.w + 8)}" y="${n(rect.y + 26)}" dominant-baseline="central" font-family="sans-serif" font-weight="500" font-size="8" fill="rgba(255,255,255,0.7)">${esc(line2)}</text>`
+      overlay += `<clipPath id="logoClip"><rect x="${n(f.logo.x)}" y="${n(f.logo.y)}" width="${f.logo.w}" height="${f.logo.h}" rx="3"/></clipPath><image href="${logoUrl}" x="${n(f.logo.x)}" y="${n(f.logo.y)}" width="${f.logo.w}" height="${f.logo.h}" clip-path="url(#logoClip)"/>`
+    overlay += text(f.textX, f.y2, 500, 8, f.ink2, f.line2)
   }
 
   const mask = scene.fade
