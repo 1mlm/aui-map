@@ -245,6 +245,14 @@ export function searchPlaces<T extends Searchable>(
           continue
         fuzzy.set(item, Math.max(fuzzy.get(item) ?? 0, 35))
       }
+      // a word still being typed, with a slip in it: "intee" while heading for "internet"
+      if (key.length >= 4)
+        for (const word of keys.keywords)
+          if (
+            word.length > key.length + 1 &&
+            distance(key, word.slice(0, key.length)) <= 1
+          )
+            fuzzy.set(item, Math.max(fuzzy.get(item) ?? 0, 30))
     }
   }
   if (fuzzy.size) {

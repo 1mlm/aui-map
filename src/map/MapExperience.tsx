@@ -59,7 +59,8 @@ const PinTuningPlayground = dynamic(
 )
 
 // long enough that it only fires once someone's actually done typing, not on every keystroke
-const ZERO_RESULT_SEARCH_TRACK_DELAY_MS = 800
+// long enough that a word still being typed ("intee" on the way to "internet") isn't recorded
+const ZERO_RESULT_SEARCH_TRACK_DELAY_MS = 2500
 
 export function MapExperience({
   items,
@@ -190,7 +191,7 @@ export function MapExperience({
   // fires once someone's paused typing, not once per keystroke
   useEffect(() => {
     const query = search.trim()
-    if (!query) return
+    if (query.length < 3) return
     const timer = setTimeout(() => {
       if (
         !parseCoordinateQuery(query) &&
