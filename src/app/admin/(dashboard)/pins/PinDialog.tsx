@@ -11,6 +11,7 @@ import { ICONS } from "@/icons"
 import { AMENITIES } from "@/map/amenities"
 import type { MapItemTag, PinLink } from "@/map/types"
 import { Button } from "@/shadcn/ui/button"
+import { ToggleGroup, ToggleGroupItem } from "@/shadcn/ui/toggle-group"
 import { Checkbox } from "@/shadcn/ui/checkbox"
 import { Input } from "@/shadcn/ui/input"
 import {
@@ -337,28 +338,28 @@ export function PinDialog({
             className={INPUT_CLASS}
           />
           <div className="flex items-center gap-2">
-            <select
-              aria-label="Mention a place"
+            <Select
               value=""
-              onChange={(e) => {
-                const mention = e.target.value
-                if (mention)
-                  setDescription(
-                    (text) =>
-                      `${text}${text && !/\s$/.test(text) ? " " : ""}@${mention} `,
-                  )
-              }}
-              className="rounded-xl corner-squircle border bg-background px-2 py-1 text-sm"
+              onValueChange={(mention) =>
+                setDescription(
+                  (text) =>
+                    `${text}${text && !/\s$/.test(text) ? " " : ""}@${mention} `,
+                )
+              }
             >
-              <option value="">Mention a place...</option>
-              {allPins
-                .filter((other) => other.id !== id)
-                .map((other) => (
-                  <option key={other.id} value={other.id}>
-                    {other.title}
-                  </option>
-                ))}
-            </select>
+              <SelectTrigger aria-label="Mention a place" className="w-auto">
+                <SelectValue placeholder="Mention a place..." />
+              </SelectTrigger>
+              <SelectContent>
+                {allPins
+                  .filter((other) => other.id !== id)
+                  .map((other) => (
+                    <SelectItem key={other.id} value={other.id}>
+                      {other.title}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
             <span className="text-muted-foreground text-xs">
               Adds @id. Visitors see a tappable chip for that place.
             </span>
@@ -415,51 +416,50 @@ export function PinDialog({
           <FieldLabel icon={ICONS.place} htmlFor="pin-amenities">
             What it has
           </FieldLabel>
-          <div id="pin-amenities" className="flex flex-wrap gap-1.5">
-            {AMENITIES.map(({ id, label, icon }) => {
-              const on = amenities.includes(id)
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() =>
-                    setAmenities((current) =>
-                      on ? current.filter((x) => x !== id) : [...current, id],
-                    )
-                  }
-                  className={`inline-flex items-center gap-1.5 rounded-xl corner-squircle px-2.5 py-1.5 text-sm transition-colors ${
-                    on
-                      ? "bg-primary font-medium text-primary-foreground"
-                      : "bg-foreground/10 hover:bg-foreground/15"
-                  }`}
-                >
-                  <Icon icon={icon} className="size-4" />
-                  {label}
-                </button>
-              )
-            })}
-          </div>
+          <ToggleGroup
+            id="pin-amenities"
+            type="multiple"
+            variant="outline"
+            size="sm"
+            spacing={1}
+            value={amenities}
+            onValueChange={setAmenities}
+            className="flex-wrap"
+          >
+            {AMENITIES.map(({ id, label, icon }) => (
+              <ToggleGroupItem
+                key={id}
+                value={id}
+                className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+              >
+                <Icon icon={icon} />
+                {label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         </div>
 
         <div className="flex flex-col gap-1.5">
           <FieldLabel icon={ICONS.size} htmlFor="pin-minzoom">
             Shows on the map
           </FieldLabel>
-          <select
-            id="pin-minzoom"
-            value={minZoom === null ? "" : String(minZoom)}
-            onChange={(e) =>
-              setMinZoom(e.target.value ? Number(e.target.value) : null)
+          <Select
+            value={minZoom === null ? "always" : String(minZoom)}
+            onValueChange={(value) =>
+              setMinZoom(value === "always" ? null : Number(value))
             }
-            className="rounded-xl corner-squircle border bg-background px-2.5 py-2 text-sm"
           >
-            <option value="">Always</option>
-            <option value="1.8">
-              Only when zoomed in a little (bathrooms, printers...)
-            </option>
-            <option value="2.5">Only when zoomed in close</option>
-          </select>
+            <SelectTrigger id="pin-minzoom" className={INPUT_CLASS}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="always">Always</SelectItem>
+              <SelectItem value="1.8">
+                Only when zoomed in a little (printers...)
+              </SelectItem>
+              <SelectItem value="2.5">Only when zoomed in close</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <Disclosure label="Show additional options">

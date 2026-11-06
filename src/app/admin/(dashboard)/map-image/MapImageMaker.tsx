@@ -3,6 +3,18 @@
 import { Download01Icon } from "@hugeicons/core-free-icons"
 import { useEffect, useRef, useState } from "react"
 import { Icon } from "@/components/Icon"
+import { Button } from "@/shadcn/ui/button"
+import { Label } from "@/shadcn/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shadcn/ui/select"
+import { Slider } from "@/shadcn/ui/slider"
+import { Switch } from "@/shadcn/ui/switch"
+import { ToggleGroup, ToggleGroupItem } from "@/shadcn/ui/toggle-group"
 import {
   buildCampusSvg,
   type CampusShapes,
@@ -863,14 +875,10 @@ export function MapImageMaker({
   }
 
   const toggle = (label: string, value: boolean, set: (v: boolean) => void) => (
-    <label className="flex cursor-pointer items-center gap-2 text-sm">
-      <input
-        type="checkbox"
-        checked={value}
-        onChange={(e) => set(e.target.checked)}
-      />
+    <Label className="flex cursor-pointer items-center justify-between gap-3 font-normal">
       {label}
-    </label>
+      <Switch checked={value} onCheckedChange={set} />
+    </Label>
   )
 
   const checkerboard = {
@@ -884,34 +892,26 @@ export function MapImageMaker({
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4 p-4 lg:flex-row">
       <div className="flex flex-col gap-4 lg:w-72 lg:shrink-0">
-        <div className="grid grid-cols-2 gap-1.5 rounded-2xl corner-squircle bg-foreground/5 p-1.5">
-          {(
-            [
-              ["satellite", "Satellite (PNG)"],
-              ["vector", "Drawing (SVG)"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setStyle(id)}
-              className={`rounded-xl corner-squircle px-2 py-2 text-sm font-medium ${
-                style === id ? "bg-primary text-primary-foreground" : ""
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={download}
-          className="inline-flex items-center justify-center gap-2 rounded-2xl corner-squircle bg-primary px-4 py-3 font-semibold text-primary-foreground"
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          spacing={0}
+          value={style}
+          onValueChange={(next) => next && setStyle(next as Style)}
+          className="w-full"
         >
-          <Icon icon={Download01Icon} className="size-5" />
+          <ToggleGroupItem value="satellite" className="flex-1">
+            Satellite (PNG)
+          </ToggleGroupItem>
+          <ToggleGroupItem value="vector" className="flex-1">
+            Drawing (SVG)
+          </ToggleGroupItem>
+        </ToggleGroup>
+        <Button type="button" size="lg" onClick={download}>
+          <Icon icon={Download01Icon} />
           Download {style === "vector" ? "SVG" : "PNG"}
-        </button>
-        <div className="flex flex-col gap-2 rounded-2xl corner-squircle bg-foreground/5 p-3">
+        </Button>
+        <div className="flex flex-col gap-3 rounded-xl bg-muted/50 p-3 text-sm">
           {toggle("Pins", showPins, setShowPins)}
           {toggle("Names", showNames, setShowNames)}
           {toggle("Small places (printers)", showDetails, setShowDetails)}
@@ -919,59 +919,61 @@ export function MapImageMaker({
           {toggle("Fade out around the campus", fade, setFade)}
           {fade && toggle("Dark legend text", darkText, setDarkText)}
         </div>
-        <div className="flex flex-col gap-3 rounded-2xl corner-squircle bg-foreground/5 p-3">
+        <div className="flex flex-col gap-3 rounded-xl bg-muted/50 p-3">
           <span className="font-semibold text-sm">You are here</span>
-          <select
-            value={pinId}
-            onChange={(e) => placeAtPin(e.target.value)}
-            className="rounded-xl corner-squircle border bg-background px-2.5 py-2 text-sm"
+          <Select
+            value={pinId || undefined}
+            onValueChange={(value) => placeAtPin(value)}
           >
-            <option value="">Click the picture, or pick a place</option>
-            {[...items]
-              .sort((a, b) => a.title.localeCompare(b.title))
-              .map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.title}
-                </option>
-              ))}
-          </select>
+            <SelectTrigger>
+              <SelectValue placeholder="Click the picture, or pick a place" />
+            </SelectTrigger>
+            <SelectContent>
+              {[...items]
+                .sort((a, b) => a.title.localeCompare(b.title))
+                .map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.title}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
           {here && (
             <>
-              <div className="grid grid-cols-4 gap-1.5">
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                size="sm"
+                spacing={1}
+                value={String(here.angle)}
+                onValueChange={(value) =>
+                  value && setHere({ ...here, angle: Number(value) })
+                }
+                className="grid w-full grid-cols-4"
+              >
                 {COMPASS.map(([label, angle]) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => setHere({ ...here, angle })}
-                    className={`rounded-xl corner-squircle py-1.5 text-xs font-semibold ${
-                      here.angle === angle
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-foreground/10"
-                    }`}
-                  >
+                  <ToggleGroupItem key={label} value={String(angle)}>
                     {label}
-                  </button>
+                  </ToggleGroupItem>
                 ))}
-              </div>
-              <input
-                type="range"
+              </ToggleGroup>
+              <Slider
                 min={0}
                 max={359}
-                value={here.angle}
-                onChange={(e) =>
-                  setHere({ ...here, angle: Number(e.target.value) })
-                }
+                value={[here.angle]}
+                onValueChange={([angle]) => setHere({ ...here, angle })}
               />
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => {
                   setHere(null)
                   setPinId("")
                 }}
-                className="rounded-xl corner-squircle bg-foreground/10 py-1.5 text-sm"
               >
                 Remove
-              </button>
+              </Button>
             </>
           )}
         </div>

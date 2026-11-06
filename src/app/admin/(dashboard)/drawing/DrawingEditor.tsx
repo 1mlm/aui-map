@@ -10,6 +10,7 @@ import { useState } from "react"
 import { type HugeIcon, Icon } from "@/components/Icon"
 import type { CampusShapes } from "@/map/campusShapes"
 import type { MapItem, MapItemTag } from "@/map/types"
+import { Tabs, TabsList, TabsTrigger } from "@/shadcn/ui/tabs"
 import { MapEditor } from "../map/MapEditor"
 import { MapImageMaker } from "../map-image/MapImageMaker"
 import { RoadsEditor } from "../roads/RoadsEditor"
@@ -56,24 +57,17 @@ export function DrawingEditor({
 
   return (
     <div className="flex h-[calc(100dvh-1rem)] flex-col">
-      <div className="flex shrink-0 items-center gap-1 p-2 pb-0">
-        <div className="flex gap-1 rounded-2xl corner-squircle bg-foreground/5 p-1">
-          {VIEWS.map(({ id, label, icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => open(id)}
-              className={`inline-flex items-center gap-1.5 rounded-xl corner-squircle px-3 py-1.5 text-sm font-medium transition-colors ${
-                view === id
-                  ? "bg-background shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Icon icon={icon} className="size-4" />
-              {label}
-            </button>
-          ))}
-        </div>
+      <div className="shrink-0 p-2 pb-0">
+        <Tabs value={view} onValueChange={(next) => open(next as View)}>
+          <TabsList>
+            {VIEWS.map(({ id, label, icon }) => (
+              <TabsTrigger key={id} value={id}>
+                <Icon icon={icon} />
+                {label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       </div>
       <div className="min-h-0 flex-1">
         <div className={show("buildings")}>

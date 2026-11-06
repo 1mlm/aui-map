@@ -7,6 +7,8 @@ import { Icon } from "@/components/Icon"
 import { ICONS } from "@/icons"
 import { latLongToPosition, positionToLatLong } from "@/map/geo"
 import { Button } from "@/shadcn/ui/button"
+import { Slider } from "@/shadcn/ui/slider"
+import { ToggleGroup, ToggleGroupItem } from "@/shadcn/ui/toggle-group"
 import {
   Dialog,
   DialogContent,
@@ -166,30 +168,33 @@ export function PhotoViewDialog({
           </div>
           <div className="flex flex-1 flex-col justify-center gap-1.5">
             <div className="flex gap-1.5">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="sm"
                 onClick={() => setCamera(pin)}
-                className="inline-flex items-center gap-1.5 rounded-xl corner-squircle bg-foreground/10 px-2.5 py-1.5 text-sm hover:bg-foreground/15"
               >
-                <Icon icon={ICONS.place} className="size-4" />
+                <Icon icon={ICONS.place} />
                 At the pin
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                onClick={() => setZoom((z) => Math.max(40, z / 1.6))}
+                variant="secondary"
+                size="icon-sm"
                 aria-label="Zoom in"
-                className="grid size-8 place-items-center rounded-xl corner-squircle bg-foreground/10 text-lg hover:bg-foreground/15"
+                onClick={() => setZoom((z) => Math.max(40, z / 1.6))}
               >
                 +
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                onClick={() => setZoom((z) => Math.min(600, z * 1.6))}
+                variant="secondary"
+                size="icon-sm"
                 aria-label="Zoom out"
-                className="grid size-8 place-items-center rounded-xl corner-squircle bg-foreground/10 text-lg hover:bg-foreground/15"
+                onClick={() => setZoom((z) => Math.min(600, z * 1.6))}
               >
                 -
-              </button>
+              </Button>
             </div>
             <span className="text-muted-foreground text-xs">
               {camera
@@ -280,36 +285,40 @@ export function PhotoViewDialog({
 
         {camera && (
           <div className="flex flex-col gap-2">
-            <div className="grid grid-cols-8 gap-1">
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              spacing={1}
+              value={heading === null ? "" : String(heading)}
+              onValueChange={(value) => value && setHeading(Number(value))}
+              className="grid w-full grid-cols-8"
+            >
               {COMPASS.map(([label, angle]) => (
-                <button
+                <ToggleGroupItem
                   key={label}
-                  type="button"
-                  onClick={() => setHeading(angle)}
-                  className={`rounded-lg corner-squircle py-1 text-xs font-semibold ${
-                    heading === angle
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-foreground/10"
-                  }`}
+                  value={String(angle)}
+                  className="px-0 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
                 >
                   {label}
-                </button>
+                </ToggleGroupItem>
               ))}
-            </div>
-            <input
-              type="range"
+            </ToggleGroup>
+            <Slider
               min={0}
               max={359}
-              value={heading ?? 0}
-              onChange={(e) => setHeading(Number(e.target.value))}
+              value={[heading ?? 0]}
+              onValueChange={([angle]) => setHeading(angle)}
             />
-            <button
+            <Button
               type="button"
+              variant="link"
+              size="xs"
+              className="self-start px-0 text-muted-foreground"
               onClick={() => setHeading(null)}
-              className="self-start text-muted-foreground text-xs underline"
             >
               No direction
-            </button>
+            </Button>
           </div>
         )}
 

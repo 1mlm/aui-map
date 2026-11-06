@@ -7,14 +7,21 @@ import {
   Cursor02Icon,
   Delete02Icon,
   FloppyDiskIcon,
+  Image01Icon,
   Pentagon01Icon,
   Redo02Icon,
   Road01Icon,
   Route01Icon,
+  Scissor01Icon,
   Undo02Icon,
 } from "@hugeicons/core-free-icons"
 import { useEffect, useRef, useState } from "react"
 import { type HugeIcon, Icon } from "@/components/Icon"
+import { Button } from "@/shadcn/ui/button"
+import { Separator } from "@/shadcn/ui/separator"
+import { Toggle } from "@/shadcn/ui/toggle"
+import { ToggleGroup, ToggleGroupItem } from "@/shadcn/ui/toggle-group"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shadcn/ui/tooltip"
 import {
   type CampusShapes,
   type Point,
@@ -46,12 +53,18 @@ const AREA_KINDS: { id: AreaKind; label: string; color: string }[] = [
   { id: "court", label: "Court", color: "#d98a68" },
   { id: "parking", label: "Parking", color: "#c9ccd0" },
 ]
-const PATH_KINDS: { id: PathKind; label: string; color: string; w: number }[] =
-  [
-    { id: "walk", label: "Paved", color: "#f6eed9", w: 3.5 },
-    { id: "dirt", label: "Dirt", color: "#d8bf92", w: 3 },
-    { id: "green", label: "Green", color: "#a6cf8d", w: 4 },
-  ]
+const PATH_KINDS: { id: PathKind; label: string; color: string }[] = [
+  { id: "walk", label: "Paved", color: "#f6eed9" },
+  { id: "dirt", label: "Dirt", color: "#d8bf92" },
+  { id: "green", label: "Green", color: "#a6cf8d" },
+]
+// only three widths each, nobody needs a number
+const WIDTHS = {
+  road: [5, 7, 10],
+  path: [2.5, 3.5, 5],
+  ring: [5, 7, 10],
+} as const
+const WIDTH_LABELS = ["S", "M", "L"] as const
 const PATH_COLOR = { walk: "#f6eed9", dirt: "#d8bf92", green: "#a6cf8d" }
 const ZONE_FILL = {
   walk: "#f6eed9",
@@ -59,36 +72,47 @@ const ZONE_FILL = {
   court: "#d98a68",
   parking: "#c9ccd0",
 }
-const TOOLS: { id: Tool; label: string; icon: HugeIcon; hint: string }[] = [
+const TOOLS: {
+  id: Tool
+  label: string
+  key: string
+  icon: HugeIcon
+  hint: string
+}[] = [
   {
     id: "select",
     label: "Select",
+    key: "V",
     icon: Cursor02Icon,
     hint: "Click anything to edit it",
   },
   {
     id: "area",
     label: "Area",
+    key: "A",
     icon: Pentagon01Icon,
-    hint: "Click the corners. Enter to finish",
+    hint: "Click the corners, Enter to finish",
   },
   {
     id: "road",
     label: "Road",
+    key: "R",
     icon: Road01Icon,
-    hint: "Click along the road. Enter to finish",
+    hint: "Click along the road, Enter to finish",
   },
   {
     id: "ring",
     label: "Roundabout",
+    key: "O",
     icon: CircleIcon,
-    hint: "Click the middle, then click the edge",
+    hint: "Click the middle, then the edge",
   },
   {
     id: "path",
     label: "Path",
+    key: "P",
     icon: Route01Icon,
-    hint: "Click along the path. Enter to finish",
+    hint: "Click along the path, Enter to finish",
   },
 ]
 
@@ -97,58 +121,122 @@ function nearestOnCircle(p: Point, c: Point, r: number): Point {
   return [c[0] + ((p[0] - c[0]) / d) * r, c[1] + ((p[1] - c[1]) / d) * r]
 }
 
-const Chip = ({
-  active,
-  onClick,
-  color,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  color?: string
-  children: React.ReactNode
-}) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={`inline-flex items-center gap-1.5 rounded-lg corner-squircle px-2.5 py-1 text-sm transition-colors ${
-      active
-        ? "bg-primary font-semibold text-primary-foreground"
-        : "hover:bg-foreground/10"
-    }`}
-  >
-    {color && (
-      <span
-        className="size-3 rounded-[0.25rem] ring-1 ring-black/20"
-        style={{ background: color }}
-      />
+const Hint = ({ label, keys }: { label: string; keys?: string }) => (
+  <>
+    {label}
+    {keys && (
+      <kbd className="ml-1.5 rounded bg-background/20 px-1 font-mono text-[0.7rem]">
+        {keys}
+      </kbd>
     )}
-    {children}
-  </button>
+  </>
 )
 
-const IconAction = ({
+function IconAction({
   icon,
   label,
+  keys,
   onClick,
   disabled,
 }: {
   icon: HugeIcon
   label: string
+  keys?: string
   onClick: () => void
   disabled?: boolean
-}) => (
-  <button
-    type="button"
-    onClick={onClick}
-    disabled={disabled}
-    aria-label={label}
-    title={label}
-    className="grid size-9 place-items-center rounded-xl corner-squircle bg-background/90 shadow-sm ring-1 ring-foreground/10 backdrop-blur transition-colors hover:bg-background disabled:opacity-35"
-  >
-    <Icon icon={icon} className="size-[1.15rem]" />
-  </button>
-)
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          aria-label={label}
+          disabled={disabled}
+          onClick={onClick}
+          className="bg-background/90 backdrop-blur"
+        >
+          <Icon icon={icon} />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <Hint {...{ label, keys }} />
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+// the choices for whatever is being drawn or is selected, one group each: what kind it is, how wide
+function Options({
+  kinds,
+  kind,
+  onKind,
+  widths,
+  width,
+  onWidth,
+}: {
+  kinds?: { id: string; label: string; color: string }[]
+  kind?: string
+  onKind: (id: string) => void
+  widths?: readonly number[]
+  width?: number
+  onWidth: (index: number) => void
+}) {
+  return (
+    <>
+      {kinds && (
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          spacing={1}
+          value={kind}
+          onValueChange={(value) => value && onKind(value)}
+        >
+          {kinds.map((k) => (
+            <ToggleGroupItem key={k.id} value={k.id}>
+              <span
+                className="size-3 rounded-[0.25rem] ring-1 ring-black/20"
+                style={{ background: k.color }}
+              />
+              {k.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      )}
+      {widths && (
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          spacing={1}
+          value={String(widths.indexOf(width ?? Number.NaN))}
+          onValueChange={(value) => value && onWidth(Number(value))}
+        >
+          {widths.map((w, i) => (
+            <Tooltip key={w}>
+              <TooltipTrigger asChild>
+                <ToggleGroupItem
+                  value={String(i)}
+                  aria-label={`Width ${WIDTH_LABELS[i]}`}
+                >
+                  {WIDTH_LABELS[i]}
+                  <span className="ml-0.5 text-[0.65rem] text-muted-foreground">
+                    {i + 1}
+                  </span>
+                </ToggleGroupItem>
+              </TooltipTrigger>
+              <TooltipContent>
+                Width {WIDTH_LABELS[i]} (key {i + 1})
+              </TooltipContent>
+            </Tooltip>
+          ))}
+        </ToggleGroup>
+      )}
+    </>
+  )
+}
 
 export function RoadsEditor({ initial }: { initial: CampusShapes }) {
   const [shapes, setShapes] = useState(initial)
@@ -156,6 +244,8 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
   const [tool, setTool] = useState<Tool>("select")
   const [areaKind, setAreaKind] = useState<AreaKind>("walk")
   const [pathKind, setPathKind] = useState<PathKind>("walk")
+  // which of the three widths the next road, path or roundabout gets
+  const [widthIdx, setWidthIdx] = useState(1)
   const [draft, setDraft] = useState<Point[]>([])
   const [ringCenter, setRingCenter] = useState<Point | null>(null)
   const [cursor, setCursor] = useState<Point | null>(null)
@@ -163,17 +253,19 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
   const [view, setView] = useState<View>({ x: 180, y: 120, s: 940 })
   const [history, setHistory] = useState<CampusShapes[]>([])
   const [future, setFuture] = useState<CampusShapes[]>([])
-  const [satOpacity, setSatOpacity] = useState(0.85)
+  const [dimSatellite, setDimSatellite] = useState(false)
   const [status, setStatus] = useState("")
   const [saving, setSaving] = useState(false)
   const [pxWidth, setPxWidth] = useState(800)
   const svgRef = useRef<SVGSVGElement>(null)
+  const boxRef = useRef<HTMLDivElement>(null)
   const drag = useRef<Drag | null>(null)
 
   const dirty = JSON.stringify(lines(shapes)) !== saved
   const px = view.s / pxWidth
   const handleR = px * 6
   const drawing = tool !== "select"
+  const satOpacity = dimSatellite ? 0.4 : 0.9
 
   useEffect(() => {
     const el = svgRef.current
@@ -200,22 +292,36 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
     return () => el.removeEventListener("wheel", onWheel)
   })
 
+  // keys for everything, so the pointer can stay on the drawing: V A R O P pick a tool, 1 2 3 the
+  // width, Tab the next kind, Enter finishes, Esc cancels
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (/INPUT|SELECT|TEXTAREA/.test((event.target as HTMLElement).tagName))
         return
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
+      const key = event.key.toLowerCase()
+      if ((event.ctrlKey || event.metaKey) && key === "z") {
         event.preventDefault()
         if (event.shiftKey) redo()
         else undo()
-      } else if (event.key === "Escape") {
+      } else if (event.ctrlKey || event.metaKey || event.altKey) return
+      else if (event.key === "Escape") {
         if (drawing) cancelDraw()
         else setSel(null)
       } else if (event.key === "Enter" && drawing) finishDraw()
       else if (event.key === "Delete" || event.key === "Backspace") {
         event.preventDefault()
-        if (drawing) setDraft((d) => d.slice(0, -1))
+        if (drawing && draft.length) setDraft((d) => d.slice(0, -1))
         else removeSelected()
+      } else if (event.key === "Tab" && barKinds) {
+        event.preventDefault()
+        const ids: string[] = barKinds.map((k) => k.id)
+        applyKind(ids[(ids.indexOf(barKind ?? "") + 1) % ids.length])
+      } else if (key === "s" && canSplit) splitSelected()
+      else if (["1", "2", "3"].includes(event.key) && barWidths)
+        applyWidth(Number(event.key) - 1)
+      else {
+        const tool = TOOLS.find((t) => t.key.toLowerCase() === key)
+        if (tool) pickTool(tool.id)
       }
     }
     window.addEventListener("keydown", onKey)
@@ -305,7 +411,8 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
   function pickTool(next: Tool) {
     setDraft([])
     setRingCenter(null)
-    setSel(null)
+    // going back to Select keeps what was just drawn selected, so it can be adjusted at once
+    if (next !== "select") setSel(null)
     setTool(next)
   }
   function cancelDraw() {
@@ -322,17 +429,18 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
       setDraft([])
       return
     }
-    if (tool === "road") change((d) => d.roads.push({ w: 7, p: pts }))
-    else if (tool === "path")
+    if (tool === "road") {
+      change((d) => d.roads.push({ w: WIDTHS.road[widthIdx], p: pts }))
+      setSel({ layer: "roads", i: shapes.roads.length })
+    } else if (tool === "path") {
       change((d) =>
-        d.paths.push({
-          w: PATH_KINDS.find((k) => k.id === pathKind)?.w ?? 3.5,
-          kind: pathKind,
-          p: pts,
-        }),
+        d.paths.push({ w: WIDTHS.path[widthIdx], kind: pathKind, p: pts }),
       )
-    else if (tool === "area")
+      setSel({ layer: "paths", i: shapes.paths.length })
+    } else if (tool === "area") {
       change((d) => d.zones.push({ kind: areaKind, p: pts }))
+      setSel({ layer: "zones", i: shapes.zones.length })
+    }
     setDraft([])
   }
 
@@ -357,20 +465,102 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
     setSel(null)
   }
 
-  function setField(field: "w" | "r", value: number) {
-    if (!sel || sel.layer === "zones") return
-    const { layer, i } = sel
+  // cuts a road or path in two at the selected point: both halves keep the point, their kind and
+  // their width, and can be moved, restyled or deleted on their own
+  const canSplit = Boolean(
+    sel &&
+      (sel.layer === "roads" || sel.layer === "paths") &&
+      sel.v !== undefined &&
+      sel.v > 0 &&
+      sel.v <
+        ((shapes[sel.layer][sel.i] as { p: Point[] } | undefined)?.p.length ??
+          0) -
+          1,
+  )
+  function splitSelected() {
+    if (!sel || !canSplit || sel.v === undefined) return
+    const { layer, i, v } = sel
     change((d) => {
-      ;(d[layer][i] as unknown as Record<string, number>)[field] = value
+      const list = d[layer as "roads"] as { p: Point[] }[]
+      const whole = list[i]
+      const second = { ...clone(whole), p: whole.p.slice(v) }
+      whole.p = whole.p.slice(0, v + 1)
+      list.splice(i + 1, 0, second)
     })
+    setSel({ layer, i })
   }
-  function setKind(kind: string) {
-    if (!sel) return
-    const { layer, i } = sel
-    if (layer !== "paths" && layer !== "zones") return
-    change((d) => {
-      ;(d[layer][i] as { kind: string }).kind = kind
-    })
+
+  // the kind and width of the selected shape, or what the next one gets when nothing is selected
+  const selected = sel
+    ? (shapes[sel.layer][sel.i] as unknown as
+        | {
+            p?: Point[]
+            w?: number
+            r?: number
+            kind?: string
+          }
+        | undefined)
+    : undefined
+  const barTool: Tool | null = sel
+    ? sel.layer === "zones"
+      ? "area"
+      : sel.layer === "roads"
+        ? "road"
+        : sel.layer === "paths"
+          ? "path"
+          : "ring"
+    : drawing
+      ? tool
+      : null
+  const barKinds =
+    barTool === "area"
+      ? AREA_KINDS
+      : barTool === "path"
+        ? PATH_KINDS
+        : undefined
+  const barKind =
+    barTool === "area"
+      ? sel?.layer === "zones"
+        ? selected?.kind
+        : areaKind
+      : barTool === "path"
+        ? sel?.layer === "paths"
+          ? selected?.kind
+          : pathKind
+        : undefined
+  const barWidths =
+    barTool === "road"
+      ? WIDTHS.road
+      : barTool === "path"
+        ? WIDTHS.path
+        : barTool === "ring"
+          ? WIDTHS.ring
+          : undefined
+  const barWidth = sel
+    ? selected?.w
+    : barWidths
+      ? barWidths[widthIdx]
+      : undefined
+
+  function applyKind(kind: string) {
+    if (sel && (sel.layer === "zones" || sel.layer === "paths")) {
+      const { layer, i } = sel
+      change((d) => {
+        ;(d[layer][i] as { kind: string }).kind = kind
+      })
+    }
+    if (barTool === "area") setAreaKind(kind as AreaKind)
+    if (barTool === "path") setPathKind(kind as PathKind)
+  }
+  function applyWidth(index: number) {
+    if (!barWidths) return
+    setWidthIdx(index)
+    if (sel && sel.layer !== "zones") {
+      const { layer, i } = sel
+      change((d) => {
+        ;(d[layer][i] as unknown as { w: number }).w = barWidths[index]
+      })
+    }
   }
 
   function startMove(event: React.PointerEvent, layer: Layer, i: number) {
@@ -474,12 +664,11 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
             s.roundabouts.push({
               c: ringCenter,
               r: Math.max(5, dist(at, ringCenter)),
-              w: 6,
+              w: WIDTHS.ring[widthIdx],
             }),
           )
           setRingCenter(null)
           setSel({ layer: "roundabouts", i: shapes.roundabouts.length })
-          setTool("select")
         }
       } else {
         const at = snapPoint(toSvg(event), event.altKey)
@@ -521,38 +710,43 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
     }
   }
 
-  const selected = sel
-    ? (shapes[sel.layer][sel.i] as unknown as
-        | { p?: Point[]; w?: number; r?: number; kind?: string }
-        | undefined)
-    : undefined
   const draftPoints =
     cursor && drawing && tool !== "ring" ? [...draft, cursor] : draft
 
-  const hint = drawing
-    ? (TOOLS.find((t) => t.id === tool)?.hint ?? "")
-    : sel
-      ? "Drag it to move. Drag a square to move a point, a small circle adds one. Delete removes"
-      : "Click anything to edit it. Drag empty space to move around, scroll to zoom"
+  // where the little toolbar for the selected shape goes: right above it, so the pointer barely
+  // has to move. Worked out from where the shape is on screen
+  const anchor = (() => {
+    const svg = svgRef.current
+    const box = boxRef.current
+    const ctm = svg?.getScreenCTM()
+    if (!sel || !selected || !svg || !box || !ctm) return null
+    let at: Point
+    if (sel.layer === "roundabouts" && selected.r !== undefined) {
+      const ring = shapes.roundabouts[sel.i]
+      at = [ring.c[0], ring.c[1] - ring.r - ring.w]
+    } else if (selected.p) {
+      // a selected point gets the toolbar beside it, otherwise it sits above the whole shape
+      const top =
+        sel.v !== undefined && selected.p[sel.v]
+          ? selected.p[sel.v]
+          : selected.p.reduce((a, b) => (b[1] < a[1] ? b : a))
+      at = [top[0], top[1]]
+    } else return null
+    const rect = box.getBoundingClientRect()
+    const x = ctm.a * at[0] + ctm.c * at[1] + ctm.e - rect.left
+    const y = ctm.b * at[0] + ctm.d * at[1] + ctm.f - rect.top
+    return {
+      x: Math.min(rect.width - 150, Math.max(150, x)),
+      y: Math.min(rect.height - 60, Math.max(70, y - 14)),
+    }
+  })()
 
-  // what the bar at the top offers right now: only what applies to what is being drawn or selected
-  const barFor: Tool | Layer | null = drawing
-    ? tool
+  const activeTool = TOOLS.find((t) => t.id === tool)
+  const hint = drawing
+    ? (activeTool?.hint ?? "")
     : sel
-      ? sel.layer === "zones"
-        ? "area"
-        : sel.layer === "roads"
-          ? "road"
-          : sel.layer === "paths"
-            ? "path"
-            : "ring"
-      : null
-  const activeAreaKind = (
-    sel?.layer === "zones" ? selected?.kind : areaKind
-  ) as AreaKind
-  const activePathKind = (
-    sel?.layer === "paths" ? selected?.kind : pathKind
-  ) as PathKind
+      ? "Drag it to move. Drag a square to move a point, a small circle adds one"
+      : "Click anything to edit it. Drag empty space to move around, scroll to zoom"
 
   function renderEditable(layer: Layer, i: number) {
     const sel1 = sel?.layer === layer && sel.i === i
@@ -755,8 +949,18 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
     )
   }
 
+  const optionProps = {
+    kinds: barKinds,
+    kind: barKind,
+    onKind: applyKind,
+    widths: barWidths,
+    width: barWidth,
+    onWidth: applyWidth,
+  }
+  const hasOptions = Boolean(barKinds || barWidths)
+
   return (
-    <div className="relative h-full min-h-0 p-2">
+    <div ref={boxRef} className="relative h-full min-h-0 p-2">
       <svg
         ref={svgRef}
         viewBox={`${view.x} ${view.y} ${view.s} ${view.s}`}
@@ -771,12 +975,17 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
+        // right click finishes what is being drawn, like Enter, without moving to a key
+        onContextMenu={(e) => {
+          e.preventDefault()
+          if (drawing && tool !== "ring") finishDraw()
+        }}
         onDoubleClick={() => {
           if (drawing && tool !== "ring") finishDraw()
           else if (sel?.v !== undefined) removeSelected()
         }}
       >
-        <title>Paths and areas</title>
+        <title>Roads, paths and areas</title>
         <rect
           x={-2000}
           y={-2000}
@@ -793,7 +1002,7 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
           pointerEvents="none"
         />
 
-        {/* the buildings, to line things up with. Edited in the Buildings view */}
+        {/* the buildings, to line things up with. Edited in the Buildings tab */}
         {shapes.buildings.map((b, i) => (
           <path
             key={`b-${i}`}
@@ -857,167 +1066,144 @@ export function RoadsEditor({ initial }: { initial: CampusShapes }) {
         )}
       </svg>
 
-      {/* the tools, one column on the left */}
-      <div className="absolute top-5 left-5 flex flex-col gap-1 rounded-2xl corner-squircle bg-background/90 p-1.5 shadow-md ring-1 ring-foreground/10 backdrop-blur">
-        {TOOLS.map(({ id, label, icon }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => pickTool(id)}
-            title={label}
-            className={`flex w-16 flex-col items-center gap-0.5 rounded-xl corner-squircle py-2 text-[0.7rem] font-medium transition-colors ${
-              tool === id
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-foreground/10"
-            }`}
+      {/* the tools in a column, and what the picked tool offers right beside it */}
+      <div className="absolute top-5 left-5 flex items-start gap-2">
+        <div className="rounded-xl bg-background/90 p-1 shadow-md ring-1 ring-foreground/10 backdrop-blur">
+          <ToggleGroup
+            type="single"
+            orientation="vertical"
+            spacing={1}
+            value={tool}
+            onValueChange={(value) => value && pickTool(value as Tool)}
           >
-            <Icon icon={icon} className="size-5" />
-            {label}
-          </button>
-        ))}
+            {TOOLS.map(({ id, label, key, icon }) => (
+              <Tooltip key={id}>
+                <TooltipTrigger asChild>
+                  <ToggleGroupItem
+                    value={id}
+                    aria-label={label}
+                    className="h-auto w-16 flex-col gap-0.5 py-2 text-[0.7rem] data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                  >
+                    <Icon icon={icon} className="size-5" />
+                    {label}
+                  </ToggleGroupItem>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <Hint {...{ label }} keys={key} />
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </ToggleGroup>
+        </div>
+        {drawing && hasOptions && !anchor && (
+          <div className="flex flex-col gap-1.5 rounded-xl bg-background/90 p-1.5 shadow-md ring-1 ring-foreground/10 backdrop-blur">
+            <Options {...optionProps} />
+          </div>
+        )}
       </div>
 
-      {/* what the current tool or selection offers, and nothing else */}
-      {barFor && (
-        <div className="absolute top-5 left-28 flex flex-wrap items-center gap-1 rounded-2xl corner-squircle bg-background/90 p-1.5 text-sm shadow-md ring-1 ring-foreground/10 backdrop-blur">
-          {barFor === "area" &&
-            AREA_KINDS.map((k) => (
-              <Chip
-                key={k.id}
-                color={k.color}
-                active={activeAreaKind === k.id}
-                onClick={() =>
-                  sel?.layer === "zones" ? setKind(k.id) : setAreaKind(k.id)
-                }
-              >
-                {k.label}
-              </Chip>
-            ))}
-          {barFor === "path" &&
-            PATH_KINDS.map((k) => (
-              <Chip
-                key={k.id}
-                color={k.color}
-                active={activePathKind === k.id}
-                onClick={() =>
-                  sel?.layer === "paths" ? setKind(k.id) : setPathKind(k.id)
-                }
-              >
-                {k.label}
-              </Chip>
-            ))}
-          {(barFor === "road" || barFor === "path") &&
-            sel &&
-            selected &&
-            sel.layer !== "zones" && (
-              <label className="flex items-center gap-2 px-2">
-                Width
-                <input
-                  type="range"
-                  min={1.5}
-                  max={16}
-                  step={0.5}
-                  value={selected.w ?? 5}
-                  onChange={(e) => setField("w", Number(e.target.value))}
-                />
-              </label>
-            )}
-          {barFor === "ring" && sel?.layer === "roundabouts" && selected && (
-            <>
-              <label className="flex items-center gap-2 px-2">
-                Size
-                <input
-                  type="range"
-                  min={4}
-                  max={60}
-                  step={0.5}
-                  value={selected.r ?? 10}
-                  onChange={(e) => setField("r", Number(e.target.value))}
-                />
-              </label>
-              <label className="flex items-center gap-2 px-2">
-                Road
-                <input
-                  type="range"
-                  min={2}
-                  max={14}
-                  step={0.5}
-                  value={selected.w ?? 6}
-                  onChange={(e) => setField("w", Number(e.target.value))}
-                />
-              </label>
-            </>
+      {/* the selected shape's own toolbar, above it */}
+      {anchor && (
+        <div
+          className="absolute z-10 flex -translate-x-1/2 -translate-y-full items-center gap-1.5 rounded-xl bg-background/95 p-1.5 shadow-lg ring-1 ring-foreground/10 backdrop-blur"
+          style={{ left: anchor.x, top: anchor.y }}
+        >
+          {hasOptions && <Options {...optionProps} />}
+          {hasOptions && <Separator orientation="vertical" className="h-5" />}
+          {canSplit && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={splitSelected}
+                >
+                  <Icon icon={Scissor01Icon} />
+                  Split
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <Hint label="Cut here into two" keys="S" />
+              </TooltipContent>
+            </Tooltip>
           )}
-          {(barFor === "road" || barFor === "ring") && !sel && (
-            <span className="px-2 text-muted-foreground">
-              Snaps to roads, paths and roundabouts it touches
-            </span>
-          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Delete"
+                onClick={removeSelected}
+                className="text-destructive hover:text-destructive"
+              >
+                <Icon icon={Delete02Icon} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <Hint label="Delete" keys="Del" />
+            </TooltipContent>
+          </Tooltip>
         </div>
       )}
 
       {/* the actions, top right */}
       <div className="absolute top-5 right-5 flex items-center gap-1.5">
         {status && (
-          <span className="rounded-lg bg-background/90 px-2 py-1 text-muted-foreground text-xs">
+          <span className="rounded-md bg-background/90 px-2 py-1 text-muted-foreground text-xs">
             {status}
           </span>
         )}
         <IconAction
           icon={Undo02Icon}
           label="Undo"
+          keys="Ctrl Z"
           disabled={!history.length}
           onClick={undo}
         />
         <IconAction
           icon={Redo02Icon}
           label="Redo"
+          keys="Ctrl Shift Z"
           disabled={!future.length}
           onClick={redo}
         />
-        <IconAction
-          icon={Delete02Icon}
-          label="Delete"
-          disabled={!sel}
-          onClick={removeSelected}
-        />
-        <label
-          className="flex h-9 items-center rounded-xl corner-squircle bg-background/90 px-2.5 shadow-sm ring-1 ring-foreground/10 backdrop-blur"
-          title="Satellite picture"
-        >
-          <input
-            type="range"
-            min={0.2}
-            max={1}
-            step={0.05}
-            value={satOpacity}
-            onChange={(e) => setSatOpacity(Number(e.target.value))}
-            className="w-20"
-          />
-        </label>
-        <button
-          type="button"
-          onClick={save}
-          disabled={!dirty || saving}
-          className="inline-flex h-9 items-center gap-1.5 rounded-xl corner-squircle bg-primary px-3.5 font-semibold text-primary-foreground text-sm shadow-sm disabled:opacity-40"
-        >
-          <Icon icon={FloppyDiskIcon} className="size-4" />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Toggle
+              variant="outline"
+              size="default"
+              pressed={dimSatellite}
+              onPressedChange={setDimSatellite}
+              aria-label="Dim the satellite picture"
+              className="bg-background/90 backdrop-blur"
+            >
+              <Icon icon={Image01Icon} />
+            </Toggle>
+          </TooltipTrigger>
+          <TooltipContent>Dim the satellite picture</TooltipContent>
+        </Tooltip>
+        <Button type="button" onClick={save} disabled={!dirty || saving}>
+          <Icon icon={FloppyDiskIcon} />
           {saving ? "Saving..." : "Save"}
-        </button>
+        </Button>
       </div>
 
-      <p className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 rounded-xl bg-black/70 px-3 py-1.5 text-white text-xs">
+      <p className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 rounded-lg bg-black/70 px-3 py-1.5 text-white text-xs">
         {hint}
       </p>
       {drawing && (
-        <button
+        <Button
           type="button"
+          variant="secondary"
+          size="icon"
           onClick={cancelDraw}
-          className="absolute bottom-5 left-5 grid size-9 place-items-center rounded-xl bg-black/70 text-white"
-          aria-label="Cancel drawing"
+          aria-label="Stop drawing"
+          className="absolute bottom-5 left-5"
         >
-          <Icon icon={Cancel01Icon} className="size-4" />
-        </button>
+          <Icon icon={Cancel01Icon} />
+        </Button>
       )}
     </div>
   )

@@ -11,6 +11,8 @@ import {
 import { useEffect, useRef, useState } from "react"
 import { type HugeIcon, Icon } from "@/components/Icon"
 import { latLongToPosition } from "@/map/geo"
+import { Button } from "@/shadcn/ui/button"
+import { Input } from "@/shadcn/ui/input"
 
 // one fix: [secondsSinceStart, lat, lng, accuracyM, altitudeM | null, altitudeAccuracyM | null]
 type Fix = [number, number, number, number, number | null, number | null]
@@ -49,17 +51,16 @@ function Btn({
   primary?: boolean
 }) {
   return (
-    <button
+    <Button
       type="button"
+      size="lg"
+      variant={primary ? "default" : "secondary"}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center justify-center gap-2 rounded-2xl corner-squircle px-4 py-3 font-semibold text-sm disabled:opacity-40 ${
-        primary ? "bg-primary text-primary-foreground" : "bg-foreground/10"
-      }`}
     >
-      <Icon icon={icon} className="size-5" />
+      <Icon icon={icon} />
       {label}
-    </button>
+    </Button>
   )
 }
 
@@ -264,11 +265,11 @@ export function WalkLogger() {
       )}
 
       <div className="flex gap-2">
-        <input
+        <Input
           value={markName}
           onChange={(e) => setMarkName(e.target.value)}
           placeholder="Name this spot (corner of B8B...)"
-          className="min-w-0 flex-1 rounded-2xl corner-squircle border bg-background px-3 py-2 text-sm"
+          className="min-w-0 flex-1"
         />
         <Btn
           icon={MapPinIcon}
